@@ -1,3 +1,6 @@
+# stupid macos stuff
+*.DS_Store
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -160,7 +163,7 @@ cython_debug/
 #.idea/
 
 # VS Code
-.vscode/*
+.vscode
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
