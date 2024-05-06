@@ -1,5 +1,7 @@
 '''
 adapted from scripts by Gilles de Hollander and Ella Casimiro.
+usage:
+    python convert_to_bids.py -s 1 --bids_folder /Users/hugofluhr/phd_local/data/LearningHabits/bids_formatted/ds-learninghabits
 '''
 import re
 import os
@@ -7,9 +9,14 @@ import os.path as op
 import shutil
 import argparse
 import glob
-from nilearn import image
-import numpy as np
 import json
+
+# Lookup table for runs
+runs_lookup = {
+    1: 'learning',
+    2: 'learning',
+    3: 'test'
+}
 
 def main(subject, bids_folder='/data'):
     # set session to 1 as we only have a single session
@@ -20,18 +27,17 @@ def main(subject, bids_folder='/data'):
         subject = f'{subject:02d}'
     except ValueError:
         pass
-    
-    # when it works: 
 
     # dev folder
     sourcedata_folder = '/Users/hugofluhr/phd_local/data/LearningHabits/scanner_raw'
+
 
     ## fix this to record subject ID at this point
     sourcedata_root = [os.path.join(root, dir) for root, dirs, files in os.walk(sourcedata_folder) for dir in dirs if dir == f'SNS_MRI_LH_sub-{subject:02}']
     try :
         sourcedata_root = sourcedata_root[0]
     except IndexError:
-        print(f"folder not found for {subject}")
+        print(f"folder not found for subject {subject}")
         return
     #sourcedata_root = op.join(bids_folder, 'sourcedata', 'mri', f'sub-{subject}', f'ses-{session}')
 
@@ -53,7 +59,7 @@ def main(subject, bids_folder='/data'):
 
     # *** functional data ***
     # loading the json template for bold run
-    with open(op.abspath('./utils/bold_training_template.json'), 'r') as f:
+    with open(op.abspath('./utils/bold_template.json'), 'r') as f:
         json_template = json.load(f)
 
     # Finding the bold runs
@@ -62,12 +68,9 @@ def main(subject, bids_folder='/data'):
     funcs = glob.glob(op.join(sourcedata_root, '*run*.nii'))
     runs = [int(reg.match(fn).group('run')) for fn in funcs]
     for run, fn in zip(runs, funcs):
-        if run == 3: # test phase
-            target_file_name = f'sub-{subject}_ses-{session}_task-test_run-{run}_bold.nii'
-            json_template['task'] = 'test'
-        else: # learning blocks 1 and 2
-            target_file_name = f'sub-{subject}_ses-{session}_task-learning_run-{run}_bold.nii'
-            json_template['task'] = 'learning'
+        task = runs_lookup[run]
+        target_file_name = f'sub-{subject}_ses-{session}_task-{task}_run-{run}_bold.nii'
+        json_template['task'] = task
         shutil.copy(fn, op.join(func_dir, target_file_name))
 
         json_sidecar = json_template
@@ -78,10 +81,8 @@ def main(subject, bids_folder='/data'):
     physiologs = glob.glob(op.join(sourcedata_root, '*run*scanphyslog*.log'))
     runs = [int(reg.match(fn).group(1)) for fn in physiologs]
     for run, fn in zip(runs, physiologs):
-        if run == 3: # test phase
-            target_file_name = f'sub-{subject}_ses-{session}_task-test_run-{run}_physio.log'
-        else: # learning blocks 1 and 2
-            target_file_name = f'sub-{subject}_ses-{session}_task-learning_run-{run}_physio.log'
+        task = runs_lookup[run]
+        target_file_name = f'sub-{subject}_ses-{session}_task-{task}_run-{run}_physio.log'
         shutil.copy(fn, op.join(func_dir, target_file_name))
 
     # # # *** FIELDMAPS ***
@@ -96,57 +97,47 @@ def main(subject, bids_folder='/data'):
 
     physiologs = glob.glob(op.join(sourcedata_root, '*fieldmap*scanphyslog*.log'))
 
-
     runs = [i+1 for i in range(len(b0_fieldmaps_mag1))]
 
+    # *** physio logfiles ***
     for run, fn in zip(runs, physiologs):
-        shutil.copy(fn, op.join(fmap_dir, f'sub-{subject:02d}_run-{run}_physio.log'))
+        task = runs_lookup[run]
+        target_file_name = f'sub-{subject}_ses-{session}_task-{task}_run-{run}_physio.log'
+        shutil.copy(fn, op.join(fmap_dir, target_file_name))
 
+    # *** fieldmaps ***
     for run, fn in zip(runs, b0_fieldmaps_mag1):
-        shutil.copy(fn, op.join(fmap_dir, f'sub-{subject:02d}_run-{run}_magnitude1.nii'))
+        shutil.copy(fn, op.join(fmap_dir, f'sub-{subject}_ses-{session}_run-{run}_magnitude1.nii'))
         json_sidecar = dict()
-        if run == 1:
-            json_sidecar[
-                'IntendedFor'] = [f'func/sub-{subject:02d}_task-learn_run-1_bold.nii']
-        elif run == 2:
-            json_sidecar[
-                'IntendedFor'] = [f'func/sub-{subject:02d}_task-learn_run-2_bold.nii',
-                                  f'func/sub-{subject:02d}_task-learn_run-3_bold.nii']
-        elif run == 3:
-            json_sidecar[
-                'IntendedFor'] = [f'func/sub-{subject:02d}_task-learn_run-4_bold.nii',
-                                  f'func/sub-{subject:02d}_task-learn_run-5_bold.nii']
-        elif run == 4:
-            json_sidecar[
-                'IntendedFor'] = [f'func/sub-{subject:02d}_task-learn_run-6_bold.nii']
-        else:
-            raise Exception("Run not between 1 and 4")
 
-
-        with open(op.join(fmap_dir, f'sub-{subject:02d}_run-{run}_magnitude1.json'), 'w') as f:
+        task = runs_lookup[run]
+        json_sidecar[
+                'IntendedFor'] = [f'bids::sub-{subject}/ses-{session}/func/sub-{subject}_ses-{session}_task-{task}_run-{run}_bold.nii']
+        
+        with open(op.join(fmap_dir, f'sub-{subject}_ses-{session}_run-{run}_magnitude1.json'), 'w') as f:
             json_sidecar['EchoTime'] = 0.0046
             json.dump(json_sidecar, f)
 
-        with open(op.join(fmap_dir, f'sub-{subject:02d}_run-{run}_magnitude2.json'), 'w') as f:
-            json_sidecar['EchoTime'] = 0.006940000000000001
+        with open(op.join(fmap_dir, f'sub-{subject}_ses-{session}_run-{run}_magnitude2.json'), 'w') as f:
+            json_sidecar['EchoTime'] = 0.00694
             json.dump(json_sidecar, f)
 
-        with open(op.join(fmap_dir, f'sub-{subject:02d}_run-{run}_phase1.json'), 'w') as f:
+        with open(op.join(fmap_dir, f'sub-{subject}_ses-{session}_run-{run}_phase1.json'), 'w') as f:
             json_sidecar['EchoTime'] = 0.0046
             json.dump(json_sidecar, f)
 
-        with open(op.join(fmap_dir, f'sub-{subject:02d}_run-{run}_phase2.json'), 'w') as f:
-            json_sidecar['EchoTime'] = 0.006940000000000001
+        with open(op.join(fmap_dir, f'sub-{subject}_ses-{session}_run-{run}_phase2.json'), 'w') as f:
+            json_sidecar['EchoTime'] = 0.00694
             json.dump(json_sidecar, f)
 
     for run, fn in zip(runs, b0_fieldmaps_mag2):
-        shutil.copy(fn, op.join(fmap_dir, f'sub-{subject:02d}_run-{run}_magnitude2.nii'))
+        shutil.copy(fn, op.join(fmap_dir, f'sub-{subject}_ses-{session}_run-{run}_magnitude2.nii'))
 
     for run, fn in zip(runs, b0_fieldmaps_phase1):
-        shutil.copy(fn, op.join(fmap_dir, f'sub-{subject:02d}_run-{run}_phase1.nii'))
+        shutil.copy(fn, op.join(fmap_dir, f'sub-{subject}_ses-{session}_run-{run}_phase1.nii'))
 
     for run, fn in zip(runs, b0_fieldmaps_phase2):
-        shutil.copy(fn, op.join(fmap_dir, f'sub-{subject:02d}_run-{run}_phase2.nii'))
+        shutil.copy(fn, op.join(fmap_dir, f'sub-{subject}_ses-{session}_run-{run}_phase2.nii'))
 
 
 if __name__ == '__main__':
