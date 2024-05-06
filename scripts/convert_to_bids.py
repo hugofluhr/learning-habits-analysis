@@ -18,7 +18,7 @@ runs_lookup = {
     3: 'test'
 }
 
-def main(subject, bids_folder='/data'):
+def main(subject, source_folder, bids_folder='/data'):
     # set session to 1 as we only have a single session
     session = 1
 
@@ -28,12 +28,8 @@ def main(subject, bids_folder='/data'):
     except ValueError:
         pass
 
-    # dev folder
-    sourcedata_folder = '/Users/hugofluhr/phd_local/data/LearningHabits/scanner_raw'
-
-
     ## fix this to record subject ID at this point
-    sourcedata_root = [os.path.join(root, dir) for root, dirs, files in os.walk(sourcedata_folder) for dir in dirs if dir == f'SNS_MRI_LH_sub-{subject:02}']
+    sourcedata_root = [os.path.join(root, dir) for root, dirs, files in os.walk(source_folder) for dir in dirs if dir == f'SNS_MRI_LH_sub-{subject:02}']
     try :
         sourcedata_root = sourcedata_root[0]
     except IndexError:
@@ -143,7 +139,8 @@ def main(subject, bids_folder='/data'):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-s','--subject', default=1, type=str)
+    parser.add_argument('--source_folder', default='/Users/hugofluhr/phd_local/data/LearningHabits/scanner_raw')
     parser.add_argument('--bids_folder', default='/Users/hugofluhr/phd_local/data/LearningHabits/bids_formatted/ds-learninghabits')
     args = parser.parse_args()
 
-    main(args.subject, bids_folder=args.bids_folder)
+    main(args.subject, source_folder = args.source_folder,bids_folder=args.bids_folder)
