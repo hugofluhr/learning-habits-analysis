@@ -47,6 +47,13 @@
         2.21715,
         2.27549],
     "NumberOfVolumesDiscardedByScanner": 5,
+    "SliceThickness": 3,
+	"FlipAngle": 90,
+    "EffectiveEchoSpacing": 0.0005940904,
+	"EchoTime": 0.03,
+	"SoftwareVersion": "V4.2\\PAR",
+	"MRAcquisitionType": "MS",
+	"SequenceName": "FEEPI",
     "TaskName": "Reward Pairs",
     "task": "task"
 }
