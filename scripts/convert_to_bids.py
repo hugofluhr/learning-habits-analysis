@@ -1,7 +1,7 @@
 '''
 adapted from scripts by Gilles de Hollander and Ella Casimiro.
 usage:
-    python convert_to_bids.py -s 1 --bids_folder /Users/hugofluhr/phd_local/data/LearningHabits/bids_formatted/ds-learninghabits
+    python scripts/convert_to_bids.py --source_folder ~/data/scanner_raw/ --bids_folder ~/data/bids/ds-learninghabits/ -s 1
 '''
 import re
 import os
