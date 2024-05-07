@@ -15,6 +15,9 @@ file_patterns = {'rewardpairs': [
                 'gonogo':      [r'results_{}.mat'],
                 'eyetracking': [r'{}.edf']
             }
+# mr_file_patters = {'T1': [r'{}_T1.nii.gz'],
+                   
+#                     }
 
 def search_patterns(subject_id, directory, patterns):
     '''
@@ -113,14 +116,14 @@ if __name__ == '__main__':
         assert isinstance(sub, str) and len(sub) == 6, f"Subject ID {sub} is not a string of length 6."
 
         # Checking data for each subject
-        print(f"Checking data for subject {sub}")
+        # print(f"Checking data for subject {sub}")
         incomplete_data = check_data(sub, args.exp_data_dir, file_patterns)
         if not incomplete_data:
             complete_participants.append(sub)
         else:
             incomplete_data_dict[sub] = incomplete_data
 
-    print("\nComplete data participants:")
+    print(f"\nComplete data participants: {len(complete_participants)}")
     print(complete_participants)
 
     print("\nMissing data:")
