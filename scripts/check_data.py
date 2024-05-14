@@ -102,16 +102,26 @@ if __name__ == '__main__':
                         default='/Volumes/g_econ_department$/projects/2024/nebe_fluhr_timokhov_tobler_learning_habits/data/exp_data')
     parser.add_argument('--participants_info_path', type=str, help='Path to the participants info file',
                          default='/Volumes/g_econ_department$/projects/2024/nebe_fluhr_timokhov_tobler_learning_habits/data/documentation/Participant_Documentation.xlsx')
+    parser.add_argument('-s', '--subjects', type=str, help='Subject ID(s) to check data for. Use "all" to check all subjects.', default='all')
     args = parser.parse_args()
 
     subj_info = pd.read_excel(args.participants_info_path)
     acquired = subj_info[subj_info["Date MRI"] <= datetime.date.today().strftime("%Y-%m-%d")]
     acquired_subj = acquired['ID'].str.lower().values
 
+    if args.subjects == 'all':
+        subjects2check = [sub for sub in acquired_subj if isinstance(sub, str) and len(sub) == 6]
+    elif ',' in args.subjects:
+        subjects2check = args.subjects.split(',')
+    else:   
+        subjects2check = [args.subjects]
+
+    print(f"Checking data for the following subjects: {subjects2check}")
+
     complete_participants = []
     incomplete_data_dict = {}
 
-    for sub in acquired_subj:
+    for sub in subjects2check:
         # Check that the subject ID is a string of length 6
         assert isinstance(sub, str) and len(sub) == 6, f"Subject ID {sub} is not a string of length 6."
 
@@ -121,10 +131,10 @@ if __name__ == '__main__':
         if not incomplete_data:
             complete_participants.append(sub)
         else:
-            incomplete_data_dict[sub] = incomplete_data
+            incomplete_data_dict.update(incomplete_data)
 
-    print(f"\nComplete data participants: {len(complete_participants)}")
+    print(f"\nComplete data: {len(complete_participants)} have complete data.")
     print(complete_participants)
 
-    print("\nMissing data:")
+    print(f"\nMissing data: {len(incomplete_data_dict)} participants have incomplete data.")
     pprint.pprint(incomplete_data_dict, indent=4)
