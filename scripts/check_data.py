@@ -122,8 +122,8 @@ if __name__ == '__main__':
     incomplete_data_dict = {}
 
     for sub in subjects2check:
-        # Check that the subject ID is a string of length 6
-        assert isinstance(sub, str) and len(sub) == 6, f"Subject ID {sub} is not a string of length 6."
+        # Check that the subject ID is in the format of 1 letter followed by 2 digits followed by 1 letter followed by 2 digits
+        assert re.match(r'^[a-zA-Z]\d{2}[a-zA-Z]\d[a-zA-Z]$', sub), f"Subject ID {sub} is not in the correct format."
 
         # Checking data for each subject
         # print(f"Checking data for subject {sub}")
@@ -133,7 +133,7 @@ if __name__ == '__main__':
         else:
             incomplete_data_dict.update(incomplete_data)
 
-    print(f"\nComplete data: {len(complete_participants)} have complete data.")
+    print(f"\nComplete data: {len(complete_participants)} participants have complete data.")
     print(complete_participants)
 
     print(f"\nMissing data: {len(incomplete_data_dict)} participants have incomplete data.")
