@@ -22,6 +22,8 @@ def main(subject, source_folder, bids_folder='/data'):
     # set session to 1 as we only have a single session
     session = 1
 
+    file_names_lookup = {}
+
     try:
         subject = int(subject)
         subject = f'{subject:02d}'
@@ -47,6 +49,7 @@ def main(subject, source_folder, bids_folder='/data'):
     # there should be only one T1w
     for run0, t in enumerate(t1w):
         shutil.copy(t, op.join(anat_dir, f'sub-{subject}_ses-{session}_run-{run0+1}_T1w.nii'))
+        file_names_lookup.update({t: op.join(anat_dir, f'sub-{subject}_ses-{session}_run-{run0+1}_T1w.nii')})
 
     # # # *** FUNCTIONAL DATA ***
     func_dir = op.join(bids_folder, f'sub-{subject}', f'ses-{session}', 'func')
@@ -68,6 +71,7 @@ def main(subject, source_folder, bids_folder='/data'):
         target_file_name = f'sub-{subject}_ses-{session}_task-{task}_run-{run}_bold.nii'
         json_template['task'] = task
         shutil.copy(fn, op.join(func_dir, target_file_name))
+        file_names_lookup.update({fn: op.join(func_dir, target_file_name)})
 
         json_sidecar = json_template
         with open(op.join(func_dir, target_file_name.replace('.nii','.json')), 'w') as f:
@@ -80,6 +84,7 @@ def main(subject, source_folder, bids_folder='/data'):
         task = runs_lookup[run]
         target_file_name = f'sub-{subject}_ses-{session}_task-{task}_run-{run}_physio.log'
         shutil.copy(fn, op.join(func_dir, target_file_name))
+        file_names_lookup.update({fn: op.join(func_dir, target_file_name)})
 
     # # # *** FIELDMAPS ***
     fmap_dir = op.join(bids_folder, f'sub-{subject}', f'ses-{session}', 'fmap')
@@ -100,10 +105,12 @@ def main(subject, source_folder, bids_folder='/data'):
         task = runs_lookup[run]
         target_file_name = f'sub-{subject}_ses-{session}_task-{task}_run-{run}_physio.log'
         shutil.copy(fn, op.join(fmap_dir, target_file_name))
+        file_names_lookup.update({fn: op.join(fmap_dir, target_file_name)})
 
     # *** fieldmaps ***
     for run, fn in zip(runs, b0_fieldmaps_mag1):
         shutil.copy(fn, op.join(fmap_dir, f'sub-{subject}_ses-{session}_run-{run}_magnitude1.nii'))
+        file_names_lookup.update({fn: op.join(fmap_dir, f'sub-{subject}_ses-{session}_run-{run}_magnitude1.nii')})
         json_sidecar = dict()
 
         task = runs_lookup[run]
@@ -128,13 +135,18 @@ def main(subject, source_folder, bids_folder='/data'):
 
     for run, fn in zip(runs, b0_fieldmaps_mag2):
         shutil.copy(fn, op.join(fmap_dir, f'sub-{subject}_ses-{session}_run-{run}_magnitude2.nii'))
+        file_names_lookup.update({fn: op.join(fmap_dir, f'sub-{subject}_ses-{session}_run-{run}_magnitude2.nii')})
 
     for run, fn in zip(runs, b0_fieldmaps_phase1):
         shutil.copy(fn, op.join(fmap_dir, f'sub-{subject}_ses-{session}_run-{run}_phase1.nii'))
+        file_names_lookup.update({fn: op.join(fmap_dir, f'sub-{subject}_ses-{session}_run-{run}_phase1.nii')})
 
     for run, fn in zip(runs, b0_fieldmaps_phase2):
         shutil.copy(fn, op.join(fmap_dir, f'sub-{subject}_ses-{session}_run-{run}_phase2.nii'))
-
+        file_names_lookup.update({fn: op.join(fmap_dir, f'sub-{subject}_ses-{session}_run-{run}_phase2.nii')})
+    
+    with open(op.join(bids_folder, f'sub-{subject}', f'ses-{session}', 'file_names_lookup.json'), 'w') as f:
+        json.dump(file_names_lookup, f)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
