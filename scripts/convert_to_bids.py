@@ -146,7 +146,7 @@ def main(subject, source_folder, bids_folder='/data'):
         file_names_lookup.update({fn: op.join(fmap_dir, f'sub-{subject}_ses-{session}_run-{run}_phase2.nii')})
     
     with open(op.join(bids_folder, f'sub-{subject}', f'ses-{session}', 'file_names_lookup.json'), 'w') as f:
-        json.dump(file_names_lookup, f)
+        json.dump(file_names_lookup, f, separators=('\n','\n'))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
