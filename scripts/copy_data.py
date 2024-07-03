@@ -2,11 +2,27 @@ import os
 import shutil
 import argparse
 import re
+import csv
 
 def copy_directories(source_dir, target_dir, prefix, dry_run=0):
-    copied_subjects = []
-    
     regex_pattern = re.compile(f'^{prefix}(.{{6}})_')
+    
+    copied_subjects = []
+    # first check existing folders in target_dir
+    for dirname in os.listdir(target_dir):
+        match = regex_pattern.match(dirname)
+        if match:
+            copied_subjects.append(match.group(1))
+    # then check if there already is a subject lookup table
+    lut_path = os.path.join(target_dir, 'subjects_lookup_table.csv')
+    if os.path.isfile(lut_path):
+        with open(lut_path, mode='r', newline='') as file:
+            reader = csv.reader(file)
+            for row in reader:
+                match = regex_pattern.match(row[0])
+                if match:
+                    copied_subjects.append(match.group(1))
+
     for root, dirs, _ in os.walk(source_dir):
         for dir_name in dirs:
             match = regex_pattern.match(dir_name)
