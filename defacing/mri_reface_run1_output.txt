@@ -1,0 +1,33 @@
+(base) ubuntu@hfluhr-gpu:~/data/mri_reface_docker$ sudo bash run_mri_reface_docker.sh /mnt/data/bids_dataset/sub-01/ses-1/anat/sub-01_ses-1_run-1_T1w.nii /mnt/data/outputs/ --imType T1
+-------------------------------------------------------
+Running mri_reface, version 0.3.3
+By: Christopher G. Schwarz schwarz.christopher@mayo.edu
+Temp directory: /tmp/tp5c1569a9_6a5c_4d7c_83ea_3c5f0607974b
+Target file: /tmp/tmp.wBP1yGE4SN/inputs/sub-01_ses-1_run-1_T1w.nii
+Output directory: /tmp/tmp.wBP1yGE4SN/outputs
+Target image type: T1
+Template: /home/reface-user/.mcrCache9.12/mri_re0/mri_reface/images/MCALT_FaceTemplate_T1.nii
+Face atlas: /home/reface-user/.mcrCache9.12/mri_re0/mri_reface/images/MCALT_FaceMask.nii
+
+Calculating affine parameters to template. This will take some time.
+Using face-optimized affine.
+Estimating warp to template using ANTS. This will take a while.
+Transforming images to input space using antsApplyTransforms
+Finding face regions using the atlas
+Matching intensities of warped-template to input (DBC)
+Adding Rician noise to template to match noise levels in input image, with multiplier 1
+Estimated noise PSF: 0
+Noise in target image norm region: 28.150515 (2.021939%)
+Noise in template image norm region: 13.274108 (0.953426%)
+Noise to add: 24.824373 (1.783036%)
+Noise in target image air: 0.000060 (0.004271%)
+Noise in template image air: 0.280470 (19.859571%)
+Noise to add in air: 0.000000 (1757.768433%))
+Replacing face
+Replacing air
+Saving outputs
+Saved: sub-01_ses-1_run-1_T1w_deFaced.nii
+Generating renders for QC use
+Saved: sub-01_ses-1_run-1_T1w.png
+Saved: sub-01_ses-1_run-1_T1w_deFaced.png
+ADIR_ReFace finished in: 14.1814 minutes
