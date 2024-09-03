@@ -76,7 +76,7 @@ def check_data(subject_id, exp_data_dir, file_patterns):
     if not all(len(files) == 1 for files in reward_pairs_files.values()):
         if subject_id not in incomplete_data:
             incomplete_data[subject_id] = {}
-        incomplete_data[subject_id]['rewardpairs'] = [pattern for pattern, files in reward_pairs_files.items() if len(files) != 1]
+        incomplete_data[subject_id]['rewardpairs'] = [pattern.format(subject_id) for pattern, files in reward_pairs_files.items() if len(files) != 1]
 
     # GoNoGo data
     gonogo_dir = os.path.join(exp_data_dir, 'data_gonogo')
