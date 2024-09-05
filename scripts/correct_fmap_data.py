@@ -48,7 +48,9 @@ def main(subject, source_folder, bids_folder='/data'):
         os.makedirs(anat_dir)
     # there should be only one T1w
     for run0, t in enumerate(t1w):
-        shutil.copy(t, op.join(anat_dir, f'sub-{subject}_ses-{session}_run-{run0+1}_T1w.nii'))
+        if not op.exists(op.join(anat_dir, f'sub-{subject}_ses-{session}_run-{run0+1}_T1w.nii')):
+            raise Exception("missing file")
+        #shutil.copy(t, op.join(anat_dir, f'sub-{subject}_ses-{session}_run-{run0+1}_T1w.nii'))
         file_names_lookup.update({t: op.join(anat_dir, f'sub-{subject}_ses-{session}_run-{run0+1}_T1w.nii')})
 
     # # # *** FUNCTIONAL DATA ***
@@ -70,12 +72,14 @@ def main(subject, source_folder, bids_folder='/data'):
         task = runs_lookup[run]
         target_file_name = f'sub-{subject}_ses-{session}_task-{task}_run-{run}_bold.nii'
         json_template['task'] = task
-        shutil.copy(fn, op.join(func_dir, target_file_name))
+        if not op.exists(op.join(func_dir, target_file_name)):
+            raise Exception("missing file")
+        #shutil.copy(fn, op.join(func_dir, target_file_name))
         file_names_lookup.update({fn: op.join(func_dir, target_file_name)})
 
-        json_sidecar = json_template
-        with open(op.join(func_dir, target_file_name.replace('.nii','.json')), 'w') as f:
-            json.dump(json_sidecar, f)
+        #json_sidecar = json_template
+        #with open(op.join(func_dir, target_file_name.replace('.nii','.json')), 'w') as f:
+        #    json.dump(json_sidecar, f)
 
     # *** physio logfiles ***
     physiologs = glob.glob(op.join(sourcedata_root, '*run*scanphyslog*.log'))
@@ -83,7 +87,9 @@ def main(subject, source_folder, bids_folder='/data'):
     for run, fn in zip(runs, physiologs):
         task = runs_lookup[run]
         target_file_name = f'sub-{subject}_ses-{session}_task-{task}_run-{run}_physio.log'
-        shutil.copy(fn, op.join(func_dir, target_file_name))
+        if not op.exists(op.join(func_dir, target_file_name)):
+            raise Exception("missing file")
+        #shutil.copy(fn, op.join(func_dir, target_file_name))
         file_names_lookup.update({fn: op.join(func_dir, target_file_name)})
 
     # # # *** FIELDMAPS ***
@@ -92,11 +98,16 @@ def main(subject, source_folder, bids_folder='/data'):
         os.makedirs(fmap_dir)
 
     b0_fieldmaps_mag1 = glob.glob(op.join(sourcedata_root, '*bo_fieldmap_v01_ec1*_typ0.nii'))
+    b0_fieldmaps_mag1.sort()
     b0_fieldmaps_mag2 = glob.glob(op.join(sourcedata_root, '*bo_fieldmap_v01_ec2*_typ0.nii'))
+    b0_fieldmaps_mag2.sort()
     b0_fieldmaps_phase1 = glob.glob(op.join(sourcedata_root, '*bo_fieldmap_v01_ec1*_typ3.nii'))
+    b0_fieldmaps_phase1.sort()
     b0_fieldmaps_phase2 = glob.glob(op.join(sourcedata_root, '*bo_fieldmap_v01_ec2*_typ3.nii'))
+    b0_fieldmaps_phase2.sort()
 
     physiologs = glob.glob(op.join(sourcedata_root, '*fieldmap*scanphyslog*.log'))
+    physiologs.sort()
 
     runs = [i+1 for i in range(len(b0_fieldmaps_mag1))]
 

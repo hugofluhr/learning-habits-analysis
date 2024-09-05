@@ -1,0 +1,1 @@
+rsync -avnz --exclude "derivatives" data/bids_dataset/ hfluhr@cluster.s3it.uzh.ch:shares-hare/ds-learning-habits/ >> update_fmap_cluster_log.txt
