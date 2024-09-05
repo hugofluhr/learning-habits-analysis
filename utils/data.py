@@ -1,0 +1,340 @@
+import os
+import scipy.io
+import numpy as np
+import warnings
+import pandas as pd
+
+
+class Block:
+    """
+    A class to represent a block of trials in an experimental session.
+
+    Parameters
+    ----------
+    raw_block : custom data structure
+        A data structure containing the raw data for the block, including timing, stimuli, and trial sequences as loaded from matlab.
+
+    Attributes
+    ----------
+    raw_block : custom data structure
+        Stores the raw block data.
+    iti_seq : array-like
+        Inter-Trial Interval sequence for the block.
+    isi_seq : array-like
+        Inter-Stimulus Interval sequence for the block.
+    scanner_trigger : float
+        Time when the scanner trigger occurred. Used as time reference for the block.
+    start_time : float
+        Block start time.
+    end_time : float
+        Block end time.
+    total_length : float
+        Total duration of the block.
+    n_trials : int
+        Number of trials in the block.
+    trials : pd.DataFrame
+        DataFrame containing detailed information about each trial in the block.
+    """
+    def __init__(self, raw_block):
+        """
+        Initialize a Block object by loading trial data and correcting time references.
+
+        Parameters
+        ----------
+        raw_block : custom data structure
+            The raw data for this block, containing sequences and timing information for each trial.
+        """
+        self.raw_block = raw_block
+
+        # ITI and ISI sequences used in the block
+        self.iti_seq = raw_block.iti_seq
+        self.isi_seq = raw_block.isi_seq
+
+        # Time references
+        self.scanner_trigger = raw_block.time.scanner_trigger
+        self.start_time = raw_block.time.start_time
+        self.end_time = raw_block.time.end_time
+        self.total_length = raw_block.time.length
+
+        # Number of trials in the block
+        self.n_trials = self.iti_seq.shape[0]
+
+        # Load trial data into a DataFrame
+        self.trials = self._load_trials(raw_block)
+
+        # Correct the time references relative to the scanner trigger
+        self._correct_time_ref()
+
+    def _load_trials(self, raw_block):
+        """
+        Load trial data into a DataFrame from the raw block data.
+
+        Parameters
+        ----------
+        raw_block : custom data structure
+            Raw block data containing trial sequences, actions, and timing.
+
+        Returns
+        -------
+        pd.DataFrame
+            A DataFrame containing information about each trial, including stimuli, actions, rewards, and timings.
+        """
+        # Initialize an empty DataFrame with trial-related columns
+        trials = pd.DataFrame(columns=['left_stim', 'right_stim', 'left_value', 'right_value', 'shift',
+                                       'action', 'rt', 'chosen_stim', 'reward', 'correct',
+                                       't_first_stim', 't_second_stim', 't_action', 't_feedback', 't_iti_onset'],
+                              index=range(self.n_trials))
+
+        # Populate the DataFrame with trial sequence and action data
+        trials.iloc[:, :5] = raw_block.seq1
+        trials['action'] = raw_block.a
+        trials['rt'] = raw_block.rt1
+        trials['chosen_stim'] = raw_block.chosen
+
+        # Calculate reward and correctness of each trial
+        trials['reward'] = self._calculate_reward(trials)
+        trials['correct'] = self._calculate_correct(trials)
+
+        # Add timing information
+        trials['t_first_stim'] = raw_block.time.first_stim_onset
+        trials['t_second_stim'] = raw_block.time.onset
+
+        # Handle missing response times, warning the user if data is missing
+        n_missing = self.n_trials - len(raw_block.time.response)
+        if n_missing > 0:
+            warnings.warn(f"Last {n_missing} trial(s) of block had no response, filling with 0")
+        trials['t_action'] = np.append(raw_block.time.response, np.full(n_missing, 0))
+        trials['t_feedback'] = np.append(raw_block.time.purple_frame_onset, np.full(n_missing, 0))
+        trials['t_iti_onset'] = raw_block.time.iti_onset
+
+        return trials
+
+    def _calculate_reward(self, trials):
+        """
+        Calculate the reward for each trial based on the chosen action.
+
+        Parameters
+        ----------
+        trials : pd.DataFrame
+            DataFrame containing trial data, including actions and stimuli values.
+
+        Returns
+        -------
+        np.ndarray
+            An array of rewards for each trial, based on the chosen stimulus.
+        """
+        return np.where(
+            trials['action'].isna(),  # If no action was taken, reward is NaN
+            np.nan,
+            np.where(trials['action'] == 1.0, trials['left_value'], trials['right_value'])  # Reward based on chosen stimulus
+        )
+
+    def _calculate_correct(self, trials):
+        """
+        Determine whether the chosen stimulus was the correct one, based on its value.
+
+        Parameters
+        ----------
+        trials : pd.DataFrame
+            DataFrame containing trial data, including actions and stimuli values.
+
+        Returns
+        -------
+        np.ndarray
+            An array indicating whether each trial was correct (1) or incorrect (0).
+        """
+        return np.where(
+            trials['action'].isna(),  # If no action was taken, correctness is NaN
+            np.nan,
+            np.where(
+                # Correct if the higher-value stimulus was chosen
+                ((trials['action'] == 1.0) & (trials['left_value'] > trials['right_value'])) | 
+                ((trials['action'] == 2.0) & (trials['right_value'] > trials['left_value'])),
+                1,
+                0
+            )
+        )
+
+    def _correct_time_ref(self, time_ref='scanner_trigger'):
+        """
+        Correct the time references of the trials to be relative to the scanner trigger.
+
+        Only applies the correction if the resulting time is positive.
+
+        Parameters
+        ----------
+        time_ref : str, optional
+            The reference time to use for the correction (default is 'scanner_trigger').
+        """
+        time_ref = getattr(self, time_ref)
+        time_columns = ['t_first_stim', 't_second_stim', 't_action', 't_feedback', 't_iti_onset']
+
+        # Adjust the time columns based on the reference time
+        for time_col in time_columns:
+            condition = (self.trials[time_col] - time_ref) > 0  # Only correct positive times
+            self.trials.loc[condition, time_col] -= time_ref
+
+
+class Subject:
+    """
+    A class to represent a subject and handle loading of various experimental data.
+
+    Parameters
+    ----------
+    subject_data : str or dict
+        If a string is provided, it is assumed to be a file path to a .mat file containing the subject data.
+        If a dictionary is provided, it is assumed to already contain the subject's data in a pre-loaded format.
+
+    Attributes
+    ----------
+    stimuli : dict
+        Contains stimulus assignment and stimulus values for the subject.
+    metadata : dict
+        Contains metadata such as date, subject ID, eyetracking file, and file name.
+    learning_phase : list of Block
+        Contains a list of Block objects representing the subject's learning phase data.
+    test_phase : Block
+        Contains a Block object representing the subject's test phase data.
+    """
+    def __init__(self, subject_data):
+        """
+        Initializes the Subject class by loading the necessary data.
+
+        If a string is passed, assumes it is a path to a .mat file and loads the data from the file.
+        Otherwise, assumes the data is already provided in a dictionary format.
+        """
+        # If a string is passed, assume it is a path to a .mat file and load the data from that file
+        if isinstance(subject_data, str):
+            subject_data = scipy.io.loadmat(subject_data, squeeze_me=True, struct_as_record=False)
+
+        # Load stimuli data, metadata, learning phase, and test phase
+        self.stimuli = self._load_stimuli_data(subject_data)
+        self.metadata = self._load_metadata(subject_data)
+        self.learning_phase = self._load_learning_phase(subject_data)
+        self.test_phase = self._load_test_phase(subject_data)
+
+        # make all trials accessible in a single DataFrame
+        self.trials = self._concatenate_trials()
+
+    def _load_block(self, block_data):
+        """
+        Loads a single block from the subject data.
+
+        Parameters
+        ----------
+        block_data : dict or custom data structure
+            Data structure containing the block information to be loaded.
+
+        Returns
+        -------
+        Block
+            Returns a Block object containing the block data.
+        """
+        return Block(block_data)
+
+    def _load_stimuli_data(self, subject_data):
+        """
+        Loads and returns the stimuli data from the subject data.
+
+        Parameters
+        ----------
+        subject_data : dict
+            Dictionary containing the subject's data, which includes stimuli information.
+
+        Returns
+        -------
+        dict
+            A dictionary with the stimuli assignment and corresponding values.
+        """
+        # Extract stimuli assignment and predefined values
+        assignment = subject_data['phase2_1'].stimuli_assignment
+        # To Do: find a better way to set this (always the same across subjects)
+        values = np.array([1, 2, 2, 3, 3, 4, 4, 5])
+        return {'stim_assignment': assignment, 'stim_values': values}
+
+    def _load_metadata(self, subject_data):
+        """
+        Loads and returns metadata information from the subject data.
+
+        Parameters
+        ----------
+        subject_data : dict
+            Dictionary containing the subject's metadata information.
+
+        Returns
+        -------
+        dict
+            A dictionary containing date, subject ID, eyetracking file, and file name.
+        """
+        # Extract and return metadata, including anonymized subject information
+        date = subject_data['setup'].date
+        subject_id = subject_data['subj_ID']  # To anonymize, hide this eventually
+        eyetracking_file = subject_data['eyetracker_log_filename']
+        file_name = subject_data['save_path']
+        return {'date': date, 'subject_id': subject_id, 'eyetracking_file': eyetracking_file, 'file_name': file_name}
+    
+    def _load_learning_phase(self, subject_data):
+        """
+        Loads the learning phase data, which contains multiple blocks.
+
+        Parameters
+        ----------
+        subject_data : dict
+            Dictionary containing the subject's data, including the learning phase information.
+
+        Returns
+        -------
+        list of Block
+            A list of Block objects representing each block in the learning phase.
+        """
+        # Load each block in the learning phase based on the number of learning blocks
+        return [self._load_block(subject_data['phase2_1'].blocks[i]) 
+                for i in range(subject_data['setup'].learning_n_blocks)]
+    
+    def _load_test_phase(self, subject_data):
+        """
+        Loads the test phase data, which contains a single block.
+
+        Parameters
+        ----------
+        subject_data : dict
+            Dictionary containing the subject's test phase data.
+
+        Returns
+        -------
+        Block
+            A Block object representing the test phase data.
+        """
+        # Load the test phase, assumed to be a single block
+        return self._load_block(subject_data['phase2_2'])
+    
+    def _concatenate_trials(self):
+        """
+        Concatenates all trials from the subject's learning phase and test phase into a single DataFrame.
+
+        Returns
+        -------
+        pd.DataFrame
+            A concatenated DataFrame containing all trials, with an additional 'block' column.
+        """
+        all_trials = []
+
+        # Iterate over each block in the learning phase
+        for i, block in enumerate(self.learning_phase):
+            # Add a 'block' column to the trials DataFrame indicating the block number
+            block_trials = block.trials.copy()
+            block_trials['block'] = f"learning_{i+1}"  # Block numbering starts from 1
+            all_trials.append(block_trials)
+        
+        # Include the test phase trials
+        test_trials = self.test_phase.trials.copy()
+        test_trials['block'] = 'test'  # Use a string identifier for the test phase
+        all_trials.append(test_trials)
+        
+        # Concatenate all trials into a single DataFrame
+        concatenated_trials = pd.concat(all_trials, ignore_index=True)
+
+        # put the block column first
+        concatenated_trials = concatenated_trials[['block'] + [col for col in concatenated_trials.columns if col != 'block']]
+
+        return concatenated_trials
