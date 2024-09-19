@@ -4,7 +4,38 @@ import numpy as np
 import warnings
 import pandas as pd
 
+def load_subject_lut(base_dir):
+    """
+    Load the subject lookup table (LUT) from the base directory.
 
+    Parameters
+    ----------
+    base_dir : str
+        The base directory containing the subject lookup table.
+
+    Returns
+    -------
+    dict
+        A DataFrame containing the subject lookup table.
+    """
+    # Read the CSV file
+    df = pd.read_csv(os.path.join(base_dir, 'subjects_lookup_table.csv'), header=None)
+    
+    # Function to clean the IDs by stripping the prefix and handling suffixes
+    def clean_id(id_value):
+        # Remove the 'SNS_MRI_LH_' prefix
+        cleaned_id = id_value.replace('SNS_MRI_LH_', '')
+        # Extract the first 6 characters of the cleaned ID
+        cleaned_id = cleaned_id[:6]
+        return cleaned_id
+    
+    # Create an inverted lookup dictionary with cleaned values as keys and keys as values
+    lookup_dict = {
+        value.replace('SNS_MRI_LH_', ''): clean_id(key)
+        for key, value in zip(df.iloc[:, 0], df.iloc[:, 1])
+    }
+    
+    return lookup_dict
 class Block:
     """
     A class to represent a block of trials in an experimental session.
@@ -292,25 +323,105 @@ class Subject:
     test_phase : Block
         Contains a Block object representing the subject's test phase data.
     """
-    def __init__(self, subject_data):
+    def __init__(self, base_dir, subject_id):
         """
         Initializes the Subject class by loading the necessary data.
 
         If a string is passed, assumes it is a path to a .mat file and loads the data from the file.
         Otherwise, assumes the data is already provided in a dictionary format.
         """
-        # If a string is passed, assume it is a path to a .mat file and load the data from that file
-        if isinstance(subject_data, str):
-            subject_data = scipy.io.loadmat(subject_data, squeeze_me=True, struct_as_record=False)
+        # Load the subject metadata
+        self.base_dir = base_dir
+        self.sub_id = subject_id
+        self.legacy_id = load_subject_lut(base_dir).get(subject_id, None)
+        self.rp_files = self._get_rp_files()
 
-        # Load stimuli data, metadata, learning phase, and test phase
-        self.stimuli = self._load_stimuli_data(subject_data)
-        self.metadata = self._load_metadata(subject_data)
-        self.learning_phase = self._load_learning_phase(subject_data)
-        self.test_phase = self._load_test_phase(subject_data)
+        # Load the Reward Pairing Task data 
+        self._load_scanner_behav_data()
+    
+    def _get_rp_files(self):
+        """
+        Search for .mat files in the given directory that contain the specified ID (case insensitive).
+
+        Parameters
+        ----------
+        behav_dir : str
+            The directory to search in.
+
+        Returns
+        -------
+        list
+            A list of matching .mat filenames that contain the ID.
+        """
+        # Define the directory to search in
+        behav_dir = os.path.join(self.base_dir, 'behav_data', 'RP_data')
+        
+        # Convert id_to_search to lowercase for case-insensitive matching
+        id_to_search_lower = self.legacy_id.lower()
+
+        # List to store matching filenames
+        matching_files = []
+
+        # Walk through the directory and its subdirectories
+        for root, dirs, files in os.walk(behav_dir):
+            for file in files:
+                # Check if the file is a .mat file and if the ID is part of the filename (case insensitive)
+                if file.endswith('.mat') and id_to_search_lower in file.lower():
+                    matching_files.append(os.path.join(root, file))  # Append full path to the matching file
+        matching_files.sort()  # Sort the filenames for consistency
+        return matching_files
+    
+    def _get_scanner_rp_file(self):
+        """
+        Find the file that matches the format *_(subj_id)_2_*.mat but does NOT contain '_learning' from the given list.
+
+        Parameters
+        -------
+        self
+
+        Returns
+        -------
+        str or None
+            The first matching file that does NOT contain '_learning', or None if no match is found.
+        """
+        # Define the pattern we're looking for
+        pattern = f"_{self.legacy_id}_2_"
+        
+        # Iterate over the file list
+        for file_path in self.rp_files:
+            # Get the file name
+            file_name = os.path.basename(file_path)
+            
+            # Check if the pattern is in the file name and it does not contain '_learning'
+            if pattern in file_name and '_learning' not in file_name:
+                return file_path
+        
+        # Return None if no file matches the pattern
+        return None
+
+    def _load_scanner_behav_data(self):
+        """
+        Load the scanner behavioral data from the .mat file.
+
+        Returns
+        -------
+        dict
+            A dictionary containing the scanner behavioral data.
+        """
+        # Check that the correct .mat file exists
+        scanner_rp_file = self._get_scanner_rp_file()
+        assert scanner_rp_file is not None, f"No scanner RP file found for subject {self.sub_id}."
+        # Load the .mat file
+        scanner_rp_data = scipy.io.loadmat(scanner_rp_file, squeeze_me=True, struct_as_record=False)
+
+        self.stimuli = self._load_stimuli_data(scanner_rp_data)
+        self.metadata = self._load_metadata(scanner_rp_data)
+        self.learning_phase = self._load_learning_phase(scanner_rp_data)
+        self.test_phase = self._load_test_phase(scanner_rp_data)
 
         # make all trials accessible in a single DataFrame
         self.trials = self._concatenate_trials()
+
 
     def _load_block(self, block_data):
         """
@@ -364,10 +475,9 @@ class Subject:
         """
         # Extract and return metadata, including anonymized subject information
         date = subject_data['setup'].date
-        subject_id = subject_data['subj_ID']  # To anonymize, hide this eventually
         eyetracking_file = subject_data['eyetracker_log_filename']
         file_name = subject_data['save_path']
-        return {'date': date, 'subject_id': subject_id, 'eyetracking_file': eyetracking_file, 'file_name': file_name}
+        return {'date': date, 'eyetracking_file': eyetracking_file, 'file_name': file_name}
     
     def _load_learning_phase(self, subject_data):
         """
