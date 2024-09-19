@@ -46,6 +46,9 @@ class Block:
         """
         self.raw_block = raw_block
 
+        # determine if the block is a learning block or a test block
+        self.block_type = 'learning' if hasattr(raw_block.time, 'rewards_onset') else 'test'
+
         # ITI and ISI sequences used in the block
         self.iti_seq = raw_block.iti_seq
         self.isi_seq = raw_block.isi_seq
@@ -82,7 +85,7 @@ class Block:
         # Initialize an empty DataFrame with trial-related columns
         trials = pd.DataFrame(columns=['left_stim', 'right_stim', 'left_value', 'right_value', 'shift',
                                        'action', 'rt', 'chosen_stim', 'reward', 'correct',
-                                       't_first_stim', 't_second_stim', 't_action', 't_feedback', 't_iti_onset'],
+                                       't_first_stim', 't_second_stim', 't_action', 't_purple_frame', 't_points_feedback', 't_iti_onset', 't_trial_end'],
                               index=range(self.n_trials))
 
         # Populate the DataFrame with trial sequence and action data
@@ -104,8 +107,11 @@ class Block:
         if n_missing > 0:
             warnings.warn(f"Last {n_missing} trial(s) of block had no response, filling with 0")
         trials['t_action'] = np.append(raw_block.time.response, np.full(n_missing, 0))
-        trials['t_feedback'] = np.append(raw_block.time.purple_frame_onset, np.full(n_missing, 0))
+        trials['t_purple_frame'] = np.append(raw_block.time.purple_frame_onset, np.full(n_missing, 0))
+        if self.block_type == 'learning':
+            trials['t_points_feedback'] = np.append(raw_block.time.rewards_onset, np.full(n_missing, 0))
         trials['t_iti_onset'] = raw_block.time.iti_onset
+        trials['t_trial_end'] = np.append(raw_block.time.first_stim_onset[1:], self.end_time-self.scanner_trigger)
 
         return trials
 
@@ -167,12 +173,102 @@ class Block:
             The reference time to use for the correction (default is 'scanner_trigger').
         """
         time_ref = getattr(self, time_ref)
-        time_columns = ['t_first_stim', 't_second_stim', 't_action', 't_feedback', 't_iti_onset']
+        time_columns = ['t_first_stim', 't_second_stim', 't_action', 't_purple_frame', 't_points_feedback', 't_iti_onset','t_trial_end']
 
         # Adjust the time columns based on the reference time
         for time_col in time_columns:
             condition = (self.trials[time_col] - time_ref) > 0  # Only correct positive times
             self.trials.loc[condition, time_col] -= time_ref
+
+    def create_event_df(self):
+        """Create an event DataFrame from the trials DataFrame.
+            The DataFrame containing trial information.
+            The event DataFrame containing information about each event.
+        Notes
+        -----
+        This function takes a trials DataFrame and creates an event DataFrame based on the trial information. The event DataFrame contains information about each event, such as the onset time, duration, and trial type.
+        For each trial in the trials DataFrame, the function creates events for the first stimulus presentation, second stimulus presentation (if applicable), response (if applicable), purple frame presentation, points feedback presentation, non-response feedback (if applicable), and inter-trial interval (iti).
+        The event DataFrame is then converted to a pandas DataFrame and returned.
+        Examples
+        --------
+        >>> trials_df = pd.DataFrame(...)
+        >>> events_df = create_event_df(trials_df)
+
+        Parameters
+        ----------
+        trials : pd.DataFrame
+
+        Returns
+        -------pd.DataFrame
+        """     
+        events = []  # Define the events list inside the function
+
+        for _, row in self.trials.iterrows():
+            # Create event for first_stim presentation
+            events.append({
+                'onset': row['t_first_stim'],
+                'duration': row['t_second_stim'] - row['t_first_stim'],
+                'trial_type': 'first_stim_presentation'
+            })
+
+            if row['action'] in [1., 2.]:
+                # response trial
+                # Create event for second_stim presentation
+                events.append({
+                    'onset': row['t_second_stim'],
+                    'duration': row['t_action'] - row['t_second_stim'],
+                    'trial_type': 'second_stim_presentation'
+                })
+
+                # Create event for response
+                events.append({
+                    'onset': row['t_action'],
+                    'duration': 0,
+                    'trial_type': 'response'
+                })
+
+                # Create event for purple frame presentation
+                events.append({
+                    'onset': row['t_purple_frame'],
+                    'duration': row['t_iti_onset'] - row['t_purple_frame'],
+                    'trial_type': 'purple_frame'
+                })
+
+                # Create event for points feedback presentation, only for learning trials
+                if self.block_type == 'learning':
+                    events.append({
+                        'onset': row['t_points_feedback'],
+                        'duration': row['t_iti_onset'] - row['t_points_feedback'],
+                        'trial_type': 'points_feedback'
+                    })
+
+            elif pd.isna(row['action']):
+                # non response trial
+                # Create event for second_stim presentation
+                events.append({
+                    'onset': row['t_second_stim'],
+                    'duration': 1,
+                    'trial_type': 'second_stim_presentation'
+                })
+
+                # Create event for non-response feedback
+                events.append({
+                    'onset': row['t_second_stim'] + 1,
+                    'duration': row['t_iti_onset'] - row['t_second_stim'] - 1,
+                    'trial_type': 'non_response_feedback'
+                })
+
+            # Create event for iti
+            events.append({
+                'onset': row['t_iti_onset'],
+                'duration': row['t_trial_end'] - row['t_iti_onset'],
+                'trial_type': 'iti'
+            })
+
+        # Convert to DataFrame and return it
+        events_df = pd.DataFrame(events)
+        
+        return events_df
 
 
 class Subject:
@@ -338,3 +434,25 @@ class Subject:
         concatenated_trials = concatenated_trials[['block'] + [col for col in concatenated_trials.columns if col != 'block']]
 
         return concatenated_trials
+    
+    def get_event_df(self, block):
+        """
+        Create an event DataFrame from the subject's trials DataFrame.
+
+        Parameters
+        ----------
+        block : str, optional
+            The block to create events for.
+            Can be one of: 'learning1', 'learning2', 'test'.
+
+        Returns
+        -------
+        pd.DataFrame
+            A DataFrame containing event information for the specified block.
+        """
+        if block == 'test':
+            events = self.test_phase.create_event_df()
+        elif block in ['learning1', 'learning2']:
+            block_num = int(block[-1]) - 1
+            events = self.learning_phase[block_num].create_event_df()
+        return events
