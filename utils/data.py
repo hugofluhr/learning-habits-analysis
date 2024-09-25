@@ -3,6 +3,7 @@ import scipy.io
 import numpy as np
 import warnings
 import pandas as pd
+from bids import BIDSLayout
 
 def load_subject_lut(base_dir):
     """
@@ -89,6 +90,7 @@ class Block:
         self.start_time = raw_block.time.start_time
         self.end_time = raw_block.time.end_time
         self.total_length = raw_block.time.length
+        self.sequence_end_time = raw_block.time.sequence_end_time
 
         # Number of trials in the block
         self.n_trials = self.iti_seq.shape[0]
@@ -323,7 +325,9 @@ class Subject:
     test_phase : Block
         Contains a Block object representing the subject's test phase data.
     """
-    def __init__(self, base_dir, subject_id):
+    bids_layout = None # Class attribute to store the BIDSL layout
+
+    def __init__(self, base_dir, subject_id, skip_imaging=False):
         """
         Initializes the Subject class by loading the necessary data.
 
@@ -338,6 +342,16 @@ class Subject:
 
         # Load the Reward Pairing Task data 
         self._load_scanner_behav_data()
+
+        # Can skip loading imaging data if not needed
+        if not skip_imaging:
+        # Load the BIDSLayout if it hasn't been created yet
+            bids_dir = next((d for d in os.listdir(base_dir) if d.startswith('bids')), None)
+            assert bids_dir is not None, "No directory starting with 'bids' found in base_dir"
+            self.bids_dir = os.path.join(base_dir, bids_dir)
+            self.get_or_create_layout(self.bids_dir)
+        # Preload most common fmriprep files for easy access
+            self._preload_fmriprep_files()
     
     def _get_rp_files(self):
         """
@@ -385,12 +399,12 @@ class Subject:
             The first matching file that does NOT contain '_learning', or None if no match is found.
         """
         # Define the pattern we're looking for
-        pattern = f"_{self.legacy_id}_2_"
+        pattern = f"_{self.legacy_id}_2_".lower()
         
         # Iterate over the file list
         for file_path in self.rp_files:
             # Get the file name
-            file_name = os.path.basename(file_path)
+            file_name = os.path.basename(file_path).lower()
             
             # Check if the pattern is in the file name and it does not contain '_learning'
             if pattern in file_name and '_learning' not in file_name:
@@ -572,3 +586,36 @@ class Subject:
             block_num = int(block[-1]) - 1
             events = self.learning_phase[block_num].create_event_df()
         return events
+    
+    @classmethod
+    def get_or_create_layout(cls, bids_dir):
+        # Check if the layout is already created
+        if cls.bids_layout is None:
+            print("Creating BIDSLayout...")
+            cls.bids_layout = BIDSLayout(bids_dir, derivatives=True)
+        else:
+            print("Using existing BIDSLayout")
+
+    def get_bids_files(self, **kwargs):
+        """
+        Wrapper for the BIDSLayout.get() method that always includes the subject ID.
+        Additional filters can be passed as keyword arguments (kwargs).
+        """
+        # Always include the subject ID in the query
+        kwargs['subject'] = self.sub_id[-2:]  # Assuming sub_id refers to the subject identifier
+        
+        # Use layout.get() with the updated filters
+        return self.bids_layout.get(**kwargs)
+
+    def _preload_fmriprep_files(self):
+        """
+        Make most common fmriprep files available as attributes.
+        """
+        # Initialize self.img as a dictionary
+        self.img = {}
+
+        # Assign the fMRIprep files using keyword arguments
+        # 'run':1,'suffix': 'bold', 'desc': 'preproc', 'extension': 'nii.gz'}
+        self.img['learning1'] = self.get_bids_files(suffix='bold', run=1, desc= 'preproc', extension='nii.gz')[0]
+        self.img['learning2'] = self.get_bids_files(suffix='bold', run=2, desc= 'preproc', extension='nii.gz')[0]
+        self.img['test'] = self.get_bids_files(suffix='bold', run=3, desc= 'preproc', extension='nii.gz')[0]
