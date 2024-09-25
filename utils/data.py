@@ -536,7 +536,13 @@ class Subject:
         test_trials = self.test_phase.trials.copy()
         test_trials['block'] = 'test'  # Use a string identifier for the test phase
         all_trials.append(test_trials)
-        
+
+        # handling column type to avoid warning due to NaN values
+        for df in all_trials:
+            for col in df.columns:
+                if df[col].isna().all():
+                    df[col] = df[col].astype('float')
+
         # Concatenate all trials into a single DataFrame
         concatenated_trials = pd.concat(all_trials, ignore_index=True)
 
