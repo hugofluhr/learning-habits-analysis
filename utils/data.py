@@ -37,6 +37,26 @@ def load_subject_lut(base_dir):
     }
     
     return lookup_dict
+
+def load_participant_list(base_dir):
+    """
+    Load the list of subjects from the base directory.
+
+    Parameters
+    ----------
+    base_dir : str
+        The base directory containing the subject list.
+
+    Returns
+    -------
+    list
+        A list of subject IDs.
+    """
+    with open(os.path.join(base_dir, 'participants.tsv'), 'r') as file:
+        # Read all lines, strip newline characters, and return as a list
+        ids = [line.strip() for line in file.readlines()]
+    return ids
+
 class Block:
     """
     A class to represent a block of trials in an experimental session.
@@ -90,7 +110,6 @@ class Block:
         self.start_time = raw_block.time.start_time
         self.end_time = raw_block.time.end_time
         self.total_length = raw_block.time.length
-        self.sequence_end_time = raw_block.time.sequence_end_time
 
         # Number of trials in the block
         self.n_trials = self.iti_seq.shape[0]
