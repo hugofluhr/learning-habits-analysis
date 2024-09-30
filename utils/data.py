@@ -38,7 +38,7 @@ def load_subject_lut(base_dir):
     
     return lookup_dict
 
-def load_participant_list(base_dir):
+def load_participant_list(base_dir, file_name='modeling_participants.tsv'):
     """
     Load the list of subjects from the base directory.
 
@@ -52,7 +52,7 @@ def load_participant_list(base_dir):
     list
         A list of subject IDs.
     """
-    with open(os.path.join(base_dir, 'participants.tsv'), 'r') as file:
+    with open(os.path.join(base_dir, file_name), 'r') as file:
         # Read all lines, strip newline characters, and return as a list
         ids = [line.strip() for line in file.readlines()]
     return ids
