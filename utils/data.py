@@ -138,7 +138,9 @@ class Block:
         trials = pd.DataFrame(columns=['left_stim', 'right_stim', 'left_value', 'right_value', 'shift',
                                        'action', 'rt', 'chosen_stim', 'reward', 'correct',
                                        't_first_stim', 't_second_stim', 't_action', 't_purple_frame', 't_points_feedback', 't_iti_onset', 't_trial_end'],
-                              index=range(self.n_trials))
+                              index=range(1, self.n_trials+1))
+        # name the index to explicitly show it's the trial number
+        trials.index.name = 'trial'
 
         # Populate the DataFrame with trial sequence and action data
         trials.iloc[:, :5] = raw_block.seq1
@@ -147,8 +149,8 @@ class Block:
         trials['chosen_stim'] = raw_block.chosen
 
         # Calculate reward and correctness of each trial
-        trials['reward'] = self._calculate_reward(trials)
-        trials['correct'] = self._calculate_correct(trials)
+        trials['reward'] = self._compute_reward(trials)
+        trials['correct'] = self._compute_correct(trials)
 
         # Add timing information
         trials['t_first_stim'] = raw_block.time.first_stim_onset
@@ -165,9 +167,30 @@ class Block:
         trials['t_iti_onset'] = raw_block.time.iti_onset
         trials['t_trial_end'] = np.append(raw_block.time.first_stim_onset[1:], self.end_time-self.scanner_trigger)
 
+        # Specify the data types for each column
+        trials = trials.astype({
+            'left_stim': 'int32',
+            'right_stim': 'int32',
+            'left_value': 'int32',
+            'right_value': 'int32',
+            'shift': 'int32',
+            'action': 'float64',
+            'rt': 'float64',
+            'chosen_stim': 'float64',
+            'reward': 'float64',
+            'correct': 'float64',
+            't_first_stim': 'float64',
+            't_second_stim': 'float64',
+            't_action': 'float64',
+            't_purple_frame': 'float64',
+            't_points_feedback': 'float64',
+            't_iti_onset': 'float64',
+            't_trial_end': 'float64'
+        })
+
         return trials
 
-    def _calculate_reward(self, trials):
+    def _compute_reward(self, trials):
         """
         Calculate the reward for each trial based on the chosen action.
 
@@ -187,7 +210,7 @@ class Block:
             np.where(trials['action'] == 1.0, trials['left_value'], trials['right_value'])  # Reward based on chosen stimulus
         )
 
-    def _calculate_correct(self, trials):
+    def _compute_correct(self, trials):
         """
         Determine whether the chosen stimulus was the correct one, based on its value.
 
@@ -200,16 +223,21 @@ class Block:
         -------
         np.ndarray
             An array indicating whether each trial was correct (1) or incorrect (0).
+            NaN values indicate non response OR same value for both stimuli.
         """
         return np.where(
             trials['action'].isna(),  # If no action was taken, correctness is NaN
             np.nan,
             np.where(
-                # Correct if the higher-value stimulus was chosen
-                ((trials['action'] == 1.0) & (trials['left_value'] > trials['right_value'])) | 
-                ((trials['action'] == 2.0) & (trials['right_value'] > trials['left_value'])),
-                1,
-                0
+                trials['left_value'] == trials['right_value'],  # If left and right values are equal, correctness is NaN
+                np.nan,
+                np.where(
+                    # Correct if the higher-value stimulus was chosen
+                    ((trials['action'] == 1.0) & (trials['left_value'] > trials['right_value'])) | 
+                    ((trials['action'] == 2.0) & (trials['right_value'] > trials['left_value'])),
+                    1,
+                    0
+                )
             )
         )
 
@@ -231,6 +259,62 @@ class Block:
         for time_col in time_columns:
             condition = (self.trials[time_col] - time_ref) > 0  # Only correct positive times
             self.trials.loc[condition, time_col] -= time_ref
+        
+    def add_modeling_data(self, modeling_data):
+        """
+        Add modeling data to an extended trials dataframe.
+
+        Parameters
+        ----------
+        modeling_data : pd.DataFrame
+            DataFrame containing modeling data to add to the trials.
+        """
+        # making copy to avoid side effects
+        modeling_df = modeling_data.copy()
+
+        # define a valid mask for rows where 'action' is not NaN and 'rt' >= 0.05
+        valid_mask = (~self.trials['action'].isna()) & (self.trials['rt'] >= 0.05)
+
+        # updated sanity checks with valid_mask
+        assert self.trials.loc[valid_mask, 'action'].astype(float).equals(modeling_df.loc[valid_mask, 'action'].astype(float)), 'actions do not match'
+        assert self.trials.loc[valid_mask, 'left_stim'].astype('int32').equals(modeling_df.loc[valid_mask, 'stim1'].astype('int32')), 'left stim do not match'
+        assert self.trials.loc[valid_mask, 'right_stim'].astype('int32').equals(modeling_df.loc[valid_mask, 'stim2'].astype('int32')), 'right stim do not match'
+        assert (abs(self.trials.loc[valid_mask, 'rt'] - modeling_df.loc[valid_mask, 'rt1']) < 1e-3).all(), 'response times do not match'
+        assert self.trials.loc[valid_mask, 'reward'].astype(float).equals(modeling_df.loc[valid_mask, 'reward_chosen'].astype(float)), 'rewards do not match'
+        assert self.trials.loc[valid_mask, 'correct'].astype(float).equals(modeling_df.loc[valid_mask, 'corr_choice'].astype(float)), 'correct choices do not match'
+
+        # drop columns that are redundant
+        columns2drop = ['action', 'stim1', 'stim2', 'rt1', 'corr_choice']
+        modeling_df.drop(columns2drop, axis=1, inplace=True)
+        
+        # perform the merge
+        merged = pd.merge(self.trials, modeling_df, on='trial', how='left')
+
+        # fill the missing values for non response trials
+        columns2fill = ['flag_therapy1', 'flag_accuracy', 'flag_include', 'alpha_rl20',
+                        'beta_rl20', 'alpha_ck20', 'beta_ck20', 'choice_prob_left',
+                        'choice_prob_right', 'action_prob', 'stim1_value_rl', 'stim2_value_rl',
+                        'stim3_value_rl', 'stim4_value_rl', 'stim5_value_rl', 'stim6_value_rl',
+                        'stim7_value_rl', 'stim8_value_rl', 'stim1_value_ck', 'stim2_value_ck',
+                        'stim3_value_ck', 'stim4_value_ck', 'stim5_value_ck', 'stim6_value_ck',
+                        'stim7_value_ck', 'stim8_value_ck']
+        for col in columns2fill:
+            merged.loc[self.trials['action'].isna(), col] = merged[col].ffill()
+
+        # TODO: fill missing values for diff_val, choice_prob, action_prob and value_diff
+        # TODO: decide how to handle trials with rt < 0.05
+
+        # Add columns with info about which stimulus was presented first and second
+        merged['first_stim'] = np.where(merged['shift'] == 0, merged['right_stim'], merged['left_stim'])
+        merged['second_stim'] = np.where(merged['shift'] == 0, merged['left_stim'], merged['right_stim'])
+        
+        # CK and RL values for those stimuli
+        merged['first_stim_value_rl'] = merged.apply(lambda row: row[f"stim{row['first_stim']}_value_rl"], axis=1)
+        merged['second_stim_value_rl'] = merged.apply(lambda row: row[f"stim{row['second_stim']}_value_rl"], axis=1)
+        merged['first_stim_value_ck'] = merged.apply(lambda row: row[f"stim{row['first_stim']}_value_ck"], axis=1)
+        merged['second_stim_value_ck'] = merged.apply(lambda row: row[f"stim{row['second_stim']}_value_ck"], axis=1)
+
+        self.extended_trials = merged
 
     def create_event_df(self):
         """Create an event DataFrame from the trials DataFrame.
@@ -344,7 +428,7 @@ class Subject:
     test_phase : Block
         Contains a Block object representing the subject's test phase data.
     """
-    bids_layout = None # Class attribute to store the BIDSL layout
+    bids_layout = None # Class attribute to store the BIDS layout
 
     def __init__(self, base_dir, subject_id, skip_imaging=False):
         """
@@ -431,6 +515,32 @@ class Subject:
         
         # Return None if no file matches the pattern
         return None
+    
+    def _get_rp_modeling_files(self, modeling_dir='modeling_data'):
+        """
+        Find the modeling files for the subject based on the legacy ID.
+        
+        Parameters
+        -------
+        self
+        modeling_dir : str
+            The directory containing the modeling files.
+
+        Returns
+        -------
+        dict
+            A dictionary containing the modeling files for the subject.
+        """
+        modeling_dir = os.path.join(self.base_dir, modeling_dir)
+        self.modeling_dir = modeling_dir
+        modeling_files = {}
+        for file in os.listdir(modeling_dir):
+            if file.startswith(self.legacy_id.lower()) and file.endswith('.csv'):
+                if '_learning' in file:
+                    modeling_files['learning'] = file
+                elif '_test' in file:
+                    modeling_files['test'] = file
+        return modeling_files
 
     def _load_scanner_behav_data(self):
         """
@@ -565,7 +675,7 @@ class Subject:
             block_trials['block'] = f"learning_{i+1}"  # Block numbering starts from 1
             all_trials.append(block_trials)
         
-        # Include the test phase trials
+        # Add the test phase trials
         test_trials = self.test_phase.trials.copy()
         test_trials['block'] = 'test'  # Use a string identifier for the test phase
         all_trials.append(test_trials)
@@ -638,3 +748,33 @@ class Subject:
         self.img['learning1'] = self.get_bids_files(suffix='bold', run=1, desc= 'preproc', extension='nii.gz')[0]
         self.img['learning2'] = self.get_bids_files(suffix='bold', run=2, desc= 'preproc', extension='nii.gz')[0]
         self.img['test'] = self.get_bids_files(suffix='bold', run=3, desc= 'preproc', extension='nii.gz')[0]
+
+    def load_modeling_data(self, modeling_dir = 'modeling_data'):
+        """
+        Load the modeling data for the subject.
+        """
+
+        modeling_files = self._get_rp_modeling_files(modeling_dir)
+        modeling_data = {}
+        for key, file in modeling_files.items():
+            df = pd.read_csv(os.path.join(self.modeling_dir, file))
+            df.drop(['ID','session'], axis=1, inplace=True)
+            df.set_index('trial', inplace=True) 
+            if key == 'learning':
+                df['run'] = df['run'].apply(lambda x: x.split(' ')[1])
+                modeling_data['learning1'] = df[df['run'] == '1']
+                modeling_data['learning2'] = df[df['run'] == '2']
+            elif key == 'test':
+                modeling_data['test'] = df
+        self.modeling_data = modeling_data
+
+    def combine_modeling_data(self):
+        """
+        Combine the modeling data with the trials data for each block in 
+        an extended trials DataFrame.
+        """
+        for key, block in self.modeling_data.items():
+            if key.startswith('learning'):
+                self.learning_phase[int(key[-1])-1].add_modeling_data(block)
+            elif key == 'test':
+                self.test_phase.add_modeling_data(block)
