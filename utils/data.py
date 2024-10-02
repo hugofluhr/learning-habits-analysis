@@ -424,9 +424,11 @@ class Subject:
         Contains stimulus assignment and stimulus values for the subject.
     metadata : dict
         Contains metadata such as date, subject ID, eyetracking file, and file name.
-    learning_phase : list of Block
-        Contains a list of Block objects representing the subject's learning phase data.
-    test_phase : Block
+    learning1 : Block
+        Contains a Block object representing the subject's first learning block.
+    learning2 : Block
+        Contains a Block object representing the subject's second learning block.
+    test : Block
         Contains a Block object representing the subject's test phase data.
     """
     bids_layout = None # Class attribute to store the BIDS layout
@@ -443,6 +445,7 @@ class Subject:
         self.sub_id = subject_id
         self.legacy_id = load_subject_lut(base_dir).get(subject_id, None)
         self.rp_files = self._get_rp_files()
+        self.runs = ['learning1', 'learning2', 'test']
 
         # Load the Reward Pairing Task data 
         self._load_scanner_behav_data()
@@ -564,8 +567,8 @@ class Subject:
 
         self.stimuli = self._load_stimuli_data(scanner_rp_data)
         self.metadata = self._load_metadata(scanner_rp_data)
-        self.learning_phase = self._load_learning_phase(scanner_rp_data)
-        self.test_phase = self._load_test_phase(scanner_rp_data)
+        self.learning1, self.learning2 = self._load_learning_phase(scanner_rp_data)
+        self.test = self._load_test_phase(scanner_rp_data)
 
         # make all trials accessible in a single DataFrame
         self.trials = self._concatenate_trials()
@@ -673,17 +676,12 @@ class Subject:
         """
         all_trials = []
 
-        # Iterate over each block in the learning phase
-        for i, block in enumerate(self.learning_phase):
-            # Add a 'block' column to the trials DataFrame indicating the block number
-            block_trials = block.trials.copy()
-            block_trials['block'] = f"learning_{i+1}"  # Block numbering starts from 1
+        # Iterate over each block
+        # Add a 'block' column to the trials DataFrame indicating the block number
+        for run in self.runs:
+            block_trials = getattr(self, run).trials.copy()
+            block_trials['block'] = f"{run}"
             all_trials.append(block_trials)
-        
-        # Add the test phase trials
-        test_trials = self.test_phase.trials.copy()
-        test_trials['block'] = 'test'  # Use a string identifier for the test phase
-        all_trials.append(test_trials)
 
         # handling column type to avoid warning due to NaN values
         for df in all_trials:
@@ -714,12 +712,7 @@ class Subject:
         pd.DataFrame
             A DataFrame containing event information for the specified block.
         """
-        if block == 'test':
-            events = self.test_phase.create_event_df()
-        elif block in ['learning1', 'learning2']:
-            block_num = int(block[-1]) - 1
-            events = self.learning_phase[block_num].create_event_df()
-        return events
+        return getattr(self, block).create_event_df()
     
     @classmethod
     def get_or_create_layout(cls, bids_dir):
@@ -779,10 +772,7 @@ class Subject:
         an extended trials DataFrame.
         """
         for key, block in self.modeling_data.items():
-            if key.startswith('learning'):
-                self.learning_phase[int(key[-1])-1].add_modeling_data(block)
-            elif key == 'test':
-                self.test_phase.add_modeling_data(block)
+            getattr(self,key).add_modeling_data(block)
 
     def add_modeling_data(self, modeling_dir = 'modeling_data'):
         """
