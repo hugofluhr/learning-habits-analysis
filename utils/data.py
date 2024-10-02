@@ -431,7 +431,7 @@ class Subject:
     """
     bids_layout = None # Class attribute to store the BIDS layout
 
-    def __init__(self, base_dir, subject_id, skip_imaging=False):
+    def __init__(self, base_dir, subject_id, include_imaging=False, include_modeling=False):
         """
         Initializes the Subject class by loading the necessary data.
 
@@ -448,7 +448,7 @@ class Subject:
         self._load_scanner_behav_data()
 
         # Can skip loading imaging data if not needed
-        if not skip_imaging:
+        if include_imaging:
         # Load the BIDSLayout if it hasn't been created yet
             bids_dir = next((d for d in os.listdir(base_dir) if d.startswith('bids')), None)
             assert bids_dir is not None, "No directory starting with 'bids' found in base_dir"
@@ -456,6 +456,10 @@ class Subject:
             self.get_or_create_layout(self.bids_dir)
         # Preload most common fmriprep files for easy access
             self._preload_fmriprep_files()
+
+        # Load modeling data if needed
+        if include_modeling:
+            self.add_modeling_data()
     
     def _get_rp_files(self):
         """
@@ -750,7 +754,7 @@ class Subject:
         self.img['learning2'] = self.get_bids_files(suffix='bold', run=2, desc= 'preproc', extension='nii.gz')[0]
         self.img['test'] = self.get_bids_files(suffix='bold', run=3, desc= 'preproc', extension='nii.gz')[0]
 
-    def load_modeling_data(self, modeling_dir = 'modeling_data'):
+    def _load_modeling_data(self, modeling_dir = 'modeling_data'):
         """
         Load the modeling data for the subject.
         """
@@ -769,7 +773,7 @@ class Subject:
                 modeling_data['test'] = df
         self.modeling_data = modeling_data
 
-    def combine_modeling_data(self):
+    def _combine_modeling_data(self):
         """
         Combine the modeling data with the trials data for each block in 
         an extended trials DataFrame.
@@ -779,3 +783,15 @@ class Subject:
                 self.learning_phase[int(key[-1])-1].add_modeling_data(block)
             elif key == 'test':
                 self.test_phase.add_modeling_data(block)
+
+    def add_modeling_data(self, modeling_dir = 'modeling_data'):
+        """
+        Add modeling data to the subject's trials DataFrame.
+        
+        Parameters
+        ----------
+        modeling_dir : str
+            The directory containing the modeling data.
+        """
+        self._load_modeling_data(modeling_dir)
+        self._combine_modeling_data()
