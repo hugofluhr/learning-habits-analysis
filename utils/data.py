@@ -120,6 +120,9 @@ class Block:
         # Correct the time references relative to the scanner trigger
         self._correct_time_ref()
 
+        # Add the events DataFrame
+        self.create_event_df()
+
     def _load_trials(self, raw_block):
         """
         Load trial data into a DataFrame from the raw block data.
@@ -405,8 +408,53 @@ class Block:
         events_df = pd.DataFrame(events)
         events_df['trial'] = events_df['trial'].astype(int)
         
-        return events_df
+        self.events = events_df
+    
+    def _add_column_to_events_df(self, event, column_name):
+        """
+        Add a new column to the events DataFrame based on the trials DataFrame.
 
+        Parameters
+        ----------
+        event : str
+            The event type to add the column to.
+        column_name : str
+            The name of the column to add to the events DataFrame
+        
+        Returns
+        -------
+        pd.DataFrame
+            An events DataFrame with the new column added.
+        """
+        ext_events_df = self.events.copy()
+        ext_events_df[column_name] = 0.
+        ext_events_df.loc[ext_events_df['trial_type']==event, column_name] = self.extended_trials[column_name].values
+        return ext_events_df
+    
+    def extend_events_df(self, columns_event='default'):
+        """
+        Extend the events DataFrame with additional columns from the trials DataFrame.
+
+        Parameters
+        ----------
+        columns : Dict or str
+            A list of column names and event type to add to the events DataFrame.
+        
+        Returns
+        -------
+        pd.DataFrame
+            An extended events DataFrame with the additional columns.
+        """
+        if columns_event == 'default':
+            columns_event = {'first_stim_value_rl':'first_stim_presentation',
+                             'first_stim_value_ck':'first_stim_presentation'}
+
+        ext_events_df = self.events.copy()            
+        for col, event in columns_event.items():
+            ext_events_df[col] = 0.
+            ext_events_df.loc[ext_events_df['trial_type']==event, col] = self.extended_trials[col].values
+        
+        return ext_events_df
 
 class Subject:
     """
