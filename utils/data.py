@@ -481,7 +481,7 @@ class Subject:
     """
     bids_layout = None # Class attribute to store the BIDS layout
 
-    def __init__(self, base_dir, subject_id, include_imaging=False, include_modeling=False):
+    def __init__(self, base_dir, subject_id, include_imaging=False, include_modeling=False, bids_dir=None):
         """
         Initializes the Subject class by loading the necessary data.
 
@@ -501,10 +501,7 @@ class Subject:
         # Can skip loading imaging data if not needed
         if include_imaging:
         # Load the BIDSLayout if it hasn't been created yet
-            bids_dir = next((d for d in os.listdir(base_dir) if d.startswith('bids')), None)
-            assert bids_dir is not None, "No directory starting with 'bids' found in base_dir"
-            self.bids_dir = os.path.join(base_dir, bids_dir)
-            self.get_or_create_layout(self.bids_dir)
+            self.get_or_create_layout(bids_dir)
         # Preload most common fmriprep files for easy access
             self._preload_fmriprep_files()
 
@@ -767,7 +764,14 @@ class Subject:
         # Check if the layout is already created
         if cls.bids_layout is None:
             print("Creating BIDSLayout...")
-            cls.bids_layout = BIDSLayout(bids_dir, derivatives=True)
+            if bids_dir is None:
+                raise ValueError("BIDS directory must be provided to create BIDSLayout.")
+            else:
+                cls.bids_dir = bids_dir
+                if 'fmriprep' in bids_dir:
+                    cls.bids_layout = BIDSLayout(bids_dir, is_derivative=True)
+                else:
+                    cls.bids_layout = BIDSLayout(bids_dir, derivatives=True)
         else:
             print("Using existing BIDSLayout")
 
