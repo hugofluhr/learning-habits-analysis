@@ -339,12 +339,12 @@ class Block:
         """     
         events = []  # Define the events list inside the function
 
-        for _, row in self.trials.iterrows():
+        for t, row in self.trials.iterrows():
             # Create event for first_stim presentation
             events.append({
                 'onset': row['t_first_stim'],
                 'duration': row['t_second_stim'] - row['t_first_stim'],
-                'trial_type': 'first_stim_presentation'
+                'trial_type': 'first_stim_presentation', 'trial': t
             })
 
             if row['action'] in [1., 2.]:
@@ -353,21 +353,21 @@ class Block:
                 events.append({
                     'onset': row['t_second_stim'],
                     'duration': row['t_action'] - row['t_second_stim'],
-                    'trial_type': 'second_stim_presentation'
+                    'trial_type': 'second_stim_presentation', 'trial': t
                 })
 
                 # Create event for response
                 events.append({
                     'onset': row['t_action'],
                     'duration': 0,
-                    'trial_type': 'response'
+                    'trial_type': 'response', 'trial': t
                 })
 
                 # Create event for purple frame presentation
                 events.append({
                     'onset': row['t_purple_frame'],
                     'duration': row['t_iti_onset'] - row['t_purple_frame'],
-                    'trial_type': 'purple_frame'
+                    'trial_type': 'purple_frame', 'trial': t
                 })
 
                 # Create event for points feedback presentation, only for learning trials
@@ -375,7 +375,7 @@ class Block:
                     events.append({
                         'onset': row['t_points_feedback'],
                         'duration': row['t_iti_onset'] - row['t_points_feedback'],
-                        'trial_type': 'points_feedback'
+                        'trial_type': 'points_feedback', 'trial': t
                     })
 
             elif pd.isna(row['action']):
@@ -384,25 +384,26 @@ class Block:
                 events.append({
                     'onset': row['t_second_stim'],
                     'duration': 1,
-                    'trial_type': 'second_stim_presentation'
+                    'trial_type': 'second_stim_presentation', 'trial': t
                 })
 
                 # Create event for non-response feedback
                 events.append({
                     'onset': row['t_second_stim'] + 1,
                     'duration': row['t_iti_onset'] - row['t_second_stim'] - 1,
-                    'trial_type': 'non_response_feedback'
+                    'trial_type': 'non_response_feedback', 'trial': t
                 })
 
             # Create event for iti
             events.append({
                 'onset': row['t_iti_onset'],
                 'duration': row['t_trial_end'] - row['t_iti_onset'],
-                'trial_type': 'iti'
+                'trial_type': 'iti', 'trial': t
             })
 
         # Convert to DataFrame and return it
         events_df = pd.DataFrame(events)
+        events_df['trial'] = events_df['trial'].astype(int)
         
         return events_df
 
