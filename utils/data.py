@@ -490,8 +490,8 @@ class Subject:
         """
         # Load the subject metadata
         self.base_dir = base_dir
-        self.sub_id = subject_id
-        self.legacy_id = load_subject_lut(base_dir).get(subject_id, None)
+        self.sub_id = f"sub-{subject_id}" if len(subject_id) == 2 else subject_id
+        self.legacy_id = load_subject_lut(base_dir).get(self.sub_id, None)
         self.rp_files = self._get_rp_files()
         self.runs = ['learning1', 'learning2', 'test']
 
