@@ -1,4 +1,5 @@
 import os
+import glob
 import scipy.io
 import numpy as np
 import warnings
@@ -479,8 +480,6 @@ class Subject:
     test : Block
         Contains a Block object representing the subject's test phase data.
     """
-    bids_layout = None # Class attribute to store the BIDS layout
-
     def __init__(self, base_dir, subject_id, include_imaging=False, include_modeling=False, bids_dir=None):
         """
         Initializes the Subject class by loading the necessary data.
@@ -500,8 +499,9 @@ class Subject:
 
         # Can skip loading imaging data if not needed
         if include_imaging:
-        # Load the BIDSLayout if it hasn't been created yet
-            self.get_or_create_layout(bids_dir)
+            if bids_dir is None:
+                raise ValueError("BIDS directory must be provided to load imaging data.")
+            self.bids_dir = bids_dir
         # Preload most common fmriprep files for easy access
             self._preload_fmriprep_files()
 
@@ -774,17 +774,47 @@ class Subject:
                     cls.bids_layout = BIDSLayout(bids_dir, derivatives=True)
         else:
             print("Using existing BIDSLayout")
+    
+    def get_base_dir (self):
+        """
+        Get the base directory for the subject's fMRI data.
 
-    def get_bids_files(self, **kwargs):
+        Returns
+        -------
+        str
+            The base directory for the subject's fmriprep func files
         """
-        Wrapper for the BIDSLayout.get() method that always includes the subject ID.
-        Additional filters can be passed as keyword arguments (kwargs).
+        assert self.bids_dir is not None and os.path.isdir(self.bids_dir), "BIDS directory does not exist."
+        if 'fmriprep' in self.bids_dir:
+            base_dir = os.path.join(self.bids_dir, self.sub_id, 'ses-1', 'func')
+        else:
+            fmriprep_dir = glob.glob(os.path.join(self.bids_dir, 'derivatives', 'fmriprep*'))[0]
+            if not fmriprep_dir:
+                raise FileNotFoundError("No fmriprep directory found in derivatives.")
+            base_dir  = os.path.join(fmriprep_dir, self.sub_id, 'ses-1', 'func')
+        return base_dir
+
+    def get_img_path (self, run):
         """
-        # Always include the subject ID in the query
-        kwargs['subject'] = self.sub_id[-2:]  # Assuming sub_id refers to the subject identifier
-        
-        # Use layout.get() with the updated filters
-        return self.bids_layout.get(**kwargs)
+        Get the path to the fMRI image file for the specified run.
+
+        Parameters
+        ----------
+        run : str, ['learning1', 'learning2', 'test']
+            The run for which to get the fMRI image file.
+
+        Returns
+        -------
+        str
+            The path to the fMRI image file for the specified run.
+        """
+        base_dir = self.get_base_dir()
+        f_task = 'learning' if 'learning' in run else 'test'
+        f_run = self.runs.index(run) + 1 # neat way to get the run number
+        img_file = os.path.join(base_dir, f"{self.sub_id}_ses-1_task-{f_task}_run-{f_run}_space-MNI152NLin2009cAsym_desc-preproc_bold.nii.gz")
+        if not os.path.exists(img_file):
+            raise FileNotFoundError(f"File {img_file} not found.")
+        return img_file
 
     def _preload_fmriprep_files(self):
         """
@@ -794,10 +824,8 @@ class Subject:
         self.img = {}
 
         # Assign the fMRIprep files using keyword arguments
-        # 'run':1,'suffix': 'bold', 'desc': 'preproc', 'extension': 'nii.gz'}
-        self.img['learning1'] = self.get_bids_files(suffix='bold', run=1, desc= 'preproc', extension='nii.gz')[0]
-        self.img['learning2'] = self.get_bids_files(suffix='bold', run=2, desc= 'preproc', extension='nii.gz')[0]
-        self.img['test'] = self.get_bids_files(suffix='bold', run=3, desc= 'preproc', extension='nii.gz')[0]
+        for run in self.runs:
+            self.img[run] = self.get_img_path(run)
 
     def _load_modeling_data(self, modeling_dir = 'modeling_data'):
         """
