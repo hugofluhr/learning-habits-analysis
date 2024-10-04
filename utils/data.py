@@ -304,6 +304,10 @@ class Block:
                         'stim7_value_ck', 'stim8_value_ck']
         for col in columns2fill:
             merged.loc[self.trials['action'].isna(), col] = merged[col].ffill()
+        
+        # Backward fill if the first trial(s) are non-response
+        for col in columns2fill:
+            merged[col] = merged[col].bfill()
 
         # TODO: fill missing values for diff_val, choice_prob, action_prob and value_diff
         # TODO: decide how to handle trials with rt < 0.05
