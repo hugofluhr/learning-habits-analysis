@@ -1,4 +1,5 @@
 import os
+import warnings
 import numpy as np
 from nilearn import image
 from nilearn.glm.first_level import FirstLevelModel, make_first_level_design_matrix
@@ -78,6 +79,11 @@ def run_model_1(subject, run, confounds, tr, hrf_model, high_pass, smoothing_fwh
     n = fmri_img.shape[-1]
     frametimes = np.linspace(tr/2., (n - .5) * tr, n)
 
+    # Ignore warnings related to null duration events and unexpected columns in events data
+    warnings.filterwarnings("ignore", message=".*events with null duration.*")
+    warnings.filterwarnings("ignore", message=".*following unexpected columns in events data.*")
+
+    # Build the design matrix
     X1 = make_first_level_design_matrix(
         frame_times=frametimes,
         events=events,
@@ -151,6 +157,11 @@ def run_model_2(subject, run, confounds, tr, hrf_model, high_pass, smoothing_fwh
     n = fmri_img.shape[-1]
     frametimes = np.linspace(tr/2., (n - .5) * tr, n)
 
+    # Ignore warnings related to null duration events and unexpected columns in events data
+    warnings.filterwarnings("ignore", message=".*events with null duration.*")
+    warnings.filterwarnings("ignore", message=".*following unexpected columns in events data.*")
+
+    # Build the design matrix
     X2 = make_first_level_design_matrix(
         frame_times=frametimes,
         events=events,

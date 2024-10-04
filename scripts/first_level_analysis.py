@@ -1,10 +1,5 @@
 import sys
 import os
-import warnings
-import numpy as np
-from nilearn import image
-from nilearn.glm.first_level import FirstLevelModel, make_first_level_design_matrix
-from nilearn.plotting import plot_stat_map
 from nilearn.interfaces.fmriprep import load_confounds
 sys.path.append('/Users/hugofluhr/phd_local/repositories/RewardPairsTask_Analysis/')
 from utils.data import Subject
@@ -57,9 +52,6 @@ if __name__ == "__main__":
     sub_id = '01'  # Example subject ID list
     subject, confounds_dict = load_subject_data(sub_id)
 
-    # Ignore warnings related to null duration events and unexpected columns in events data
-    warnings.filterwarnings("ignore", message=".*events with null duration.*")
-    warnings.filterwarnings("ignore", message=".*following unexpected columns in events data.*")
     for run in subject.runs:
         run_model_1(subject, run, confounds_dict[run], tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir, plot_stat=False, plot_design=True)
         run_model_2(subject, run, confounds_dict[run], tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir, plot_stat=False, plot_design=True)
