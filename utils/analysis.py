@@ -75,7 +75,6 @@ def run_model_1(subject, run, confounds, tr, hrf_model, high_pass, smoothing_fwh
     img_path = subject.img.get(run)
     fmri_img = image.load_img(img_path)
 
-    # Build design matrix
     n = fmri_img.shape[-1]
     frametimes = np.linspace(tr/2., (n - .5) * tr, n)
 
@@ -83,7 +82,7 @@ def run_model_1(subject, run, confounds, tr, hrf_model, high_pass, smoothing_fwh
     warnings.filterwarnings("ignore", message=".*events with null duration.*")
     warnings.filterwarnings("ignore", message=".*following unexpected columns in events data.*")
 
-    # Build the design matrix
+    # Build the design matrix
     X1 = make_first_level_design_matrix(
         frame_times=frametimes,
         events=events,
@@ -92,6 +91,11 @@ def run_model_1(subject, run, confounds, tr, hrf_model, high_pass, smoothing_fwh
         high_pass=high_pass,
         add_regs=confounds
     )
+    # Add the parametric modulator for the first stimulus presentation
+    condition = 'first_stim_presentation'
+    reg_rl_value = compute_parametric_modulator(events, condition, 'first_stim_value_rl',
+                                            frametimes, hrf_model)
+    X1.insert(1, 'first_stim_value_rl', reg_rl_value)
 
     # Optionally plot and save the design matrix
     if plot_design:
@@ -99,21 +103,17 @@ def run_model_1(subject, run, confounds, tr, hrf_model, high_pass, smoothing_fwh
         plot_design_matrix(X1, output_file=design_matrix_path)
         print(f"Design matrix for Model 1 saved to {design_matrix_path}")
 
-    # Fit the first-level model
     model1 = FirstLevelModel(smoothing_fwhm=smoothing_fwhm, minimize_memory=False)
     model1 = model1.fit(fmri_img, design_matrices=X1)
 
-    # Compute the contrast
     z_map1 = model1.compute_contrast(
-        contrast_def="first_stim_presentation - iti", output_type="z_score"
+        contrast_def="first_stim_value_rl", output_type="z_score"
     )
 
-    # Save the z-map to derivatives directory
     z_map1_path = os.path.join(derivatives_dir, f'{subject.sub_id}_run-{run}_model1_z_map.nii.gz')
     z_map1.to_filename(z_map1_path)
     print(f"Model 1 results saved to {z_map1_path}")
 
-    # Plot and save the statistical map as an image if requested
     if plot_stat:
         plot_stat_map(
             z_map1,
@@ -172,9 +172,9 @@ def run_model_2(subject, run, confounds, tr, hrf_model, high_pass, smoothing_fwh
     )
     # Add the parametric modulator for the first stimulus presentation
     condition = 'first_stim_presentation'
-    reg_rl_value = compute_parametric_modulator(events, condition, 'first_stim_value_rl',
+    reg_ck_value = compute_parametric_modulator(events, condition, 'first_stim_value_ck',
                                             frametimes, hrf_model)
-    X2.insert(1, 'first_stim_value_rl', reg_rl_value)
+    X2.insert(1, 'first_stim_value_ck', reg_ck_value)
 
     # Optionally plot and save the design matrix
     if plot_design:
@@ -186,7 +186,7 @@ def run_model_2(subject, run, confounds, tr, hrf_model, high_pass, smoothing_fwh
     model2 = model2.fit(fmri_img, design_matrices=X2)
 
     z_map2 = model2.compute_contrast(
-        contrast_def="second_stim_presentation - iti", output_type="z_score"
+        contrast_def="first_stim_value_ck", output_type="z_score"
     )
 
     z_map2_path = os.path.join(derivatives_dir, f'{subject.sub_id}_run-{run}_model2_z_map.nii.gz')
