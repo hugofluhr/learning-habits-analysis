@@ -3,7 +3,7 @@ import os
 from nilearn.interfaces.fmriprep import load_confounds
 sys.path.append('/Users/hugofluhr/phd_local/repositories/RewardPairsTask_Analysis/')
 from utils.data import Subject
-from utils.analysis import run_model_1, run_model_2
+from utils.analysis import run_model_rl, run_model_ck
 
 # Set base directory and derivatives directory
 base_dir = '/Users/hugofluhr/data/LH_dev'
@@ -53,5 +53,5 @@ if __name__ == "__main__":
     subject, confounds_dict = load_subject_data(sub_id)
 
     for run in subject.runs:
-        run_model_1(subject, run, confounds_dict[run], tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir, plot_stat=False, plot_design=True)
-        run_model_2(subject, run, confounds_dict[run], tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir, plot_stat=False, plot_design=True)
+        run_model_rl(subject, run, confounds_dict[run], tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir, plot_stat=False, plot_design=True)
+        run_model_ck(subject, run, confounds_dict[run], tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir, plot_stat=False, plot_design=True)
