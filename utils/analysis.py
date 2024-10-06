@@ -45,8 +45,8 @@ def compute_parametric_modulator(events, condition, modulator, frametimes, hrf_m
     return regressor
 
 # Function to run first-level analysis for a given model
-def run_model(subject, run, confounds, tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir,
-              model_label, parametric_modulator_column, plot_stat=False, plot_design=False):
+def run_model(subject, run, confounds, sample_mask, tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir,
+              model_label, parametric_modulator_column, remove_baseline=False, plot_stat=False, plot_design=False):
     """
     Run the first-level fMRI analysis model for a given subject and run.
 
@@ -54,6 +54,7 @@ def run_model(subject, run, confounds, tr, hrf_model, high_pass, smoothing_fwhm,
     subject (object): The subject object containing fMRI data and metadata.
     run (str): The specific run identifier within the subject's data.
     confounds (DataFrame): Confounding variables to include in the design matrix.
+    sample_mask (array): Boolean mask to indicate which volumes to include in the analysis.
     tr (float): Repetition time of the fMRI acquisition.
     hrf_model (str): Hemodynamic response function model to use.
     high_pass (float): High-pass filter cutoff frequency in Hz.
@@ -61,6 +62,7 @@ def run_model(subject, run, confounds, tr, hrf_model, high_pass, smoothing_fwhm,
     derivatives_dir (str): Directory path to save the output z-map and statistical map.
     model_label (str): Label for the model, e.g., 'model1' or 'model2'.
     parametric_modulator_column (str): Column name for the parametric modulator to be added to the design matrix.
+    remove_baseline (bool, optional): Whether to remove the baseline condition in the contrast. Default is False.
     plot_stat (bool, optional): Whether to plot and save the statistical map as an image. Default is False.
     plot_design (bool, optional): Whether to plot and save the design matrix as an image. Default is False.
 
@@ -80,6 +82,13 @@ def run_model(subject, run, confounds, tr, hrf_model, high_pass, smoothing_fwhm,
 
     n = fmri_img.shape[-1]
     frametimes = np.linspace(tr / 2., (n - .5) * tr, n)
+
+    # if remove_baseline is True, change the model label.
+    if remove_baseline:
+        model_label = f"{model_label}_no_baseline"
+    # if sample_mask is not None, change the model label.
+    if sample_mask is not None:
+        model_label = f"{model_label}_masked"
 
     # Ignore warnings related to null duration events and unexpected columns in events data
     warnings.filterwarnings("ignore", message=".*events with null duration.*")
@@ -109,12 +118,17 @@ def run_model(subject, run, confounds, tr, hrf_model, high_pass, smoothing_fwhm,
 
     # Fit the first-level model
     model = FirstLevelModel(smoothing_fwhm=smoothing_fwhm, minimize_memory=True)
-    model = model.fit(fmri_img, design_matrices=design_matrix)
+    model = model.fit(fmri_img, design_matrices=design_matrix, sample_masks=sample_mask)
 
     # Compute contrast and save z-map
-    z_map = model.compute_contrast(
-        contrast_def=parametric_modulator_column, output_type="z_score"
-    )
+    if not remove_baseline:
+        z_map = model.compute_contrast(
+            contrast_def=parametric_modulator_column, output_type="z_score"
+        )
+    else:
+        z_map = model.compute_contrast(
+            contrast_def=f"{parametric_modulator_column} - first_stim_presentation", output_type="z_score"
+        )
 
     z_map_path = os.path.join(derivatives_dir, f'{subject.sub_id}_run-{run}_{model_label}_z_map.nii.gz')
     z_map.to_filename(z_map_path)
@@ -131,19 +145,19 @@ def run_model(subject, run, confounds, tr, hrf_model, high_pass, smoothing_fwhm,
 
 
 # Wrapper functions for running specific models
-def run_model_rl(subject, run, confounds, tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir, plot_stat=False, plot_design=True):
+def run_model_rl(subject, run, confounds, sample_mask, tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir, remove_baseline=False, plot_stat=False, plot_design=True):
     """
     Wrapper to run Model 1 analysis.
     """
-    run_model(subject, run, confounds, tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir,
-              model_label='model_rl', parametric_modulator_column='first_stim_value_rl',
+    run_model(subject, run, confounds, sample_mask, tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir,
+              model_label='model_rl', parametric_modulator_column='first_stim_value_rl', remove_baseline=remove_baseline,
               plot_stat=plot_stat, plot_design=plot_design)
 
 
-def run_model_ck(subject, run, confounds, tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir, plot_stat=False, plot_design=True):
+def run_model_ck(subject, run, confounds, sample_mask, tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir, remove_baseline=False, plot_stat=False, plot_design=True):
     """
     Wrapper to run Model 2 analysis.
     """
-    run_model(subject, run, confounds, tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir,
-              model_label='model_ck', parametric_modulator_column='first_stim_value_ck',
+    run_model(subject, run, confounds, sample_mask, tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir,
+              model_label='model_ck', parametric_modulator_column='first_stim_value_ck', remove_baseline=remove_baseline,
               plot_stat=plot_stat, plot_design=plot_design)
