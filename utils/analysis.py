@@ -7,7 +7,7 @@ from nilearn.plotting import plot_stat_map, plot_design_matrix
 from nilearn.glm.first_level.hemodynamic_models import compute_regressor
 
 
-def compute_parametric_modulator(events, condition, modulator, frametimes, hrf_model):
+def compute_parametric_modulator(events, condition, modulator, frametimes, hrf_model, center=True):
     """
     Compute the parametric modulator for a given condition and modulator
     
@@ -23,6 +23,8 @@ def compute_parametric_modulator(events, condition, modulator, frametimes, hrf_m
         The frame times
     hrf_model : str
         The HRF model to use
+    center : bool, optional
+        Whether to center the modulator. Default is True.
     
     Returns
     -------
@@ -37,6 +39,9 @@ def compute_parametric_modulator(events, condition, modulator, frametimes, hrf_m
         events.duration[condition_mask].values,
         events[modulator][condition_mask].values,
     )
+    if center:
+        exp_condition = (exp_condition[0], exp_condition[1], exp_condition[2] - exp_condition[2].mean())
+
     regressor, _ = compute_regressor(exp_condition=exp_condition,
                                      hrf_model=hrf_model,
                                      frame_times=frametimes
@@ -142,14 +147,14 @@ def run_model(subject, run, confounds, sample_mask, tr, hrf_model, high_pass, sm
             title=f"{model_label.capitalize()}: Subject {subject.sub_id}, Run {run} Contrast",
             output_file=os.path.join(derivatives_dir, f'{subject.sub_id}_run-{run}_{model_label}_stat_map.png')
         )
-
+    return model
 
 # Wrapper functions for running specific models
 def run_model_rl(subject, run, confounds, sample_mask, tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir, remove_baseline=False, plot_stat=False, plot_design=True):
     """
     Wrapper to run Model 1 analysis.
     """
-    run_model(subject, run, confounds, sample_mask, tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir,
+    _ = run_model(subject, run, confounds, sample_mask, tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir,
               model_label='model_rl', parametric_modulator_column='first_stim_value_rl', remove_baseline=remove_baseline,
               plot_stat=plot_stat, plot_design=plot_design)
 
@@ -158,6 +163,6 @@ def run_model_ck(subject, run, confounds, sample_mask, tr, hrf_model, high_pass,
     """
     Wrapper to run Model 2 analysis.
     """
-    run_model(subject, run, confounds, sample_mask, tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir,
+    _ = run_model(subject, run, confounds, sample_mask, tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir,
               model_label='model_ck', parametric_modulator_column='first_stim_value_ck', remove_baseline=remove_baseline,
               plot_stat=plot_stat, plot_design=plot_design)

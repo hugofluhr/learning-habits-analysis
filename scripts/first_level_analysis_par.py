@@ -10,7 +10,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 # Set base directory and derivatives directory
 base_dir = '/Users/hugofluhr/data/LH_dev'
 bids_dir = "/Users/hugofluhr/data/LH_dev/fmriprep-23.2.1"
-derivatives_dir = os.path.join(base_dir, 'nilearn_first_level_no_baseline_masked')
+derivatives_dir = os.path.join(base_dir, 'nilearn/first_level_scrubbed')
 
 # Create derivatives folder if it does not exist
 if not os.path.exists(derivatives_dir):
@@ -24,6 +24,7 @@ smoothing_fwhm = 5
 high_pass = 0.01
 motion_type = 'basic'
 mask_samples = True
+remove_baseline = False
 
 def process_subject(sub_id, tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir, mask_samples):
     print(f"Processing Subject {sub_id}...")  
@@ -33,8 +34,8 @@ def process_subject(sub_id, tr, hrf_model, high_pass, smoothing_fwhm, derivative
             confounds, sample_mask = subject.load_confounds(run, motion_type=motion_type)
             if not mask_samples:
                 sample_mask = None
-            run_model_rl(subject, run, confounds, sample_mask, tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir, remove_baseline=True, plot_stat=False, plot_design=True)
-            run_model_ck(subject, run, confounds, sample_mask, tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir, remove_baseline=True, plot_stat=False, plot_design=True)
+            run_model_rl(subject, run, confounds, sample_mask, tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir, remove_baseline=remove_baseline, plot_stat=False, plot_design=True)
+            run_model_ck(subject, run, confounds, sample_mask, tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir, remove_baseline=remove_baseline, plot_stat=False, plot_design=True)
     
         return f"Subject {sub_id} processed successfully"
     except Exception as e:
