@@ -25,43 +25,17 @@ high_pass = 0.01
 motion_type = 'basic'
 mask_samples = True
 
-# Function to load subject data including confounds
-def load_subject_data(sub_id):
-    subject = Subject(base_dir, sub_id, include_modeling=True, include_imaging=True, bids_dir=bids_dir)
-    
-    confounds_dict = {}
-    sample_mask_dict = {}
-    for run in subject.runs:
-        img_path = subject.img.get(run)
-        confounds, sample_mask = load_confounds(
-            img_path,
-            strategy=('motion', 'high_pass', 'wm_csf', 'scrub'),
-            motion=motion_type,
-            scrub=0,
-            fd_threshold=0.5,
-            std_dvars_threshold=2.5
-        )
-
-        # Filter to keep only the first 5 cosine columns
-        cosine_columns = [col for col in confounds.columns if col.startswith('cosine')]
-        cosine_columns_to_keep = cosine_columns[:5]
-        columns_to_keep = [col for col in confounds.columns if not col.startswith('cosine')] + cosine_columns_to_keep
-        confounds_dict[run] = confounds[columns_to_keep]
-        sample_mask_dict[run] = sample_mask
-
-    return subject, confounds_dict, sample_mask_dict
-
 def process_subject(sub_id, tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir, mask_samples):
-    print(f"Processing Subject {sub_id}...")
+    print(f"Processing Subject {sub_id}...")  
     try:
-        subject, confounds_dict, sample_mask = load_subject_data(sub_id)
-        if not mask_samples:
-            sample_mask = {run: None for run in subject.runs}
-        
+        subject = Subject(base_dir, sub_id, include_modeling=True, include_imaging=True, bids_dir=bids_dir)        
         for run in subject.runs:
-            run_model_rl(subject, run, confounds_dict[run], sample_mask[run], tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir, remove_baseline=True, plot_stat=False, plot_design=True)
-            run_model_ck(subject, run, confounds_dict[run], sample_mask[run], tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir, remove_baseline=True, plot_stat=False, plot_design=True)
-        
+            confounds, sample_mask = subject.load_confounds(run, motion_type=motion_type)
+            if not mask_samples:
+                sample_mask = None
+            run_model_rl(subject, run, confounds, sample_mask, tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir, remove_baseline=True, plot_stat=False, plot_design=True)
+            run_model_ck(subject, run, confounds, sample_mask, tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir, remove_baseline=True, plot_stat=False, plot_design=True)
+    
         return f"Subject {sub_id} processed successfully"
     except Exception as e:
         return f"An error occurred for Subject {sub_id}: {e}"

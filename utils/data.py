@@ -4,7 +4,7 @@ import scipy.io
 import numpy as np
 import warnings
 import pandas as pd
-from bids import BIDSLayout
+from nilearn.interfaces.fmriprep import load_confounds
 
 def load_subject_lut(base_dir):
     """
@@ -39,7 +39,7 @@ def load_subject_lut(base_dir):
     
     return lookup_dict
 
-def load_participant_list(base_dir, file_name='modeling_participants.tsv'):
+def load_participant_list(base_dir, file_name='participants_sne2024.tsv'):
     """
     Load the list of subjects from the base directory.
 
@@ -819,6 +819,32 @@ class Subject:
         if not os.path.exists(img_file):
             raise FileNotFoundError(f"File {img_file} not found.")
         return img_file
+    
+    def load_confounds(self, run, motion_type='basic'):
+        """ Load the confounds file for the specified run.
+
+        Parameters
+        ----------
+        run : str
+            The run for which to load the confounds file.
+        """
+        img_path = self.img.get(run)
+        confounds, sample_mask = load_confounds(
+            img_path,
+            strategy=('motion', 'high_pass', 'wm_csf', 'scrub'),
+            motion=motion_type,
+            scrub=0,
+            fd_threshold=0.5,
+            std_dvars_threshold=2.5
+        )
+
+        # Filter to keep only the first 5 cosine columns
+        cosine_columns = [col for col in confounds.columns if col.startswith('cosine')]
+        cosine_columns_to_keep = cosine_columns[:5]
+        columns_to_keep = [col for col in confounds.columns if not col.startswith('cosine')] + cosine_columns_to_keep
+        confounds = confounds[columns_to_keep]
+
+        return confounds, sample_mask
 
     def _preload_fmriprep_files(self):
         """
