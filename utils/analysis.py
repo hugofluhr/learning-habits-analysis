@@ -51,7 +51,7 @@ def compute_parametric_modulator(events, condition, modulator, frametimes, hrf_m
 
 # Function to run first-level analysis for a given model
 def run_model(subject, run, confounds, sample_mask, tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir,
-              model_label, parametric_modulator_column, remove_baseline=False, plot_stat=False, plot_design=False):
+              model_label, parametric_modulator_column, demean_modulator=True, plot_stat=False, plot_design=False):
     """
     Run the first-level fMRI analysis model for a given subject and run.
 
@@ -67,7 +67,7 @@ def run_model(subject, run, confounds, sample_mask, tr, hrf_model, high_pass, sm
     derivatives_dir (str): Directory path to save the output z-map and statistical map.
     model_label (str): Label for the model, e.g., 'model1' or 'model2'.
     parametric_modulator_column (str): Column name for the parametric modulator to be added to the design matrix.
-    remove_baseline (bool, optional): Whether to remove the baseline condition in the contrast. Default is False.
+    demean_modulator (bool, optional): Whether to demean the parametric modulators. Default is True.
     plot_stat (bool, optional): Whether to plot and save the statistical map as an image. Default is False.
     plot_design (bool, optional): Whether to plot and save the design matrix as an image. Default is False.
 
@@ -88,9 +88,9 @@ def run_model(subject, run, confounds, sample_mask, tr, hrf_model, high_pass, sm
     n = fmri_img.shape[-1]
     frametimes = np.linspace(tr / 2., (n - .5) * tr, n)
 
-    # if remove_baseline is True, change the model label.
-    if remove_baseline:
-        model_label = f"{model_label}_no_baseline"
+    # if demean_modulator is True, change the model label.
+    if demean_modulator:
+        model_label = f"{model_label}_demeaned_modulator"
     # if sample_mask is not None, change the model label.
     if sample_mask is not None:
         model_label = f"{model_label}_masked"
@@ -112,7 +112,7 @@ def run_model(subject, run, confounds, sample_mask, tr, hrf_model, high_pass, sm
     # Add the parametric modulator for the first stimulus presentation
     condition = 'first_stim_presentation'
     reg_value = compute_parametric_modulator(events, condition, parametric_modulator_column,
-                                             frametimes, hrf_model)
+                                             frametimes, hrf_model, center=demean_modulator)
     design_matrix.insert(1, parametric_modulator_column, reg_value)
 
     # Optionally plot and save the design matrix
@@ -126,14 +126,9 @@ def run_model(subject, run, confounds, sample_mask, tr, hrf_model, high_pass, sm
     model = model.fit(fmri_img, design_matrices=design_matrix, sample_masks=sample_mask)
 
     # Compute contrast and save z-map
-    if not remove_baseline:
-        z_map = model.compute_contrast(
-            contrast_def=parametric_modulator_column, output_type="z_score"
-        )
-    else:
-        z_map = model.compute_contrast(
-            contrast_def=f"{parametric_modulator_column} - first_stim_presentation", output_type="z_score"
-        )
+    z_map = model.compute_contrast(
+        contrast_def=f"{parametric_modulator_column} - first_stim_presentation", output_type="z_score"
+    )
 
     z_map_path = os.path.join(derivatives_dir, f'{subject.sub_id}_run-{run}_{model_label}_z_map.nii.gz')
     z_map.to_filename(z_map_path)
@@ -150,19 +145,19 @@ def run_model(subject, run, confounds, sample_mask, tr, hrf_model, high_pass, sm
     return model
 
 # Wrapper functions for running specific models
-def run_model_rl(subject, run, confounds, sample_mask, tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir, remove_baseline=False, plot_stat=False, plot_design=True):
+def run_model_rl(subject, run, confounds, sample_mask, tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir, demean_modulator=True, plot_stat=False, plot_design=True):
     """
     Wrapper to run Model 1 analysis.
     """
     _ = run_model(subject, run, confounds, sample_mask, tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir,
-              model_label='model_rl', parametric_modulator_column='first_stim_value_rl', remove_baseline=remove_baseline,
+              model_label='model_rl', parametric_modulator_column='first_stim_value_rl', demean_modulator=demean_modulator,
               plot_stat=plot_stat, plot_design=plot_design)
 
 
-def run_model_ck(subject, run, confounds, sample_mask, tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir, remove_baseline=False, plot_stat=False, plot_design=True):
+def run_model_ck(subject, run, confounds, sample_mask, tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir, demean_modulator=True, plot_stat=False, plot_design=True):
     """
     Wrapper to run Model 2 analysis.
     """
     _ = run_model(subject, run, confounds, sample_mask, tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir,
-              model_label='model_ck', parametric_modulator_column='first_stim_value_ck', remove_baseline=remove_baseline,
+              model_label='model_ck', parametric_modulator_column='first_stim_value_ck', demean_modulator=demean_modulator,
               plot_stat=plot_stat, plot_design=plot_design)
