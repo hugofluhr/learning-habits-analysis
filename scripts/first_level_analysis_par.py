@@ -11,7 +11,7 @@ import json
 # Set base directory and derivatives directory
 base_dir = '/Users/hugofluhr/data/LH_dev'
 bids_dir = "/Users/hugofluhr/data/LH_dev/fmriprep-23.2.1"
-derivatives_dir = os.path.join(base_dir, 'nilearn/new_first_level_scrubbed_demeaned_basic_motion')
+derivatives_dir = os.path.join(base_dir, 'nilearn/new_first_level_scrubbed_demeaned_basic_motion_with_contrast')
 
 # Create derivatives folder if it does not exist
 if not os.path.exists(derivatives_dir):
