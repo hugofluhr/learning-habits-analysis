@@ -1,17 +1,18 @@
 import sys
 import os
 from nilearn.interfaces.fmriprep import load_confounds
-sys.path.append('/Users/hugofluhr/phd_local/repositories/RewardPairsTask_Analysis/')
+sys.path.append('/home/ubuntu/repos/learning-habits-analysis')
 from utils.data import Subject, load_participant_list
 from utils.analysis import run_model_rl, run_model_ck
+import time
 
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import json
 
 # Set base directory and derivatives directory
-base_dir = '/Users/hugofluhr/data/LH_dev'
-bids_dir = "/Users/hugofluhr/data/LH_dev/fmriprep-23.2.1"
-derivatives_dir = os.path.join(base_dir, 'nilearn/new_first_level_scrubbed_demeaned_basic_motion_with_contrast')
+base_dir = '/home/ubuntu/data/learning-habits'
+bids_dir = '/home/ubuntu/data/learning-habits/bids_dataset/derivatives/fmriprep-23.2.1/'
+derivatives_dir = os.path.join(base_dir, 'outputs/first_level/benchmark')
 
 # Create derivatives folder if it does not exist
 if not os.path.exists(derivatives_dir):
@@ -61,6 +62,7 @@ def process_subject(sub_id, tr, hrf_model, high_pass, smoothing_fwhm, derivative
 
 # Entry point for the script
 if __name__ == "__main__":
+    start_time = time.time()
     subject_ids = load_participant_list(base_dir)
 
     # Set up parallel processing with ProcessPoolExecutor
@@ -71,3 +73,6 @@ if __name__ == "__main__":
         # Gather results as they are completed
         for future in as_completed(futures):
             print(future.result())
+    
+    end_time = time.time()
+    print(f"Total time elapsed: {end_time - start_time:.2f} seconds")
