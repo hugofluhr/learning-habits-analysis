@@ -80,7 +80,7 @@ def fft_computation(size=10**7):
 
 if __name__ == "__main__":
     # Benchmark parameters
-    n_repeats = 3  # Number of repetitions for each function
+    n_repeats = 7  # Number of repetitions for each function
 
     # List of functions to benchmark and their parameters
     benchmark_tasks = [
