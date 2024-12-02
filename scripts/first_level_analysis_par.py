@@ -11,8 +11,8 @@ import json
 
 # Set base directory and derivatives directory
 base_dir = '/home/ubuntu/data/learning-habits'
-bids_dir = '/home/ubuntu/data/learning-habits/bids_dataset/derivatives/fmriprep-23.2.1/'
-derivatives_dir = os.path.join(base_dir, 'outputs/first_level/benchmark')
+bids_dir = '/home/ubuntu/data/learning-habits/bids_dataset/derivatives/fmriprep-24.0.1/'
+derivatives_dir = os.path.join(base_dir, 'outputs/first_level/cloud-24.0.1')
 
 # Create derivatives folder if it does not exist
 if not os.path.exists(derivatives_dir):
@@ -66,7 +66,7 @@ if __name__ == "__main__":
     subject_ids = load_participant_list(base_dir)
 
     # Set up parallel processing with ProcessPoolExecutor
-    with ProcessPoolExecutor(max_workers=6) as executor:
+    with ProcessPoolExecutor(max_workers=8) as executor:
         # Submit all subjects to be processed
         futures = {executor.submit(process_subject, sub_id, tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir, mask_samples): sub_id for sub_id in subject_ids}
         
