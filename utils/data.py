@@ -512,6 +512,7 @@ class Subject:
         # Load modeling data if needed
         if include_modeling:
             self.add_modeling_data()
+            self.extended_trials = self._concatenate_trials(trial_type='extended_trials')
     
     def _get_rp_files(self):
         """
@@ -714,21 +715,29 @@ class Subject:
         # Load the test phase, assumed to be a single block
         return self._load_block(subject_data['phase2_2'])
     
-    def _concatenate_trials(self):
+    def _concatenate_trials(self, trial_type='trials'):
         """
         Concatenates all trials from the subject's learning phase and test phase into a single DataFrame.
+
+        Parameters
+        ----------
+        trial_type : str, optional
+            Specifies the type of trials to concatenate ('trials' or 'extended_trials'). Default is 'trials'.
 
         Returns
         -------
         pd.DataFrame
             A concatenated DataFrame containing all trials, with an additional 'block' column.
         """
+        if trial_type not in ['trials', 'extended_trials']:
+            raise ValueError("trial_type must be 'trials' or 'extended_trials'")
+
         all_trials = []
 
         # Iterate over each block
         # Add a 'block' column to the trials DataFrame indicating the block number
         for run in self.runs:
-            block_trials = getattr(self, run).trials.copy()
+            block_trials = getattr(self, run).__getattribute__(trial_type).copy()
             block_trials['block'] = f"{run}"
             all_trials.append(block_trials)
 
