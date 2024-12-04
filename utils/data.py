@@ -811,6 +811,28 @@ class Subject:
         if not os.path.exists(img_file):
             raise FileNotFoundError(f"File {img_file} not found.")
         return img_file
+
+    def get_brain_mask (self, run):
+        """
+        Get the path to the brain mask file for the specified run.
+        
+        Parameters
+        ----------
+        run : str, ['learning1', 'learning2', 'test']
+            The run for which to get the brain mask file.
+
+        Returns
+        -------
+        str
+            The path to the brain mask file for the specified run.
+        """
+        base_dir = self.get_base_dir()
+        f_task = 'learning' if 'learning' in run else 'test'
+        f_run = self.runs.index(run) + 1
+        mask_file = os.path.join(base_dir, f"{self.sub_id}_ses-1_task-{f_task}_run-{f_run}_space-MNI152NLin2009cAsym_desc-brain_mask.nii.gz")
+        if not os.path.exists(mask_file):
+            raise FileNotFoundError(f"File {mask_file} not found.")
+        return mask_file
     
     def load_confounds(self, run, motion_type='basic'):
         """ Load the confounds file for the specified run.
@@ -844,10 +866,13 @@ class Subject:
         """
         # Initialize self.img as a dictionary
         self.img = {}
+        # Same for brains masks
+        self.brain_mask = {}
 
         # Assign the fMRIprep files using keyword arguments
         for run in self.runs:
             self.img[run] = self.get_img_path(run)
+            self.brain_mask[run] = self.get_brain_mask(run)
 
     def _load_modeling_data(self, modeling_dir = 'modeling_data'):
         """
