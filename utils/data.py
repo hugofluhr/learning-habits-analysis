@@ -14,7 +14,6 @@ def load_subject_lut(base_dir):
     ----------
     base_dir : str
         The base directory containing the subject lookup table.
-
     Returns
     -------
     dict
@@ -771,22 +770,6 @@ class Subject:
             A DataFrame containing event information for the specified block.
         """
         return getattr(self, block).create_event_df()
-    
-    @classmethod
-    def get_or_create_layout(cls, bids_dir):
-        # Check if the layout is already created
-        if cls.bids_layout is None:
-            print("Creating BIDSLayout...")
-            if bids_dir is None:
-                raise ValueError("BIDS directory must be provided to create BIDSLayout.")
-            else:
-                cls.bids_dir = bids_dir
-                if 'fmriprep' in bids_dir:
-                    cls.bids_layout = BIDSLayout(bids_dir, is_derivative=True)
-                else:
-                    cls.bids_layout = BIDSLayout(bids_dir, derivatives=True)
-        else:
-            print("Using existing BIDSLayout")
     
     def get_base_dir (self):
         """
