@@ -8,11 +8,10 @@ import os
 sys.path.append('/home/ubuntu/repos/learning-habits-analysis')
 from utils.data import Subject, load_participant_list
 from scipy.io import savemat
+import numpy as np
 
 # Set base directory and derivatives directory
 base_dir = '/home/ubuntu/data/learning-habits'
-#bids_dir = '/home/ubuntu/data/learning-habits/bids_dataset/derivatives/fmriprep-23.2.1/'
-
 
 def prepare_bids_for_spm(bids_dir, output_dir):
     """
@@ -31,7 +30,7 @@ def prepare_bids_for_spm(bids_dir, output_dir):
     subjects = load_participant_list(base_dir)
     for subject in subjects:
         print(f"Processing {subject}...")
-        output_subject_dir = os.path.join(output_dir, subject, "func")
+        output_subject_dir = os.path.join(output_dir, 'sub-' + subject, "func")
         os.makedirs(output_subject_dir, exist_ok=True)
 
         subject = Subject(base_dir, subject, include_modeling=False, include_imaging=True, bids_dir=bids_dir)        
@@ -62,17 +61,31 @@ def prepare_bids_for_spm(bids_dir, output_dir):
             print(f"Saved motion regressors to {output_regressors}")
 
             # save events file
-            for trial_type, group in events.groupby("trial_type"):
-                onsets = group["onset"].tolist()
-                durations = group["duration"].tolist()
-                # Save to .mat file
-                mat_data = {
-                    "onsets": onsets,
-                    "durations": durations,
-                }
-                output_file = os.path.join(output_subject_dir, f"{trial_type}_events.mat")
-                savemat(output_file, mat_data)
-                print(f"Saved: {output_file}")
+            # Convert DataFrame columns to NumPy arrays (which can be saved as MATLAB cell arrays)
+            # Group by 'trial_type' to aggregate the events for each condition
+            grouped_events = events.groupby('trial_type')
+
+            # Prepare lists for names, onsets, and durations
+            names = []
+            onsets = []
+            durations = []
+
+            # Iterate through each group and collect the onsets and durations for each condition
+            for trial_type, group in grouped_events:
+                names.append(trial_type)  # Add the trial type (condition name)
+                onsets.append(group['onset'].tolist())  # Add the onsets as a list
+                durations.append(group['duration'].tolist())  # Add the durations as a list
+
+            # Convert lists to numpy arrays (which will be saved as MATLAB cell arrays)
+            names_cell = np.array(names, dtype=object)
+            onsets_cell = np.empty(len(onsets), dtype=object)
+            onsets_cell[:] = onsets
+            durations_cell = np.empty(len(durations), dtype=object)
+            durations_cell[:] = durations
+
+            output_events = os.path.join(output_subject_dir, os.path.basename(bold_file).replace(".nii.gz", "_events.mat")) 
+            savemat(output_events, {"names": names_cell, "onsets": onsets_cell, "durations": durations_cell})
+            print(f"Saved events to {output_events}")
 
     print("Preparation complete.")
 
