@@ -127,19 +127,19 @@ def run_model(subject, run, confounds, sample_mask, tr, hrf_model, high_pass, sm
 
     # Compute betamap and save it
     z_map = model.compute_contrast(
-        contrast_def=f"{parametric_modulator_column}", output_type="z_score"
+        contrast_def=f"{parametric_modulator_column}", output_type="effect_size"
     )
-    z_map_path = os.path.join(derivatives_dir, f'{subject.sub_id}_run-{run}_{model_label}_z_map.nii.gz')
+    z_map_path = os.path.join(derivatives_dir, f'{subject.sub_id}_run-{run}_{model_label}_b_map.nii.gz')
     z_map.to_filename(z_map_path)
     print(f"{model_label.capitalize()} betamap results saved to {z_map_path}")
 
     # Compute constrast and save it
-    z_map_contrast = model.compute_contrast(
-        contrast_def=f"{parametric_modulator_column} - first_stim_presentation", output_type="z_score"
-    )
-    z_map_contrast_path = os.path.join(derivatives_dir, f'{subject.sub_id}_run-{run}_{model_label}_contrast_z_map.nii.gz')
-    z_map_contrast.to_filename(z_map_contrast_path)
-    print(f"{model_label.capitalize()} contrast results saved to {z_map_contrast_path}")
+    # z_map_contrast = model.compute_contrast(
+    #     contrast_def=f"{parametric_modulator_column} - first_stim_presentation", output_type="z_score"
+    # )
+    # z_map_contrast_path = os.path.join(derivatives_dir, f'{subject.sub_id}_run-{run}_{model_label}_contrast_z_map.nii.gz')
+    # z_map_contrast.to_filename(z_map_contrast_path)
+    # print(f"{model_label.capitalize()} contrast results saved to {z_map_contrast_path}")
 
     # Optionally plot and save the statistical map
     if plot_stat:

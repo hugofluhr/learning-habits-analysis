@@ -12,7 +12,7 @@ import json
 # Set base directory and derivatives directory
 base_dir = '/home/ubuntu/data/learning-habits'
 bids_dir = '/home/ubuntu/data/learning-habits/bids_dataset/derivatives/fmriprep-24.0.1/'
-derivatives_dir = os.path.join(base_dir, 'outputs/first_level/cloud-24.0.1')
+derivatives_dir = os.path.join(base_dir, 'outputs/first_level/cloud-24.0.1_bmap')
 
 # Create derivatives folder if it does not exist
 if not os.path.exists(derivatives_dir):
