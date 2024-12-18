@@ -1,5 +1,5 @@
 % Base directory for SPM results
-base_dir = '/Users/hugofluhr/phd_local/data/LearningHabits/spm_format/outputs/spm_results';  % Adjust to your base directory
+base_dir = '/Users/hugofluhr/Downloads/spm_results/first-level';  % Adjust to your base directory
 
 % Get list of subjects
 subject_dirs = dir(fullfile(base_dir, 'sub-*'));
@@ -58,7 +58,7 @@ for i = 1:length(subjects)
             sanitized_name = regexprep(regressor_name, '[^a-zA-Z0-9]', '_');
             
             % Create new file name
-            new_name = fullfile(run_dir, ['beta_' sanitized_name '.nii']);
+            new_name = fullfile(run_dir, [sub_id,'_', run_id, '_beta_' sanitized_name '.nii']);
             
             % Rename the file
             try
