@@ -1,8 +1,10 @@
+addpath('/home/ubuntu/repos/spm12');
+
 spm('Defaults', 'fMRI');
 spm_jobman('initcfg');
 
 % Directory paths
-base_dir = '/Users/hugofluhr/phd_local/data/LearningHabits/spm_format';
+base_dir = '/home/ubuntu/data/learning-habits/spm_format';
 derivatives_dir = fullfile(base_dir, 'outputs', 'spm_results'); 
 if ~exist(derivatives_dir, 'dir')
     mkdir(derivatives_dir);
@@ -14,12 +16,15 @@ smoothing_fwhm = 5; % Smoothing kernel
 high_pass_cutoff = 128; % High-pass filter in seconds
 
 % Subjects to process
-subjects = {'01', '02'};  % Add all subject IDs
+sub_dirs = dir(fullfile(base_dir, 'sub-*'));
+subjects = {sub_dirs([sub_dirs.isdir]).name}; % Get all sub- directory names
 
 % Loop through subjects
-for i = 2%1:length(subjects)
+for i = 1:length(subjects)
     sub_id = subjects{i};
+    disp(['Processing subject: ', sub_id]);
     func_dir = fullfile(base_dir, sub_id, 'func');
+    disp(func_dir);
     
     % Identify unique runs based on BOLD file names
     bold_files = spm_select('FPList', func_dir, '^sub-.*_desc-preproc_bold.nii$');
@@ -29,7 +34,7 @@ for i = 2%1:length(subjects)
     smoothed_files = {};
     for j = 1:length(run_ids)
         run_id = run_ids{j};
-        
+        disp(['Smoothing run: ', run_id]);
         % Select BOLD files for current run
         run_bold_files = spm_select('FPList', func_dir, ['^sub-.*' run_id '_.*_desc-preproc_bold.nii$']);
         if isempty(run_bold_files)
@@ -45,16 +50,16 @@ for i = 2%1:length(subjects)
         matlabbatch{1}.spm.spatial.smooth.prefix = 'smoothed_';
         
         % Save and run smoothing batch
-        %spm_jobman('run', matlabbatch);
+        spm_jobman('run', matlabbatch);
         
         % Collect smoothed files for model specification
         smoothed_files{j} = spm_select('FPList', func_dir, ['^smoothed_.*' run_id '_.*_bold.nii$']);
     end
-    
+    disp('Smoothing complete');
     % Step 2: Model specification and estimation
     for j = 1:length(run_ids)
         run_id = run_ids{j};
-        output_dir = fullfile(derivatives_dir, ['sub-', sub_id], run_id);
+        output_dir = fullfile(derivatives_dir, sub_id, run_id);
         if ~exist(output_dir, 'dir')
             mkdir(output_dir);
         end
