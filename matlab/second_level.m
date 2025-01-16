@@ -1,6 +1,6 @@
 %% Get files
 % Set base directories
-base_dir = '/Users/hugofluhr/Downloads/';
+base_dir = '/Users/hugofluhr/phd_local/data/LearningHabits/spm_format/outputs';
 derivatives_dir = fullfile(base_dir, 'spm_results');
 
 % Find all subject directories
