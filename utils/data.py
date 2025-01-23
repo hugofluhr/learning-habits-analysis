@@ -800,13 +800,15 @@ class Subject:
             The directory containing the physiological regressors for the subject.
         """
         assert self.bids_dir is not None and os.path.isdir(self.bids_dir), "BIDS directory does not exist."
+        
+        # I call the fmriprep bids_dir for simplicity (bad decision)
         if 'fmriprep' in self.bids_dir:
-            base_dir = os.path.join(self.bids_dir, self.sub_id, 'ses-1', 'func')
-        else:
-            fmriprep_dir = glob.glob(os.path.join(self.bids_dir, 'derivatives', 'fmriprep*'))[0]
-            if not fmriprep_dir:
-                raise FileNotFoundError("No fmriprep directory found in derivatives.")
-            base_dir  = os.path.join(fmriprep_dir, self.sub_id, 'ses-1', 'func')
+            actual_bids = os.path.dirname(self.bids_dir)
+        
+        physio_dir = os.path.join(actual_bids, 'physIO', self.sub_id, 'ses-1', 'func')
+        if not os.path.exists(physio_dir):
+            raise FileNotFoundError("No fmriprep directory found in derivatives.")
+        
         return physio_dir
 
     def get_img_path (self, run):
@@ -878,6 +880,26 @@ class Subject:
         confounds = confounds[columns_to_keep]
 
         return confounds, sample_mask
+    
+    def load_physio_regressors(self, run):
+        """ Load the physiological regressors for the specified run.
+
+        Parameters
+        ----------
+        run : str
+            The run for which to load the physiological regressors.
+        """
+        physio_dir = self.get_physio_dir()
+        f_task = 'learning' if 'learning' in run else 'test'
+        f_run = self.runs.index(run) + 1
+        regressors_path = os.path.join(physio_dir, f"{self.sub_id}_ses-1_task-{f_task}_run-{f_run}_physio.tsv")
+        if not os.path.exists(regressors_path):
+            raise FileNotFoundError(f"File {regressors_path} not found.")
+        
+        physio_regressors = pd.read_csv(regressors_path, sep='\t', header=None, names=[f'physio{i}' for i in range(1, 19)], index_col=False)
+
+        return physio_regressors
+
 
     def _preload_fmriprep_files(self):
         """
