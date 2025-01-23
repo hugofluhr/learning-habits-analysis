@@ -789,6 +789,25 @@ class Subject:
                 raise FileNotFoundError("No fmriprep directory found in derivatives.")
             base_dir  = os.path.join(fmriprep_dir, self.sub_id, 'ses-1', 'func')
         return base_dir
+    
+    def get_physio_dir(self):
+        """
+        Get the directory containing the physiological regressors for the subject.
+
+        Returns
+        -------
+        str
+            The directory containing the physiological regressors for the subject.
+        """
+        assert self.bids_dir is not None and os.path.isdir(self.bids_dir), "BIDS directory does not exist."
+        if 'fmriprep' in self.bids_dir:
+            base_dir = os.path.join(self.bids_dir, self.sub_id, 'ses-1', 'func')
+        else:
+            fmriprep_dir = glob.glob(os.path.join(self.bids_dir, 'derivatives', 'fmriprep*'))[0]
+            if not fmriprep_dir:
+                raise FileNotFoundError("No fmriprep directory found in derivatives.")
+            base_dir  = os.path.join(fmriprep_dir, self.sub_id, 'ses-1', 'func')
+        return physio_dir
 
     def get_img_path (self, run):
         """
