@@ -25,7 +25,7 @@ bids_dir = "/home/ubuntu/data/learning-habits/bids_dataset/derivatives/fmriprep-
 sub_ids = load_participant_list(base_dir)
 
 model_params = {
-    'model_name': 'ck_modulation',
+    'model_name': 'rl_modulation',
     'tr': 2.33384,
     'hrf_model': 'spm',
     'noise_model': 'ar1',
@@ -96,7 +96,7 @@ def model_run(subject, run, model_params):
                                         add_regs=confounds)
     
     # Parametric modulation
-    parametric_modulator_column = 'first_stim_value_ck'
+    parametric_modulator_column = 'first_stim_value_rl'
     condition = 'first_stim_presentation'
     reg_value = compute_parametric_modulator(events, condition, parametric_modulator_column,
                                              frametimes, hrf_model, center=demean_modulator)
@@ -135,11 +135,18 @@ def model_run(subject, run, model_params):
         beta_map.to_filename(beta_path)
         #print(f"Saved: {beta_path}")
 
-    # Save contrast map
-    z_map = model.compute_contrast(contrast_def='response', output_type="effect_size")
-    z_map_path = os.path.join(sub_output_dir, f'{subject.sub_id}_run-{run}_response_contrast.nii.gz')
-    z_map.to_filename(z_map_path)
-    #print(f"Contrast map saved to {z_map_path}")
+    # Save the parametric modulator separately
+    if parametric_modulator_column in design_matrix.columns:
+        idx = design_matrix.columns.get_loc(parametric_modulator_column)
+        beta_map = model.compute_contrast(np.eye(len(design_matrix.columns))[idx], output_type='effect_size')
+        beta_path = os.path.join(sub_output_dir, f'beta_{parametric_modulator_column}.nii.gz')
+        beta_map.to_filename(beta_path)
+
+    # # Save contrast map
+    # z_map = model.compute_contrast(contrast_def='response', output_type="effect_size")
+    # z_map_path = os.path.join(sub_output_dir, f'{subject.sub_id}_run-{run}_response_contrast.nii.gz')
+    # z_map.to_filename(z_map_path)
+    # #print(f"Contrast map saved to {z_map_path}")
 
     # Save the design matrix
     design_matrix_path = os.path.join(sub_output_dir, f'{subject.sub_id}_run-{run}_design_matrix.csv')
@@ -180,7 +187,7 @@ if __name__ == "__main__":
     sub_ids = load_participant_list(base_dir)
 
     # Set up parallel processing with ProcessPoolExecutor
-    with ProcessPoolExecutor(max_workers=24) as executor:
+    with ProcessPoolExecutor(max_workers=30) as executor:
         futures = {executor.submit(process_subject, sub, model_params): sub for sub in sub_ids}
 
         # Process completed subjects
