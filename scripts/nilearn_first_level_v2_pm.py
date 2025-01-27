@@ -2,6 +2,7 @@ import sys
 import os
 import numpy as np
 import pickle
+import time
 import json
 from datetime import datetime
 import warnings
@@ -15,6 +16,8 @@ sys.path.append('/home/ubuntu/repos/learning-habits-analysis')
 from utils.data import Subject, load_participant_list
 from utils.analysis import compute_parametric_modulator
 
+from concurrent.futures import ProcessPoolExecutor, as_completed
+
 
 base_dir = '/home/ubuntu/data/learning-habits'
 bids_dir = "/home/ubuntu/data/learning-habits/bids_dataset/derivatives/fmriprep-24.0.1"
@@ -22,7 +25,7 @@ bids_dir = "/home/ubuntu/data/learning-habits/bids_dataset/derivatives/fmriprep-
 sub_ids = load_participant_list(base_dir)
 
 model_params = {
-    'model_name': 'rl_modulation',
+    'model_name': 'ck_modulation',
     'tr': 2.33384,
     'hrf_model': 'spm',
     'noise_model': 'ar1',
@@ -66,7 +69,7 @@ def model_run(subject, run, model_params):
     fmri_img = load_img(img_path)
 
     # Load events
-    events = getattr(subject, run).events
+    events = getattr(subject, run).extend_events_df()
 
     # This should always be None for now
     if brain_mask:
@@ -93,7 +96,7 @@ def model_run(subject, run, model_params):
                                         add_regs=confounds)
     
     # Parametric modulation
-    parametric_modulator_column = 'first_stim_value_rl'
+    parametric_modulator_column = 'first_stim_value_ck'
     condition = 'first_stim_presentation'
     reg_value = compute_parametric_modulator(events, condition, parametric_modulator_column,
                                              frametimes, hrf_model, center=demean_modulator)
@@ -161,21 +164,28 @@ def model_run(subject, run, model_params):
     #print(f"GLM report saved to {report_path}")
 
 
+
 def process_subject(sub_id, model_params):
     print(f"Processing Subject {sub_id}...")  
-    
-    #try:
-    subject = Subject(base_dir, sub_id, include_modeling=True, include_imaging=True, bids_dir=bids_dir)
-        
-    for run in subject.runs:
-        #print(f"----------------- run {run}...")
-        model_run(subject, run, model_params)
+    try:
+        subject = Subject(base_dir, sub_id, include_modeling=True, include_imaging=True, bids_dir=bids_dir)
+        for run in subject.runs:
+            model_run(subject, run, model_params)
+        return f"Subject {sub_id} processed successfully"
+    except Exception as e:
+        return f"An error occurred for Subject {sub_id}: {e}"
 
-    return f"Subject {sub_id} processed successfully"
+if __name__ == "__main__":
+    start_time = time.time()
+    sub_ids = load_participant_list(base_dir)
 
-    #except Exception as e:
-    #    return f"An error occurred for Subject {sub_id}: {e}"
+    # Set up parallel processing with ProcessPoolExecutor
+    with ProcessPoolExecutor(max_workers=24) as executor:
+        futures = {executor.submit(process_subject, sub, model_params): sub for sub in sub_ids}
 
+        # Process completed subjects
+        for future in as_completed(futures):
+            print(future.result())
 
-for sub in sub_ids:
-    print(process_subject(sub, model_params))
+    end_time = time.time()
+    print(f"Total time elapsed: {end_time - start_time:.2f} seconds")
