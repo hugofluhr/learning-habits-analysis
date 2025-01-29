@@ -7,7 +7,7 @@ from nilearn.plotting import plot_stat_map, plot_design_matrix
 from nilearn.glm.first_level.hemodynamic_models import compute_regressor
 
 
-def compute_parametric_modulator(events, condition, modulator, frametimes, hrf_model, center=True):
+def compute_parametric_modulator(events, condition, modulator, frametimes, hrf_model, normalize='center'):
     """
     Compute the parametric modulator for a given condition and modulator
     
@@ -23,15 +23,15 @@ def compute_parametric_modulator(events, condition, modulator, frametimes, hrf_m
         The frame times
     hrf_model : str
         The HRF model to use
-    center : bool, optional
-        Whether to center the modulator. Default is True.
+    normalize : str, optional
+        The normalization to apply to the modulator. Default is 'center'
     
     Returns
     -------
     regressor : array-like
         The modulated regressor
     """
-    # adapted from nilearn's code
+    #ï¿½adapted from nilearn's code
 
     condition_mask = events.trial_type == condition
     exp_condition = (
@@ -39,8 +39,10 @@ def compute_parametric_modulator(events, condition, modulator, frametimes, hrf_m
         events.duration[condition_mask].values,
         events[modulator][condition_mask].values,
     )
-    if center:
+    if normalize == 'center':
         exp_condition = (exp_condition[0], exp_condition[1], exp_condition[2] - exp_condition[2].mean())
+    elif normalize == 'zscore':
+        exp_condition = (exp_condition[0], exp_condition[1], (exp_condition[2] - exp_condition[2].mean()) / exp_condition[2].std())
 
     regressor, _ = compute_regressor(exp_condition=exp_condition,
                                      hrf_model=hrf_model,
