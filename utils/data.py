@@ -308,7 +308,7 @@ class Block:
         for col in columns2fill:
             merged[col] = merged[col].bfill()
 
-        # TODO: fill missing values for diff_val, choice_prob, action_prob and value_diff
+        #ï¿½TODO: fill missing values for diff_val, choice_prob, action_prob and value_diff
         # TODO: decide how to handle trials with rt < 0.05
 
         # Add columns with info about which stimulus was presented first and second
@@ -500,7 +500,7 @@ class Subject:
         # Load the Reward Pairing Task data 
         self._load_scanner_behav_data()
 
-        # Can skip loading imaging data if not needed
+        #ï¿½Can skip loading imaging data if not needed
         if include_imaging:
             if bids_dir is None:
                 raise ValueError("BIDS directory must be provided to load imaging data.")
