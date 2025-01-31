@@ -855,7 +855,7 @@ class Subject:
             raise FileNotFoundError(f"File {mask_file} not found.")
         return mask_file
     
-    def load_confounds(self, run, motion_type='basic'):
+    def load_confounds(self, run, motion_type='basic', scrub=0, fd_thresh=0.5, std_dvars_thresh=2.5):
         """ Load the confounds file for the specified run.
 
         Parameters
@@ -868,9 +868,9 @@ class Subject:
             img_path,
             strategy=('motion', 'high_pass', 'wm_csf', 'scrub'),
             motion=motion_type,
-            scrub=0,
-            fd_threshold=0.5,
-            std_dvars_threshold=2.5
+            scrub=scrub,
+            fd_threshold=fd_thresh,
+            std_dvars_threshold=std_dvars_thresh
         )
 
         # Filter to keep only the first 5 cosine columns
@@ -953,3 +953,29 @@ class Subject:
         """
         self._load_modeling_data(modeling_dir)
         self._combine_modeling_data()
+
+def create_dummy_regressors(sample_mask, n_scans):
+    """
+    Create dummy regressors for volumes excluded by sample_mask.
+    
+    Parameters:
+    - sample_mask: list or array of indices to keep (from load_confounds)
+    - n_scans: total number of volumes in the fMRI run
+    
+    Returns:
+    - dummy_regressors: Pandas DataFrame with one-hot encoded regressors for excluded volumes
+    """
+    # Identify excluded volumes (volumes not in sample_mask)
+    excluded_vols = np.setdiff1d(np.arange(n_scans), sample_mask)
+
+    # Create an empty array for regressors (n_scans x num_excluded_volumes)
+    dummy_regressors = np.zeros((n_scans, len(excluded_vols)))
+
+    # Assign 1s to the excluded volumes
+    for i, vol in enumerate(excluded_vols):
+        dummy_regressors[vol, i] = 1  # One-hot encoding
+
+    # Convert to Pandas DataFrame with meaningful column names
+    dummy_regressors_df = pd.DataFrame(dummy_regressors, columns=[f"scrub_vol_{vol}" for vol in excluded_vols])
+
+    return dummy_regressors_df
