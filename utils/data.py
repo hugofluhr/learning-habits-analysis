@@ -965,6 +965,9 @@ def create_dummy_regressors(sample_mask, n_scans):
     Returns:
     - dummy_regressors: Pandas DataFrame with one-hot encoded regressors for excluded volumes
     """
+    if sample_mask is None:
+        return pd.DataFrame()
+
     # Identify excluded volumes (volumes not in sample_mask)
     excluded_vols = np.setdiff1d(np.arange(n_scans), sample_mask)
 
