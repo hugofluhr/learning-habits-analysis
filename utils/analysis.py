@@ -31,7 +31,7 @@ def compute_parametric_modulator(events, condition, modulator, frametimes, hrf_m
     regressor : array-like
         The modulated regressor
     """
-    #�adapted from nilearn's code
+    # Adapted from nilearn's code
 
     condition_mask = events.trial_type == condition
     exp_condition = (
@@ -42,7 +42,10 @@ def compute_parametric_modulator(events, condition, modulator, frametimes, hrf_m
     if normalize == 'center':
         exp_condition = (exp_condition[0], exp_condition[1], exp_condition[2] - exp_condition[2].mean())
     elif normalize == 'zscore':
-        exp_condition = (exp_condition[0], exp_condition[1], (exp_condition[2] - exp_condition[2].mean()) / exp_condition[2].std())
+        epsilon = 1e-8
+        exp_condition = (exp_condition[0], exp_condition[1], (exp_condition[2] - exp_condition[2].mean()) / (exp_condition[2].std() + epsilon))
+    elif normalize is not None:
+        raise ValueError(f"Unknown normalization method: {normalize}")
 
     regressor, _ = compute_regressor(exp_condition=exp_condition,
                                      hrf_model=hrf_model,
