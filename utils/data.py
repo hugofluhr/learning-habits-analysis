@@ -982,3 +982,23 @@ def create_dummy_regressors(sample_mask, n_scans):
     dummy_regressors_df = pd.DataFrame(dummy_regressors, columns=[f"scrub_vol_{vol}" for vol in excluded_vols])
 
     return dummy_regressors_df
+
+def get_contrast_modulator_path(sub_id, first_level_dir, run, pattern):
+    try:
+        path = glob.glob(os.path.join(first_level_dir, f"sub-{sub_id}", f"run-{run}", pattern.format(sub_id=sub_id, run=run)))[0]
+        return path
+    except IndexError:
+        #print(f"No file found for subject {sub_id}")
+        return None
+    
+def get_betamap_paths(sub_ids, first_level_dir, run, pattern):
+    contrast_modulator_paths = []
+    matched_sub_ids = []
+    
+    for sub_id in sub_ids:
+        path = get_contrast_modulator_path(sub_id, first_level_dir, run, pattern)
+        if path:
+            contrast_modulator_paths.append(path)
+            matched_sub_ids.append(sub_id)
+    
+    return contrast_modulator_paths, matched_sub_ids
