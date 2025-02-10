@@ -28,7 +28,7 @@ bids_dir = "/home/ubuntu/data/learning-habits/bids_dataset/derivatives/fmriprep-
 sub_ids = load_participant_list(base_dir)
 
 model_params = {
-    'model_name': 'both_modulators_no_mask',
+    'model_name': 'both_modulators_nophysio',
     'tr': 2.33384,
     'hrf_model': 'spm',
     'noise_model': 'ar1',
@@ -39,9 +39,9 @@ model_params = {
     'std_dvars_thresh': 2,
     'scrub': 'dummies',
     'modulators': 'both',
-    'exclude_stimuli': False,
-    'include_physio': True,
-    'brain_mask': False,
+    'exclude_stimuli': True,
+    'include_physio': False,
+    'brain_mask': True,
     'modulator_normalization': 'zscore',
     'exclusion_threshold': 0.2
 }
