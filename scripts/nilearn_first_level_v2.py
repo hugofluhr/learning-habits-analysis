@@ -5,6 +5,8 @@ import json
 import pickle
 import warnings
 from datetime import datetime
+
+
 from joblib import Parallel, delayed
 import multiprocessing
 
@@ -28,7 +30,7 @@ bids_dir = "/home/ubuntu/data/learning-habits/bids_dataset/derivatives/fmriprep-
 sub_ids = load_participant_list(base_dir)
 
 model_params = {
-    'model_name': 'both_modulators_nophysio',
+    'model_name': 'null_durations',
     'tr': 2.33384,
     'hrf_model': 'spm',
     'noise_model': 'ar1',
@@ -40,8 +42,9 @@ model_params = {
     'scrub': 'dummies',
     'modulators': 'both',
     'exclude_stimuli': True,
-    'include_physio': False,
+    'include_physio': True,
     'brain_mask': True,
+    'duration': 'iti_only',
     'modulator_normalization': 'zscore',
     'exclusion_threshold': 0.2
 }
@@ -60,6 +63,7 @@ def model_run(subject, run, model_params):
     modulator_normalization = model_params["modulator_normalization"]
     modulators = model_params["modulators"]
     exclude_stimuli = model_params["exclude_stimuli"]
+    duration = model_params["duration"]
     motion_type = model_params["motion_type"]
     fd_thresh = model_params["fd_thresh"]
     std_dvars_thresh = model_params["std_dvars_thresh"]
@@ -74,7 +78,6 @@ def model_run(subject, run, model_params):
     sub_output_dir = os.path.join(model_dir,sub_id, f"run-{run}")
     if not os.path.exists(sub_output_dir):
         os.makedirs(sub_output_dir)
-
 
     # Load fMRI volume
     img_path = subject.img.get(run)
@@ -131,6 +134,14 @@ def model_run(subject, run, model_params):
             axis=1
         ) 
 
+    # Handle the duration of events
+    if duration == 'iti_only':
+        events.loc[events['trial_type'] != 'iti', 'duration'] = 0
+    elif duration == 'all':
+        pass
+    else:
+        raise ValueError("Invalid duration type. Must be 'iti_only' or 'all'")
+
     # Compute frame timing    
     n = fmri_img.shape[-1]
     frametimes = np.linspace(tr / 2., (n - .5) * tr, n)
@@ -139,7 +150,6 @@ def model_run(subject, run, model_params):
     warnings.filterwarnings("ignore", message=".*events with null duration.*")
     warnings.filterwarnings("ignore", message=".*following unexpected columns in events data.*")
     
-
     # Create design matrix
     design_matrix = make_first_level_design_matrix(frame_times=frametimes,
                                         events=events,
@@ -177,6 +187,11 @@ def model_run(subject, run, model_params):
     
     model = model.fit(fmri_img, design_matrices=design_matrix, sample_masks=sample_mask)
 
+    # Save the events dataframe to csv
+    events_path = os.path.join(sub_output_dir, f'{sub_id}_run-{run}_events.csv')
+    events.to_csv(events_path, index=False)
+    #print(f"Events saved to {events_path}")
+
     # Save the fitted model using pickle
     model_filename = os.path.join(sub_output_dir, f'{sub_id}_run-{run}_model.pkl')
     with open(model_filename, 'wb') as f:
@@ -213,6 +228,9 @@ def model_run(subject, run, model_params):
     with open(params_path, 'w') as f:
         json.dump(model_params, f, indent=4)
     #print(f"Analysis parameters saved to {params_path}")
+
+    # Suppress Tight layout warning
+    warnings.filterwarnings("ignore", message=".*Tight layout not applied.*")
 
     # Save QC plot of design matrix
     qc_design_path = os.path.join(sub_output_dir, f'{sub_id}_run-{run}_design_matrix.png')
