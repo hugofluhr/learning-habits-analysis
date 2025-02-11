@@ -23,8 +23,8 @@ from utils.analysis import compute_parametric_modulator
 max_workers = min(30, multiprocessing.cpu_count())
 
 # Mapping for reward and frequency
-stim_rewards = {0: 0, 1: 1, 2: 2, 3: 2, 4: 3, 5: 3, 6: 4, 7: 4, 8: 5}
-stim_frequ = {0: 0, 1: 0, 2: -1, 3: 1, 4: -1, 5: 1, 6: -1, 7: 1, 8: 0}
+stim_rewards = {1: 1, 2: 2, 3: 2, 4: 3, 5: 3, 6: 4, 7: 4, 8: 5}
+stim_frequ = {1: 0, 2: -1, 3: 1, 4: -1, 5: 1, 6: -1, 7: 1, 8: 0}
 
 base_dir = '/home/ubuntu/data/learning-habits'
 bids_dir = "/home/ubuntu/data/learning-habits/bids_dataset/derivatives/fmriprep-24.0.1"
@@ -32,7 +32,7 @@ bids_dir = "/home/ubuntu/data/learning-habits/bids_dataset/derivatives/fmriprep-
 sub_ids = load_participant_list(base_dir)
 
 model_params = {
-    'model_name': 'non_param_both',
+    'model_name': 'non_param_both_centered',
     'tr': 2.33384,
     'hrf_model': 'spm',
     'noise_model': 'ar1',
@@ -43,7 +43,7 @@ model_params = {
     'std_dvars_thresh': 2.5,
     'scrub': 'dummies',
     'modulators': 'non_parametric',
-    'modulator_normalization': None,
+    'modulator_normalization': 'center',
     'exclude_stimuli': True,
     'include_physio': True,
     'brain_mask': True,
