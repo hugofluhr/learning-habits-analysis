@@ -1,23 +1,27 @@
-import sys
 import os
-import numpy as np
-import pickle
+import sys
 import time
 import json
-from datetime import datetime
+import pickle
 import warnings
-from nilearn.plotting import plot_design_matrix
+from datetime import datetime
+
+
+from joblib import Parallel, delayed
+import multiprocessing
+
+import numpy as np
+import pandas as pd
 from nilearn.image import load_img
-from nilearn.reporting import make_glm_report
-from nilearn import image
 from nilearn.glm.first_level import FirstLevelModel, make_first_level_design_matrix
 from nilearn.plotting import plot_design_matrix
+from nilearn.reporting import make_glm_report
+
 sys.path.append('/home/ubuntu/repos/learning-habits-analysis')
-from utils.data import Subject, load_participant_list
-from utils.analysis import compute_parametric_modulator
+from utils.data import Subject, load_participant_list, create_dummy_regressors
 
-from concurrent.futures import ProcessPoolExecutor, as_completed
-
+# Dynamically set the number of workers based on available CPUs
+max_workers = min(30, multiprocessing.cpu_count())
 
 base_dir = '/home/ubuntu/data/learning-habits'
 bids_dir = "/home/ubuntu/data/learning-habits/bids_dataset/derivatives/fmriprep-24.0.1"
@@ -25,20 +29,21 @@ bids_dir = "/home/ubuntu/data/learning-habits/bids_dataset/derivatives/fmriprep-
 sub_ids = load_participant_list(base_dir)
 
 model_params = {
-    'model_name': 'ck_modulation',
+    'model_name': 'rsa',
     'tr': 2.33384,
     'hrf_model': 'spm',
     'noise_model': 'ar1',
     'smoothing_fwhm': 5,
     'high_pass': 0.01,
     'motion_type': 'basic',
+    'fd_thresh': 0.5,
+    'std_dvars_thresh': 2,
+    'scrub': 'dummies',
     'include_physio': True,
-    'brain_mask': False,
-    'mask_samples': False,
-    'demean_modulator': True,
+    'brain_mask': True,
+    'duration': 'iti_only',
+    'exclusion_threshold': 0.2
 }
-
-run = 'test'
 
 def model_run(subject, run, model_params):
 
@@ -49,37 +54,77 @@ def model_run(subject, run, model_params):
     noise_model = model_params["noise_model"]
     smoothing_fwhm = model_params["smoothing_fwhm"]
     high_pass = model_params["high_pass"]
-    motion_type = model_params["motion_type"]
     include_physio = model_params["include_physio"]
     brain_mask = model_params["brain_mask"]
-    mask_samples = model_params["mask_samples"]
-    demean_modulator = model_params["demean_modulator"]
+    duration = model_params["duration"]
+    motion_type = model_params["motion_type"]
+    fd_thresh = model_params["fd_thresh"]
+    std_dvars_thresh = model_params["std_dvars_thresh"]
+    scrub = model_params["scrub"]
+    exclusion_threshold = model_params["exclusion_threshold"]
+
+    # Create output directory
+    sub_id = subject.sub_id
+    derivatives_dir = os.path.join(os.path.dirname(subject.bids_dir), 'nilearn')
+    current_time = datetime.now().strftime("%Y%m%d")
+    model_dir = os.path.join(derivatives_dir, f"{model_name}_{current_time}")
+    sub_output_dir = os.path.join(model_dir,sub_id, f"run-{run}")
+    if not os.path.exists(sub_output_dir):
+        os.makedirs(sub_output_dir)
+
+    # Load fMRI volume
+    img_path = subject.img.get(run)
+    fmri_img = load_img(img_path)
+    n_volumes = fmri_img.shape[-1]
 
     # Load confounds
-    confounds, sample_mask = subject.load_confounds(run, motion_type=motion_type)
+    confounds, sample_mask = subject.load_confounds(run, motion_type=motion_type,
+                                                    fd_thresh=fd_thresh, std_dvars_thresh=std_dvars_thresh,
+                                                    scrub=(0 if scrub == 'dummies' else scrub))
+    
+    # Exclude runs with too many scrubbed volumes
+    if sample_mask is not None and len(sample_mask) < (1-exclusion_threshold)*n_volumes:
+        exclusion_flag_path = os.path.join(sub_output_dir, 'exclusion_flag.txt')
+        with open(exclusion_flag_path, 'w') as f:
+            f.write(f"Run {run} of {sub_id} excluded due to excessive scrubbing")
+        print(f"Run {run} of {sub_id} excluded due to excessive scrubbing")
+        return f"Run {run} of {sub_id} excluded due to excessive scrubbing"
+
+    # Load physio regressors
     if include_physio:
         physio_regressors = subject.load_physio_regressors(run)
         confounds = confounds.join(physio_regressors)
 
-    if not mask_samples:
-        sample_mask = None
-    
-    # Load fMRI volume
-    img_path = subject.img.get(run)
-    fmri_img = load_img(img_path)
+    # Create dummy regressors for outlier volumes
+    if scrub == 'dummies':
+        dummies = create_dummy_regressors(sample_mask, len(confounds))
+        confounds = pd.concat([confounds, dummies], axis=1)
 
-    # Load events
-    events = getattr(subject, run).extend_events_df(
-        columns_events={'first_stim': 'first_stim_presentation'}
-    )
-
-    # This should always be None for now
+    # fmriprep's brain mask
     if brain_mask:
         brain_mask_path = subject.brain_mask.get(run)
         brain_mask = load_img(brain_mask_path)
     else:
         brain_mask = None
 
+    # Load events
+    events = getattr(subject, run).extend_events_df(columns_event={'first_stim':'first_stim_presentation'})
+
+    # Add stim index to first stim presentation
+    events['trial_type'] = events.apply(
+        lambda row: f"{row['trial_type']}_{int(row['first_stim'])}" if row['trial_type'] == 'first_stim_presentation' else row['trial_type'],
+        axis=1
+    )
+
+    # Handle the duration of events
+    if duration == 'iti_only':
+        events.loc[events['trial_type'] != 'iti', 'duration'] = 0
+    elif duration == 'all':
+        pass
+    else:
+        raise ValueError("Invalid duration type. Must be 'iti_only' or 'all'")
+
+    # Compute frame timing    
     n = fmri_img.shape[-1]
     frametimes = np.linspace(tr / 2., (n - .5) * tr, n)
 
@@ -94,13 +139,6 @@ def model_run(subject, run, model_params):
                                         drift_model=None,
                                         high_pass=high_pass,
                                         add_regs=confounds)
-    
-    # Parametric modulation
-    parametric_modulator_column = 'first_stim_value_ck'
-    condition = 'first_stim_presentation'
-    reg_value = compute_parametric_modulator(events, condition, parametric_modulator_column,
-                                             frametimes, hrf_model, center=demean_modulator)
-    design_matrix.insert(1, parametric_modulator_column, reg_value)
 
     # Create the model
     model = FirstLevelModel(t_r=tr, 
@@ -113,17 +151,13 @@ def model_run(subject, run, model_params):
     
     model = model.fit(fmri_img, design_matrices=design_matrix, sample_masks=sample_mask)
 
-    # Create output directory
-    sub_id = subject.sub_id
-    derivatives_dir = os.path.join(os.path.dirname(subject.bids_dir), 'nilearn')
-    current_time = datetime.now().strftime("%Y%m%d")
-    model_dir = os.path.join(derivatives_dir, f"{model_name}_{current_time}")
-    sub_output_dir = os.path.join(model_dir,sub_id, f"run-{run}")
-    if not os.path.exists(sub_output_dir):
-        os.makedirs(sub_output_dir)
+    # Save the events dataframe to csv
+    events_path = os.path.join(sub_output_dir, f'{sub_id}_run-{run}_events.csv')
+    events.to_csv(events_path, index=False)
+    #print(f"Events saved to {events_path}")
 
     # Save the fitted model using pickle
-    model_filename = os.path.join(sub_output_dir, f'sub-{sub_id}_run-{run}_model.pkl')
+    model_filename = os.path.join(sub_output_dir, f'{sub_id}_run-{run}_model.pkl')
     with open(model_filename, 'wb') as f:
         pickle.dump(model, f)
     #print(f"GLM model saved to {model_filename}")
@@ -131,38 +165,34 @@ def model_run(subject, run, model_params):
     # Save beta maps for each regressor (events only)
     for i, column in enumerate(events.trial_type.unique()):
         beta_map = model.compute_contrast(np.eye(len(design_matrix.columns))[i], output_type='effect_size')
-        beta_path = os.path.join(sub_output_dir, f'beta_{i:04d}_{column}.nii.gz')
+        beta_path = os.path.join(sub_output_dir, f'{sub_id}_run-{run}_betamap_{column}.nii.gz')
         beta_map.to_filename(beta_path)
         #print(f"Saved: {beta_path}")
 
-    # Save contrast map
-    z_map = model.compute_contrast(contrast_def='response', output_type="effect_size")
-    z_map_path = os.path.join(sub_output_dir, f'{subject.sub_id}_run-{run}_response_contrast.nii.gz')
-    z_map.to_filename(z_map_path)
-    #print(f"Contrast map saved to {z_map_path}")
-
     # Save the design matrix
-    design_matrix_path = os.path.join(sub_output_dir, f'{subject.sub_id}_run-{run}_design_matrix.csv')
+    design_matrix_path = os.path.join(sub_output_dir, f'{sub_id}_run-{run}_design_matrix.csv')
     design_matrix.to_csv(design_matrix_path, index=False)
     #print(f"Design matrix saved to {design_matrix_path}")
 
     # Save analysis parameters
-    params_path = os.path.join(sub_output_dir, f'{subject.sub_id}_run-{run}_params.json')
+    params_path = os.path.join(sub_output_dir, f'{sub_id}_run-{run}_params.json')
     with open(params_path, 'w') as f:
         json.dump(model_params, f, indent=4)
     #print(f"Analysis parameters saved to {params_path}")
 
+    # Suppress Tight layout warning
+    warnings.filterwarnings("ignore", message=".*Tight layout not applied.*")
+
     # Save QC plot of design matrix
-    qc_design_path = os.path.join(sub_output_dir, f'{subject.sub_id}_run-{run}_design_matrix.png')
+    qc_design_path = os.path.join(sub_output_dir, f'{sub_id}_run-{run}_design_matrix.png')
     plot_design_matrix(design_matrix, output_file=qc_design_path)
     #print(f"Design matrix plot saved to {qc_design_path}")
 
     # Generate GLM report
-    report_path = os.path.join(sub_output_dir, f'{subject.sub_id}_run-{run}_glm_report.html')
-    report = make_glm_report(model=model, contrasts={"response": "response"})
-    report.save_as_html(report_path)
+    # report_path = os.path.join(sub_output_dir, f'{sub_id}_run-{run}_glm_report.html')
+    # report = make_glm_report(model=model, contrasts={"response": "response"})
+    # report.save_as_html(report_path)
     #print(f"GLM report saved to {report_path}")
-
 
 
 def process_subject(sub_id, model_params):
@@ -179,13 +209,14 @@ if __name__ == "__main__":
     start_time = time.time()
     sub_ids = load_participant_list(base_dir)
 
-    # Set up parallel processing with ProcessPoolExecutor
-    with ProcessPoolExecutor(max_workers=24) as executor:
-        futures = {executor.submit(process_subject, sub, model_params): sub for sub in sub_ids}
+    # Parallel processing with joblib
+    results = Parallel(n_jobs=max_workers)(
+        delayed(process_subject)(sub, model_params) for sub in sub_ids
+    )
 
-        # Process completed subjects
-        for future in as_completed(futures):
-            print(future.result())
+    # Print results for each subject
+    for result in results:
+        print(result)
 
     end_time = time.time()
     print(f"Total time elapsed: {end_time - start_time:.2f} seconds")
