@@ -1002,3 +1002,100 @@ def get_betamap_paths(sub_ids, first_level_dir, run, pattern):
             matched_sub_ids.append(sub_id)
     
     return contrast_modulator_paths, matched_sub_ids
+
+
+def collapse_events(df):
+    """
+    Collapse events within each 'trial' in the given DataFrame according to:
+      - sum durations of first_stim_presentation + second_stim_presentation ? 'stim_presentation'
+      - if a response exists: sum durations of response + purple_frame + points_feedback ? 'feedback'
+      - otherwise keep 'non_response_feedback'
+      - keep 'iti' as it is
+
+    Copies all columns from the reference row except 'trial', 'trial_type', 'onset', and 'duration',
+    and reorders final columns to match the original df.
+    """
+    EXCLUDE_COLS = ['trial', 'trial_type', 'onset', 'duration']
+
+    # Save the original column order for later use
+    original_cols = df.columns
+
+    def build_collapsed_row(ref_row, new_trial, new_type, new_onset, new_duration):
+        """
+        Given a reference row (e.g., from first_stim), create a dict:
+          - Copies all columns from ref_row except the ones in EXCLUDE_COLS
+          - Overwrites trial, trial_type, onset, duration
+        """
+        meta = ref_row.drop(labels=EXCLUDE_COLS).to_dict()
+        meta.update({
+            'trial':      new_trial,
+            'trial_type': new_type,
+            'onset':      new_onset,
+            'duration':   new_duration,
+        })
+        return meta
+
+    collapsed_data = []
+
+    # Group by trial
+    for trial_id, grp in df.groupby('trial', sort=False):
+        # 1) Combine first and second stim
+        first_stim  = grp.query("trial_type == 'first_stim_presentation'").iloc[0]
+        second_stim = grp.query("trial_type == 'second_stim_presentation'").iloc[0]
+
+        stim_row = build_collapsed_row(
+            ref_row      = first_stim,
+            new_trial    = trial_id,
+            new_type     = 'stim_presentation',
+            new_onset    = first_stim['onset'],
+            new_duration = first_stim['duration'] + second_stim['duration']
+        )
+        collapsed_data.append(stim_row)
+
+        # 2) Combine feedback events if a response exists, else keep non_response_feedback
+        response_rows = grp.query("trial_type in ['response', 'purple_frame', 'points_feedback']")
+
+        if not response_rows.empty:
+            # Sum durations
+            earliest_onset = response_rows['onset'].min()
+            total_duration = response_rows['duration'].sum()
+            feedback_row = build_collapsed_row(
+                ref_row      = first_stim,
+                new_trial    = trial_id,
+                new_type     = 'feedback',
+                new_onset    = earliest_onset,
+                new_duration = total_duration
+            )
+            collapsed_data.append(feedback_row)
+        else:
+            non_resp = grp.query("trial_type == 'non_response_feedback'").iloc[0]
+            feedback_row = build_collapsed_row(
+                ref_row      = non_resp,
+                new_trial    = trial_id,
+                new_type     = 'non_response_feedback',
+                new_onset    = non_resp['onset'],
+                new_duration = non_resp['duration']
+            )
+            collapsed_data.append(feedback_row)
+
+        # 3) Keep ITI as is
+        iti = grp.query("trial_type == 'iti'").iloc[0]
+        iti_row = build_collapsed_row(
+            ref_row      = iti,
+            new_trial    = trial_id,
+            new_type     = 'iti',
+            new_onset    = iti['onset'],
+            new_duration = iti['duration']
+        )
+        collapsed_data.append(iti_row)
+
+    # Build the collapsed DataFrame
+    collapsed_df = pd.DataFrame(collapsed_data)
+
+    # Reorder columns to match the original DataFrame's order (only for columns that exist in collapsed_df)
+    final_cols = [c for c in original_cols if c in collapsed_df.columns]
+    # If you also want any new columns (unlikely in this scenario) to appear after the original ones:
+    extra_cols = [c for c in collapsed_df.columns if c not in original_cols]
+    collapsed_df = collapsed_df[final_cols + extra_cols]
+
+    return collapsed_df
