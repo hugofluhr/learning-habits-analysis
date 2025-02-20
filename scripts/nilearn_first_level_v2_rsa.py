@@ -41,7 +41,7 @@ model_params = {
     'scrub': 'dummies',
     'include_physio': True,
     'brain_mask': True,
-    'duration': 'iti_only',
+    'duration': 'all',
     'exclusion_threshold': 0.2
 }
 
