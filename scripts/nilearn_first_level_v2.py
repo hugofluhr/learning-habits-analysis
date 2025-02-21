@@ -30,45 +30,45 @@ bids_dir = "/home/ubuntu/data/learning-habits/bids_dataset/derivatives/fmriprep-
 sub_ids = load_participant_list(base_dir)
 
 model_params = {
-    'model_name': 'null_durations',
+    'model_name': 'exclude_iti',
     'tr': 2.33384,
     'hrf_model': 'spm',
     'noise_model': 'ar1',
     'smoothing_fwhm': 5,
-    'high_pass': 0.01,
     'motion_type': 'basic',
-    'fd_thresh': 0.5,
-    'std_dvars_thresh': 2,
-    'scrub': 'dummies',
-    'modulators': 'both',
-    'exclude_stimuli': True,
     'include_physio': True,
     'brain_mask': True,
-    'duration': 'iti_only',
+    'fd_thresh': 0.5,
+    'std_dvars_thresh': 2,
+    'exclusion_threshold': 0.2,
+    'scrub': 'dummies',
+    'modulators': 'both',
     'modulator_normalization': 'zscore',
-    'exclusion_threshold': 0.2
+    'exclude_stimuli': True,
+    'duration': 'all',
+    'iti_included': False
 }
 
 def model_run(subject, run, model_params):
 
     # Parameters
-    model_name = model_params["model_name"]
-    tr = model_params["tr"]
-    hrf_model = model_params["hrf_model"]
-    noise_model = model_params["noise_model"]
-    smoothing_fwhm = model_params["smoothing_fwhm"]
-    high_pass = model_params["high_pass"]
-    include_physio = model_params["include_physio"]
-    brain_mask = model_params["brain_mask"]
-    modulator_normalization = model_params["modulator_normalization"]
-    modulators = model_params["modulators"]
-    exclude_stimuli = model_params["exclude_stimuli"]
-    duration = model_params["duration"]
-    motion_type = model_params["motion_type"]
-    fd_thresh = model_params["fd_thresh"]
-    std_dvars_thresh = model_params["std_dvars_thresh"]
-    scrub = model_params["scrub"]
-    exclusion_threshold = model_params["exclusion_threshold"]
+    model_name = model_params['model_name']
+    tr = model_params['tr']
+    hrf_model = model_params['hrf_model']
+    noise_model = model_params['noise_model']
+    smoothing_fwhm = model_params['smoothing_fwhm']
+    motion_type = model_params['motion_type']
+    include_physio = model_params['include_physio']
+    fd_thresh = model_params['fd_thresh']
+    std_dvars_thresh = model_params['std_dvars_thresh']
+    exclusion_threshold = model_params['exclusion_threshold']
+    scrub = model_params['scrub']
+    modulators = model_params['modulators']
+    modulator_normalization = model_params['modulator_normalization']
+    exclude_stimuli = model_params['exclude_stimuli']
+    brain_mask = model_params['brain_mask']
+    duration = model_params['duration']
+    iti_included = model_params['iti_included']
 
     # Create output directory
     sub_id = subject.sub_id
@@ -135,12 +135,18 @@ def model_run(subject, run, model_params):
         ) 
 
     # Handle the duration of events
-    if duration == 'iti_only':
-        events.loc[events['trial_type'] != 'iti', 'duration'] = 0
+    if duration == 'none':
+        events['duration'] = 0
     elif duration == 'all':
         pass
     else:
-        raise ValueError("Invalid duration type. Must be 'iti_only' or 'all'")
+        raise ValueError("Invalid duration type. Must be 'none' or 'all'")
+    
+    # Handle the ITI
+    if not iti_included:
+        events = events[events['trial_type'] != 'iti']
+    else:
+        pass
 
     # Compute frame timing    
     n = fmri_img.shape[-1]
@@ -155,7 +161,6 @@ def model_run(subject, run, model_params):
                                         events=events,
                                         hrf_model=hrf_model,
                                         drift_model=None,
-                                        high_pass=high_pass,
                                         add_regs=confounds)
     
     # Parametric modulation
@@ -182,8 +187,7 @@ def model_run(subject, run, model_params):
                             mask_img=brain_mask,
                             hrf_model=hrf_model,
                             noise_model=noise_model,
-                            drift_model=None, 
-                            high_pass=high_pass)
+                            drift_model=None)
     
     model = model.fit(fmri_img, design_matrices=design_matrix, sample_masks=sample_mask)
 
