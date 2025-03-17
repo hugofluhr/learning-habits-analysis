@@ -5,6 +5,8 @@ import json
 import pickle
 import warnings
 from datetime import datetime
+
+
 from joblib import Parallel, delayed
 import multiprocessing
 
@@ -37,38 +39,40 @@ model_params = {
     'hrf_model': 'spm',
     'noise_model': 'ar1',
     'smoothing_fwhm': 5,
-    'high_pass': 0.01,
     'motion_type': 'basic',
+    'include_physio': True,
+    'brain_mask': True,
     'fd_thresh': 0.5,
-    'std_dvars_thresh': 2.5,
+    'std_dvars_thresh': 2,
+    'exclusion_threshold': 0.2,
     'scrub': 'dummies',
     'modulators': 'non_parametric',
     'modulator_normalization': 'center',
     'exclude_stimuli': True,
-    'include_physio': True,
-    'brain_mask': True,
-    'exclusion_threshold': 0.2
+    'duration': 'all',
+    'iti_included': False
 }
 
 def model_run(subject, run, model_params):
 
     # Parameters
-    model_name = model_params["model_name"]
-    tr = model_params["tr"]
-    hrf_model = model_params["hrf_model"]
-    noise_model = model_params["noise_model"]
-    smoothing_fwhm = model_params["smoothing_fwhm"]
-    high_pass = model_params["high_pass"]
-    include_physio = model_params["include_physio"]
-    brain_mask = model_params["brain_mask"]
-    modulators = model_params["modulators"]
-    modulator_normalization = model_params["modulator_normalization"]
-    exclude_stimuli = model_params["exclude_stimuli"]
-    motion_type = model_params["motion_type"]
-    fd_thresh = model_params["fd_thresh"]
-    std_dvars_thresh = model_params["std_dvars_thresh"]
-    scrub = model_params["scrub"]
-    exclusion_threshold = model_params["exclusion_threshold"]
+    model_name = model_params['model_name']
+    tr = model_params['tr']
+    hrf_model = model_params['hrf_model']
+    noise_model = model_params['noise_model']
+    smoothing_fwhm = model_params['smoothing_fwhm']
+    motion_type = model_params['motion_type']
+    include_physio = model_params['include_physio']
+    fd_thresh = model_params['fd_thresh']
+    std_dvars_thresh = model_params['std_dvars_thresh']
+    exclusion_threshold = model_params['exclusion_threshold']
+    scrub = model_params['scrub']
+    modulators = model_params['modulators']
+    modulator_normalization = model_params['modulator_normalization']
+    exclude_stimuli = model_params['exclude_stimuli']
+    brain_mask = model_params['brain_mask']
+    duration = model_params['duration']
+    iti_included = model_params['iti_included']
 
     # Create output directory
     sub_id = subject.sub_id
@@ -78,7 +82,6 @@ def model_run(subject, run, model_params):
     sub_output_dir = os.path.join(model_dir,sub_id, f"run-{run}")
     if not os.path.exists(sub_output_dir):
         os.makedirs(sub_output_dir)
-
 
     # Load fMRI volume
     img_path = subject.img.get(run)
@@ -139,6 +142,20 @@ def model_run(subject, run, model_params):
     events['first_stim'] = events['first_stim'].astype(int)
     events['first_stim_reward'] = events['first_stim'].map(stim_rewards)
     events['first_stim_frequ'] = events['first_stim'].map(stim_frequ)
+    
+    # Handle the duration of events
+    if duration == 'none':
+        events['duration'] = 0
+    elif duration == 'all':
+        pass
+    else:
+        raise ValueError("Invalid duration type. Must be 'none' or 'all'")
+    
+    # Handle the ITI
+    if not iti_included:
+        events = events[events['trial_type'] != 'iti']
+    else:
+        pass
 
     # Compute frame timing    
     n = fmri_img.shape[-1]
@@ -147,16 +164,12 @@ def model_run(subject, run, model_params):
     # Ignore warnings related to null duration events and unexpected columns in events data
     warnings.filterwarnings("ignore", message=".*events with null duration.*")
     warnings.filterwarnings("ignore", message=".*following unexpected columns in events data.*")
-
-    # Ignore warnings related to tight layout
-    warnings.filterwarnings("ignore", message=".*Tight layout not applied.*")
-
+    
     # Create design matrix
     design_matrix = make_first_level_design_matrix(frame_times=frametimes,
                                         events=events,
                                         hrf_model=hrf_model,
                                         drift_model=None,
-                                        high_pass=high_pass,
                                         add_regs=confounds)
     
     # Parametric modulation
@@ -183,10 +196,14 @@ def model_run(subject, run, model_params):
                             mask_img=brain_mask,
                             hrf_model=hrf_model,
                             noise_model=noise_model,
-                            drift_model=None, 
-                            high_pass=high_pass)
+                            drift_model=None)
     
     model = model.fit(fmri_img, design_matrices=design_matrix, sample_masks=sample_mask)
+
+    # Save the events dataframe to csv
+    events_path = os.path.join(sub_output_dir, f'{sub_id}_run-{run}_events.csv')
+    events.to_csv(events_path, index=False)
+    #print(f"Events saved to {events_path}")
 
     # Save the fitted model using pickle
     model_filename = os.path.join(sub_output_dir, f'{sub_id}_run-{run}_model.pkl')
@@ -224,6 +241,9 @@ def model_run(subject, run, model_params):
     with open(params_path, 'w') as f:
         json.dump(model_params, f, indent=4)
     #print(f"Analysis parameters saved to {params_path}")
+
+    # Suppress Tight layout warning
+    warnings.filterwarnings("ignore", message=".*Tight layout not applied.*")
 
     # Save QC plot of design matrix
     qc_design_path = os.path.join(sub_output_dir, f'{sub_id}_run-{run}_design_matrix.png')
