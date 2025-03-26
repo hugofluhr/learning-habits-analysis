@@ -54,6 +54,26 @@ def compute_parametric_modulator(events, condition, modulator, frametimes, hrf_m
     
     return regressor
 
+def orthogonalize_modulator(mod, main_reg):
+    """
+    Orthogonalize the modulator with respect to the main regressor using Gram-Schmidt.
+    
+    Parameters:
+    - mod: np.array
+        The parametric modulator regressor.
+    - main_reg: np.array
+        The main condition regressor.
+        
+    Returns:
+    - mod_orth: np.array
+        The orthogonalized modulator (residuals after regressing mod on main_reg).
+    """
+    # Compute the projection coefficient (scalar)
+    coeff = np.dot(mod, main_reg) / np.dot(main_reg, main_reg)
+    # Subtract the projection of mod onto main_reg
+    mod_orth = mod - coeff * main_reg
+    return mod_orth.values
+
 # Function to run first-level analysis for a given model
 def run_model(subject, run, confounds, sample_mask, tr, hrf_model, high_pass, smoothing_fwhm, derivatives_dir,
               model_label, parametric_modulator_column, demean_modulator=True, plot_stat=False, plot_design=False):
