@@ -1099,3 +1099,15 @@ def collapse_events(df):
     collapsed_df = collapsed_df[final_cols + extra_cols]
 
     return collapsed_df
+
+
+def sort_key(col):
+    order = ['Info', 'Opt1Social', 'Opt1Juice', 'Opt2Social', 'Opt2Juice', 'Decision', 'Feedback']
+    # For each column, look for one of the condition names in 'order'
+    # Return a tuple (order_index, col) so that columns matching earlier conditions come first,
+    # and then are sorted alphabetically within each condition.
+    for i, cond in enumerate(order):
+        if cond in col:
+            return (i, col)
+    # If no condition is found, put them at the end.
+    return (len(order), col)
