@@ -4,6 +4,7 @@ import scipy.io
 import numpy as np
 import warnings
 import pandas as pd
+import json
 from nilearn.interfaces.fmriprep import load_confounds
 
 def load_subject_lut(base_dir):
@@ -1102,7 +1103,7 @@ def collapse_events(df):
 
 
 def sort_key(col):
-    order = ['Info', 'Opt1Social', 'Opt1Juice', 'Opt2Social', 'Opt2Juice', 'Decision', 'Feedback']
+    order = ['Info', 'Opt1', 'Opt2', 'Decision', 'Feedback']
     # For each column, look for one of the condition names in 'order'
     # Return a tuple (order_index, col) so that columns matching earlier conditions come first,
     # and then are sorted alphabetically within each condition.
@@ -1111,3 +1112,22 @@ def sort_key(col):
             return (i, col)
     # If no condition is found, put them at the end.
     return (len(order), col)
+
+
+def print_first_lvl_params(first_lvl_dir):
+    """
+    Print first-level parameters for each subject in the given directory.
+
+    Parameters
+    ----------
+    first_lvl_dir : str
+        Directory containing first-level analysis results.
+    """
+    # Find the first JSON file
+    json_file_path = glob.glob(os.path.join(first_lvl_dir, '**', '*_params.json'), recursive=True)[0]
+
+    # Load and print the JSON file contents
+    with open(json_file_path, 'r') as file:
+        json_data = json.load(file)
+        for key, value in json_data.items():
+            print(f"{key}: {value}")
