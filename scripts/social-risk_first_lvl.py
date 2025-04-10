@@ -179,6 +179,9 @@ def glm2(sub_id, behav_df, model_params):
                                     drift_model=None,
                                     add_regs=all_confounds)
     X = X.drop('constant', axis=1)
+    # spm and nilearn have different naming conventions
+    # Rename columns to match SPM
+    X.columns = X.columns.str.replace('_derivative', 'dt')
 
     # Drift matrix
     drift_X = create_drift_matrix([ft1, ft2, ft3], drift_model, high_pass)
@@ -197,7 +200,7 @@ def glm2(sub_id, behav_df, model_params):
                                               hrf_model, normalize='center')
             pm_ortho = orthogonalize_modulator(pm[:, 0], X[condition])
             parametric_modulators[mod_name] = pd.DataFrame({mod_name: pm_ortho,
-                                                            mod_name+'_derivative': pm[:, 1]})
+                                                            mod_name+'dt': pm[:, 1]})
 
     all_modulators = pd.concat(parametric_modulators.values(), axis=1)
     all_modulators.index = X.index
@@ -255,6 +258,29 @@ def glm2(sub_id, behav_df, model_params):
     r2_map = model.r_square[0]
     r2_map_path = os.path.join(sub_output_dir, f'{sub_id}_r2map.nii.gz')
     r2_map.to_filename(r2_map_path)
+
+    # Contrasts
+    connames = ['Info','Infodt','Opt1','Opt1dt','Opt1xWTP','Opt1xWTPdt',
+                'Opt2','Opt2dt','Opt2xWTP','Opt2xWTPdt',
+                'Decision','Decisiondt','Feedback','Feedbackdt']
+    
+    contrasts = {}
+    for name in connames:
+        weights = np.array([1 if col.endswith(name) else 0 for col in X.columns])
+        n_matches = np.sum(weights)
+        if n_matches > 0:
+            contrasts[name] = weights / n_matches
+        else:
+            print(f"Warning: No columns found for contrast {name}")
+
+    for con in contrasts:
+        z_map = model.compute_contrast(contrasts[con], output_type='z_score')
+        beta_map = model.compute_contrast(contrasts[con], output_type='effect_size')
+        stat_map = model.compute_contrast(contrasts[con], output_type='stat')
+        # save the contrast as zmap and betamap
+        z_map.to_filename(os.path.join(sub_output_dir, f'con_{con}_zmap.nii.gz'))
+        beta_map.to_filename(os.path.join(sub_output_dir, f'con_{con}_betamap.nii.gz'))
+        stat_map.to_filename(os.path.join(sub_output_dir, f'con_{con}_statmap.nii.gz'))
 
     # Save the design matrix
     design_matrix_path = os.path.join(sub_output_dir, f'{sub_id}_design_matrix.csv')
