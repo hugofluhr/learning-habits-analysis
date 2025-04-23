@@ -30,9 +30,9 @@ bids_dir = "/home/ubuntu/data/learning-habits/bids_dataset/derivatives/fmriprep-
 sub_ids = load_participant_list(base_dir)
 
 model_params = {
-    'model_name': 'exclude_iti',
+    'model_name': 'hrf_derivative',
     'tr': 2.33384,
-    'hrf_model': 'spm',
+    'hrf_model': 'spm + derivative',
     'noise_model': 'ar1',
     'smoothing_fwhm': 5,
     'motion_type': 'basic',
