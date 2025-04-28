@@ -29,7 +29,7 @@ bids_dir = "/home/ubuntu/data/learning-habits/bids_dataset/derivatives/fmriprep-
 sub_ids = load_participant_list(base_dir)
 
 model_params = {
-    'model_name': 'rsa_no_iti',
+    'model_name': 'stim_category',
     'tr': 2.33384,
     'hrf_model': 'spm',
     'noise_model': 'ar1',
@@ -108,11 +108,11 @@ def model_run(subject, run, model_params):
         brain_mask = None
 
     # Load events
-    events = getattr(subject, run).extend_events_df(columns_event={'first_stim':'first_stim_presentation'})
+    events = getattr(subject, run).extend_events_df(columns_event={'first_stim_cat': 'first_stim_presentation'})
 
-    # Add stim index to first stim presentation
+    # Add stim category to first stim presentation
     events['trial_type'] = events.apply(
-        lambda row: f"{row['trial_type']}_{int(row['first_stim'])}" if row['trial_type'] == 'first_stim_presentation' else row['trial_type'],
+        lambda row: f"{row['trial_type']}_{row['first_stim_cat']}" if row['trial_type'] == 'first_stim_presentation' else row['trial_type'],
         axis=1
     )
 
