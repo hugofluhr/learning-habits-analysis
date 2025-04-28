@@ -7,6 +7,17 @@ import pandas as pd
 import json
 from nilearn.interfaces.fmriprep import load_confounds
 
+STIM_NAMES = [
+    'figure_circle',
+    'face_female',
+    'face_male',
+    'hand_back',
+    'hand_palm',
+    'house_1',
+    'house_2',
+    'figure_triangle'
+]
+
 def load_subject_lut(base_dir):
     """
     Load the subject lookup table (LUT) from the base directory.
@@ -98,6 +109,7 @@ class Block:
             The raw data for this block, containing sequences and timing information for each trial.
         """
         self.raw_block = raw_block
+        self.stim_names = STIM_NAMES
 
         # determine if the block is a learning block or a test block
         self.block_type = 'learning' if hasattr(raw_block.time, 'rewards_onset') else 'test'
@@ -171,6 +183,22 @@ class Block:
         trials['t_iti_onset'] = raw_block.time.iti_onset
         trials['t_trial_end'] = np.append(raw_block.time.first_stim_onset[1:], self.end_time-self.scanner_trigger)
 
+        # Add columns with info about which stimulus was presented first and second
+        trials['first_stim'] = np.where(trials['shift'] == 0, trials['right_stim'], trials['left_stim'])
+        trials['second_stim'] = np.where(trials['shift'] == 0, trials['left_stim'], trials['right_stim'])
+        
+        # Add stimuli type information
+        trials['left_stim_name'] = trials['left_stim'].apply(lambda x: self.stim_names[x-1])
+        trials['right_stim_name'] = trials['right_stim'].apply(lambda x: self.stim_names[x-1])
+        trials['left_stim_cat'] = trials['left_stim_name'].apply(lambda x: x.split('_')[0])
+        trials['right_stim_cat'] = trials['right_stim_name'].apply(lambda x: x.split('_')[0])
+
+        # Same information for stimuli, by order of presentation
+        trials['first_stim_name'] = trials['first_stim'].apply(lambda x: self.stim_names[x-1])
+        trials['second_stim_name'] = trials['second_stim'].apply(lambda x: self.stim_names[x-1])
+        trials['first_stim_cat'] = trials['first_stim_name'].apply(lambda x: x.split('_')[0])
+        trials['second_stim_cat'] = trials['second_stim_name'].apply(lambda x: x.split('_')[0])
+
         # Specify the data types for each column
         trials = trials.astype({
             'left_stim': 'int32',
@@ -189,7 +217,11 @@ class Block:
             't_purple_frame': 'float64',
             't_points_feedback': 'float64',
             't_iti_onset': 'float64',
-            't_trial_end': 'float64'
+            't_trial_end': 'float64',
+            'left_stim_name': 'str',
+            'right_stim_name': 'str',
+            'left_stim_cat': 'str',
+            'right_stim_cat': 'str'
         })
 
         return trials
@@ -309,12 +341,8 @@ class Block:
         for col in columns2fill:
             merged[col] = merged[col].bfill()
 
-        #�TODO: fill missing values for diff_val, choice_prob, action_prob and value_diff
+        # TODO: fill missing values for diff_val, choice_prob, action_prob and value_diff
         # TODO: decide how to handle trials with rt < 0.05
-
-        # Add columns with info about which stimulus was presented first and second
-        merged['first_stim'] = np.where(merged['shift'] == 0, merged['right_stim'], merged['left_stim'])
-        merged['second_stim'] = np.where(merged['shift'] == 0, merged['left_stim'], merged['right_stim'])
         
         # CK and RL values for those stimuli
         merged['first_stim_value_rl'] = merged.apply(lambda row: row[f"stim{row['first_stim']}_value_rl"], axis=1)
@@ -456,7 +484,8 @@ class Block:
 
         ext_events_df = self.events.copy()            
         for col, event in columns_event.items():
-            ext_events_df[col] = 0.
+            dtype = self.extended_trials[col].dtype
+            ext_events_df[col] = None if dtype == 'O' else 0.
             ext_events_df.loc[ext_events_df['trial_type']==event, col] = self.extended_trials[col].values
         
         return ext_events_df
