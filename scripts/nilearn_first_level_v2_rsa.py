@@ -18,7 +18,7 @@ from nilearn.plotting import plot_design_matrix
 from nilearn.reporting import make_glm_report
 
 sys.path.append('/home/ubuntu/repos/learning-habits-analysis')
-from utils.data import Subject, load_participant_list, create_dummy_regressors
+from utils.data import Subject, load_participant_list, create_dummy_regressors, collapse_events
 
 # Dynamically set the number of workers based on available CPUs
 max_workers = min(30, multiprocessing.cpu_count())
@@ -29,7 +29,7 @@ bids_dir = "/home/ubuntu/data/learning-habits/bids_dataset/derivatives/fmriprep-
 sub_ids = load_participant_list(base_dir)
 
 model_params = {
-    'model_name': 'stim_category',
+    'model_name': 'stim_id_collapsed',
     'tr': 2.33384,
     'hrf_model': 'spm',
     'noise_model': 'ar1',
@@ -42,6 +42,8 @@ model_params = {
     'exclusion_threshold': 0.2,
     'scrub': 'dummies',
     'duration': 'all',
+    'combine_events': True,
+    'split_stim_by': 'stim_id',
     'iti_included': False
 }
 
@@ -61,6 +63,8 @@ def model_run(subject, run, model_params):
     scrub = model_params['scrub']
     brain_mask = model_params['brain_mask']
     duration = model_params['duration']
+    combine_events = model_params['combine_events']
+    split_stim_by = model_params['split_stim_by']
     iti_included = model_params['iti_included']
 
     # Create output directory
@@ -108,13 +112,27 @@ def model_run(subject, run, model_params):
         brain_mask = None
 
     # Load events
-    events = getattr(subject, run).extend_events_df(columns_event={'first_stim_cat': 'first_stim_presentation'})
+    if split_stim_by == 'stim_id':
+        events = getattr(subject, run).extend_events_df(columns_event={'first_stim': 'first_stim_presentation'})
 
-    # Add stim category to first stim presentation
-    events['trial_type'] = events.apply(
-        lambda row: f"{row['trial_type']}_{row['first_stim_cat']}" if row['trial_type'] == 'first_stim_presentation' else row['trial_type'],
-        axis=1
-    )
+        # Add stim index to first stim presentation
+        events['trial_type'] = events.apply(
+            lambda row: f"{row['trial_type']}_{int(row['first_stim'])}" if row['trial_type'] == 'first_stim_presentation' else row['trial_type'],
+            axis=1
+        )
+    elif split_stim_by == 'stim_cat':
+        events = getattr(subject, run).extend_events_df(columns_event={'first_stim_cat': 'first_stim_presentation'})
+
+        # Add stim category to first stim presentation
+        events['trial_type'] = events.apply(
+            lambda row: f"{row['trial_type']}_{row['first_stim_cat']}" if row['trial_type'] == 'first_stim_presentation' else row['trial_type'],
+            axis=1
+        )
+
+
+    # Collapse events if specified
+    if combine_events:
+        events = collapse_events(events)
 
     # Handle the duration of events
     if duration == 'none':
