@@ -1070,13 +1070,18 @@ def collapse_events(df):
     # Group by trial
     for trial_id, grp in df.groupby('trial', sort=False):
         # 1) Combine first and second stim
-        first_stim  = grp.query("trial_type == 'first_stim_presentation'").iloc[0]
+        first_stim  = grp.query("trial_type.str.startswith('first_stim_presentation')").iloc[0]
         second_stim = grp.query("trial_type == 'second_stim_presentation'").iloc[0]
+        # get the suffix of the first_stim_presentation
+        if first_stim['trial_type'] == 'first_stim_presentation':
+            stim_suffix = False
+        else:
+            stim_suffix = first_stim['trial_type'].split('_')[-1]
 
         stim_row = build_collapsed_row(
             ref_row      = first_stim,
             new_trial    = trial_id,
-            new_type     = 'stim_presentation',
+            new_type     = 'stim_presentation'+f"_{stim_suffix}" if stim_suffix else 'stim_presentation',
             new_onset    = first_stim['onset'],
             new_duration = first_stim['duration'] + second_stim['duration']
         )
