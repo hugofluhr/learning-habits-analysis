@@ -1,6 +1,7 @@
 clear;
 
-spmpath = '/Users/hugofluhr/code/spm25';
+% Paths
+spmpath = '/Users/hugofluhr/code/spm12';
 data_dir = '/Users/hugofluhr/phd_local/data/LearningHabits/dev_sample/spm_format';
 analysis_dir = '/Users/hugofluhr/phd_local/data/LearningHabits/dev_sample/spm_format';
 addpath(spmpath);
@@ -28,36 +29,44 @@ spm('Defaults', 'fMRI');
 spm_jobman('initcfg');
 
 % Loop through subjects
-for s = 1:2%length(subjects)
-    clear matlabbatch;
+for s = 1:1%2%length(subjects)
     sub_id = subjects{s};
     disp(['Processing subject: ', sub_id]);
     func_dir = fullfile(data_dir, sub_id, 'func');
     disp(func_dir);
-    
+
     % Identify unique runs based on BOLD file names
     bold_files = spm_select('FPList', func_dir, '^sub-.*_desc-preproc_bold.nii$');
     run_ids = unique(regexp(cellstr(bold_files), 'run-\d+', 'match', 'once'));
     
-    % Step 2: Model specification and estimation
-    for r = 1:length(run_ids)
+    % Loop through each run separately
+    for r = 1:1%length(run_ids)
         run_id = run_ids{r};
-        sub_output_dir = fullfile(output_dir, sub_id, run_id);
-        if ~exist(sub_output_dir, 'dir')
-            mkdir(sub_output_dir);
+        disp(['Processing run: ', run_id]);
+
+        % Define output directory for this run
+        run_output_dir = fullfile(output_dir, sub_id, run_id);
+        if ~exist(run_output_dir, 'dir')
+            mkdir(run_output_dir);
         end
         
-        % Select smoothed files for the current run
+        % Select BOLD files for the current run
         currBOLD = spm_select('FPList', func_dir, ['^smoothed_.*' run_id '_.*_bold.nii$']);
-
-        % Select brain mask
         brain_mask = spm_select('FPList', func_dir, ['^sub-.*' run_id '_.*_desc-brain_mask.nii$']);
-        
-        % Select confound files for the current run
         confounds_file = spm_select('FPList', func_dir, ['^sub-.*' run_id '_.*_motion.txt$']);
-        
-        if isempty(currBOLD) || isempty(confounds_file)
-            error(['Missing required files for run: ', run_id, ' in subject: ', sub_id]);
+
+        % Sanity check for missing files
+        if isempty(currBOLD)
+            warning(['No BOLD files found for ', run_id, ' in subject ', sub_id]);
+            continue;
+        end
+        if isempty(brain_mask)
+            warning(['Brain mask not found for ', run_id, ' in subject ', sub_id]);
+            continue;
+        end
+        if isempty(confounds_file)
+            warning(['Confounds not found for ', run_id, ' in subject ', sub_id]);
+            continue;
         end
         
         % Get block data and filter trials
@@ -69,9 +78,9 @@ for s = 1:2%length(subjects)
         block_data = block_data(block_data.first_stim ~= 1, :);
         %block_data = block_data(block_data.left_stim ~= 8, :);
         %block_data = block_data(block_data.right_stim ~= 8, :);
-
-        % Model specification, common to all runs
-        matlabbatch{1}.spm.stats.fmri_spec.dir = {sub_output_dir};
+        % Model specification for this run
+        clear matlabbatch
+        matlabbatch{1}.spm.stats.fmri_spec.dir = {run_output_dir};
         matlabbatch{1}.spm.stats.fmri_spec.timing.units = 'secs';
         matlabbatch{1}.spm.stats.fmri_spec.timing.RT = TR;
         % TO DO: check if these are correct, these are default values
@@ -79,65 +88,64 @@ for s = 1:2%length(subjects)
         matlabbatch{1}.spm.stats.fmri_spec.timing.fmri_t0 = 8;
 
         % General stuff
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).scans = cellstr(currBOLD);
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond = struct('name', {}, 'onset', {}, 'duration', {}, 'tmod', {}, 'pmod', {});
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).multi = {''};
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).multi_reg = {confounds_file};
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).hpf = high_pass_cutoff;
+        matlabbatch{1}.spm.stats.fmri_spec.sess.scans = cellstr(currBOLD);
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond = struct('name', {}, 'onset', {}, 'duration', {}, 'tmod', {}, 'pmod', {});
+        matlabbatch{1}.spm.stats.fmri_spec.sess.multi = {''};
+        matlabbatch{1}.spm.stats.fmri_spec.sess.multi_reg = {confounds_file};
+        matlabbatch{1}.spm.stats.fmri_spec.sess.hpf = high_pass_cutoff;
         
         % First stimulus
         % TO DO: check how to normalize the parametric modulators.
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).name = 'first_stim';
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).onset = block_data.t_first_stim;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).duration = 0; % check duration
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).tmod = 0;   
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod(1).name = 'Qval';
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod(1).param = zscore(block_data.first_stim_value_rl);
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod(1).poly = 1;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod(2).name = 'Hval';
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod(2).param = zscore(block_data.first_stim_value_ck);
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod(2).poly = 1;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).orth = 0;
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).name = 'first_stim';
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).onset = block_data.t_first_stim;
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).duration = block_data.t_second_stim - block_data.t_first_stim; % check duration
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).tmod = 0;   
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(1).name = 'Qval';
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(1).param = zscore(block_data.first_stim_value_rl);
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(1).poly = 1;
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(2).name = 'Hval';
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(2).param = zscore(block_data.first_stim_value_ck);
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(2).poly = 1;
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).orth = 0;
     
         % Second stimulus
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).name = 'second_stim';
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).onset = block_data.t_second_stim;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).duration = 0; % check duration
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).tmod = 0;   
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod = struct('name', {}, 'param', {}, 'poly', {});
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).orth = 0;
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).name = 'second_stim';
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).onset = block_data.t_second_stim;
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).duration = block_data.t_action - block_data.t_second_stim; % check duration
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).tmod = 0;   
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod = struct('name', {}, 'param', {}, 'poly', {});
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).orth = 0;
 
         % Response
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(3).name = 'response';
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(3).onset = block_data.t_action;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(3).duration = 0; % check duration
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(3).tmod = 0;   
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(3).pmod = struct('name', {}, 'param', {}, 'poly', {});
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(3).orth = 0;
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(3).name = 'response';
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(3).onset = block_data.t_action;
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(3).duration = 0; % check duration
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(3).tmod = 0;   
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(3).pmod = struct('name', {}, 'param', {}, 'poly', {});
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(3).orth = 0;
 
         % Feedback
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).name = 'feedback';
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).onset = block_data.t_purple_frame;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).duration = 0; % check duration
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).tmod = 0;   
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).pmod = struct('name', {}, 'param', {}, 'poly', {});
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).orth = 0;
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).name = 'feedback';
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).onset = block_data.t_purple_frame;
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).duration = block_data.t_iti_onset - block_data.t_purple_frame; % check duration
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).tmod = 0;   
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).pmod = struct('name', {}, 'param', {}, 'poly', {});
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).orth = 0;
 
         % Other specifications
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).multi = {''};
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).regress = struct('name', {}, 'val', {});
+        matlabbatch{1}.spm.stats.fmri_spec.sess.multi = {''};
+        matlabbatch{1}.spm.stats.fmri_spec.sess.regress = struct('name', {}, 'val', {});
         % Use confounds from fmriprep
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).multi_reg = cellstr(confounds_file);
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).hpf = high_pass_cutoff;
+        matlabbatch{1}.spm.stats.fmri_spec.sess.multi_reg = cellstr(confounds_file);
+        matlabbatch{1}.spm.stats.fmri_spec.sess.hpf = high_pass_cutoff;
 
-    end
-    % Other specifications, from Jae-Chang's script
-    matlabbatch{1}.spm.stats.fmri_spec.fact = struct('name', {}, 'levels', {});
-    matlabbatch{1}.spm.stats.fmri_spec.bases.hrf.derivs = [1 0]; % check for the derivative including or not
-    matlabbatch{1}.spm.stats.fmri_spec.volt = 1;
-    matlabbatch{1}.spm.stats.fmri_spec.global = 'None';
-    matlabbatch{1}.spm.stats.fmri_spec.mask = cellstr(brain_mask);
-    matlabbatch{1}.spm.stats.fmri_spec.cvi = 'AR(1)';
+        % Other specifications, from Jae-Chang's script
+        matlabbatch{1}.spm.stats.fmri_spec.fact = struct('name', {}, 'levels', {});
+        matlabbatch{1}.spm.stats.fmri_spec.bases.hrf.derivs = [0 0];
+        matlabbatch{1}.spm.stats.fmri_spec.volt = 1;
+        matlabbatch{1}.spm.stats.fmri_spec.global = 'None';
+        matlabbatch{1}.spm.stats.fmri_spec.mask = cellstr(brain_mask);
+        matlabbatch{1}.spm.stats.fmri_spec.cvi = 'AR(1)';
 
     %% Model estimation
     matlabbatch{2}.spm.stats.fmri_est.spmmat(1) = cfg_dep('fMRI model specification: SPM.mat File', substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','spmmat'));
@@ -150,13 +158,15 @@ for s = 1:2%length(subjects)
     for cc = 1:length(connames)
         matlabbatch{3}.spm.stats.con.consess{cc}.tcon.name = connames{cc};
         matlabbatch{3}.spm.stats.con.consess{cc}.tcon.weights = [zeros(1,cc-1) 1];
-        matlabbatch{3}.spm.stats.con.consess{cc}.tcon.sessrep = 'repl';
+        matlabbatch{3}.spm.stats.con.consess{cc}.tcon.sessrep = 'none';
     end
 
     matlabbatch{3}.spm.stats.con.delete = 1;
     
     % Save and run batch
-    save(fullfile(sub_output_dir, ['batch_job_', run_id, '.mat']), 'matlabbatch');
+    save(fullfile(run_output_dir, ['batch_job_', run_id, '.mat']), 'matlabbatch');
     spm_jobman('run', matlabbatch);
 
+        disp(['Model for ', run_id, ' in ', sub_id, ' complete.']);
+    end
 end
