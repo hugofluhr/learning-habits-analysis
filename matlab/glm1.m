@@ -1,19 +1,20 @@
 clear;
 
 % Paths
-spmpath = '/Users/hugofluhr/code/spm12';
-data_dir = '/Users/hugofluhr/phd_local/data/LearningHabits/dev_sample/spm_format';
-analysis_dir = '/Users/hugofluhr/phd_local/data/LearningHabits/dev_sample/spm_format';
+spmpath = '/home/ubuntu/repos/spm12';
+data_dir = '/home/ubuntu/data/learning-habits/spm_format';
+analysis_dir = '/home/ubuntu/data/learning-habits/spm_format';
+bbt_path = '/home/ubuntu/data/learning-habits/bbt.csv';
 addpath(spmpath);
 
 current_date = char(datetime('now', 'Format', 'yyyy-MM-dd-hh-mm'));
-output_dir = fullfile(analysis_dir, 'outputs', current_date);
+output_dir = fullfile(analysis_dir, 'new_outputs', current_date);
 if ~exist(output_dir, 'dir')
     mkdir(output_dir);
 end
 
 % Load behavioral data
-bbt = readtable(fullfile(data_dir, 'bbt.csv'));
+bbt = readtable(bbt_path);
 subjects = unique(bbt.sub_id);
 block_names = {'learning1', 'learning2', 'test'};
 
@@ -29,8 +30,11 @@ spm('Defaults', 'fMRI');
 spm_jobman('initcfg');
 
 % Loop through subjects
-for s = 1:1%2%length(subjects)
+for s = 37:length(subjects)
     sub_id = subjects{s};
+    if strcmp(sub_id,'sub-04') || strcmp(sub_id, 'sub-45')
+        continue; % Skip these subjects, alpha_H is 0
+    end
     disp(['Processing subject: ', sub_id]);
     func_dir = fullfile(data_dir, sub_id, 'func');
     disp(func_dir);
@@ -40,7 +44,7 @@ for s = 1:1%2%length(subjects)
     run_ids = unique(regexp(cellstr(bold_files), 'run-\d+', 'match', 'once'));
     
     % Loop through each run separately
-    for r = 1:1%length(run_ids)
+    for r = 1:length(run_ids)
         run_id = run_ids{r};
         disp(['Processing run: ', run_id]);
 
