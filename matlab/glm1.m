@@ -29,7 +29,7 @@ high_pass_cutoff = 128; % High-pass filter in seconds
 
 % set up contrasts
 connames = {'first_stim', 'first_stimxQval', 'first_stimxHval', 'second_stim', ...
-    'response', 'feedback'};
+'response', 'feedback'};
 
 spm('Defaults', 'fMRI');
 spm_jobman('initcfg');
@@ -43,7 +43,7 @@ for s = 1:length(subjects)
     disp(['Processing subject: ', sub_id]);
     func_dir = fullfile(data_dir, sub_id, 'func');
     disp(func_dir);
-
+    
     % Identify unique runs based on BOLD file names
     bold_files = spm_select('FPList', func_dir, '^sub-.*_desc-preproc_bold.nii$');
     run_ids = unique(regexp(cellstr(bold_files), 'run-\d+', 'match', 'once'));
@@ -52,7 +52,7 @@ for s = 1:length(subjects)
     for r = 1:length(run_ids)
         run_id = run_ids{r};
         disp(['Processing run: ', run_id]);
-
+        
         % Define output directory for this run
         run_output_dir = fullfile(output_dir, sub_id, run_id);
         if ~exist(run_output_dir, 'dir')
@@ -63,7 +63,7 @@ for s = 1:length(subjects)
         currBOLD = spm_select('FPList', func_dir, ['^smoothed_.*' run_id '_.*_bold.nii$']);
         brain_mask = spm_select('FPList', func_dir, ['^sub-.*' run_id '_.*_desc-brain_mask.nii$']);
         confounds_file = spm_select('FPList', func_dir, ['^sub-.*' run_id '_.*_motion.txt$']);
-
+        
         % Sanity check for missing files
         if isempty(currBOLD)
             warning(['No BOLD files found for ', run_id, ' in subject ', sub_id]);
@@ -85,7 +85,7 @@ for s = 1:length(subjects)
         % Ignore trials with highest/lowest stimuli
         block_data = block_data(block_data.first_stim ~= 1, :);
         block_data = block_data(block_data.first_stim ~= 8, :);
-
+        
         % Model specification for this run
         clear matlabbatch
         matlabbatch{1}.spm.stats.fmri_spec.dir = {run_output_dir};
@@ -94,7 +94,7 @@ for s = 1:length(subjects)
         % TO DO: check if these are correct, these are default values
         matlabbatch{1}.spm.stats.fmri_spec.timing.fmri_t = 16;
         matlabbatch{1}.spm.stats.fmri_spec.timing.fmri_t0 = 8;
-
+        
         % General stuff
         matlabbatch{1}.spm.stats.fmri_spec.sess.scans = cellstr(currBOLD);
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond = struct('name', {}, 'onset', {}, 'duration', {}, 'tmod', {}, 'pmod', {});
@@ -115,7 +115,7 @@ for s = 1:length(subjects)
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(2).param = zscore(block_data.first_stim_value_ck);
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(2).poly = 1;
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).orth = 0;
-    
+        
         % Second stimulus
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).name = 'second_stim';
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).onset = block_data.t_second_stim;
@@ -123,7 +123,7 @@ for s = 1:length(subjects)
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).tmod = 0;   
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod = struct('name', {}, 'param', {}, 'poly', {});
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).orth = 0;
-
+        
         % Response
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(3).name = 'response';
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(3).onset = block_data.t_action;
@@ -131,7 +131,7 @@ for s = 1:length(subjects)
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(3).tmod = 0;   
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(3).pmod = struct('name', {}, 'param', {}, 'poly', {});
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(3).orth = 0;
-
+        
         % Feedback
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).name = 'feedback';
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).onset = block_data.t_purple_frame;
@@ -139,14 +139,14 @@ for s = 1:length(subjects)
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).tmod = 0;   
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).pmod = struct('name', {}, 'param', {}, 'poly', {});
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).orth = 0;
-
+        
         % Other specifications
         matlabbatch{1}.spm.stats.fmri_spec.sess.multi = {''};
         matlabbatch{1}.spm.stats.fmri_spec.sess.regress = struct('name', {}, 'val', {});
         % Use confounds from fmriprep
         matlabbatch{1}.spm.stats.fmri_spec.sess.multi_reg = cellstr(confounds_file);
         matlabbatch{1}.spm.stats.fmri_spec.sess.hpf = high_pass_cutoff;
-
+        
         % Other specifications, from Jae-Chang's script
         matlabbatch{1}.spm.stats.fmri_spec.fact = struct('name', {}, 'levels', {});
         matlabbatch{1}.spm.stats.fmri_spec.bases.hrf.derivs = [0 0];
@@ -154,27 +154,36 @@ for s = 1:length(subjects)
         matlabbatch{1}.spm.stats.fmri_spec.global = 'None';
         matlabbatch{1}.spm.stats.fmri_spec.mask = cellstr(brain_mask);
         matlabbatch{1}.spm.stats.fmri_spec.cvi = 'AR(1)';
-
-    %% Model estimation
-    matlabbatch{2}.spm.stats.fmri_est.spmmat(1) = cfg_dep('fMRI model specification: SPM.mat File', substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','spmmat'));
-    matlabbatch{2}.spm.stats.fmri_est.write_residuals = 0;
-    matlabbatch{2}.spm.stats.fmri_est.method.Classical = 1;
-    
-    %% Contrast definition
-    matlabbatch{3}.spm.stats.con.spmmat(1) = cfg_dep('Model estimation: SPM.mat File', substruct('.','val', '{}',{2}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','spmmat'));
-    
-    for cc = 1:length(connames)
-        matlabbatch{3}.spm.stats.con.consess{cc}.tcon.name = connames{cc};
-        matlabbatch{3}.spm.stats.con.consess{cc}.tcon.weights = [zeros(1,cc-1) 1];
-        matlabbatch{3}.spm.stats.con.consess{cc}.tcon.sessrep = 'none';
-    end
-
-    matlabbatch{3}.spm.stats.con.delete = 1;
-    
-    % Save and run batch
-    save(fullfile(run_output_dir, ['batch_job_', run_id, '.mat']), 'matlabbatch');
-    spm_jobman('run', matlabbatch);
-
+        
+        %% Model estimation
+        matlabbatch{2}.spm.stats.fmri_est.spmmat(1) = cfg_dep('fMRI model specification: SPM.mat File', substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','spmmat'));
+        matlabbatch{2}.spm.stats.fmri_est.write_residuals = 0;
+        matlabbatch{2}.spm.stats.fmri_est.method.Classical = 1;
+        
+        %% Contrast definition
+        matlabbatch{3}.spm.stats.con.spmmat(1) = cfg_dep('Model estimation: SPM.mat File', substruct('.','val', '{}',{2}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','spmmat'));
+        
+        for cc = 1:length(connames)
+            matlabbatch{3}.spm.stats.con.consess{cc}.tcon.name = connames{cc};
+            matlabbatch{3}.spm.stats.con.consess{cc}.tcon.weights = [zeros(1,cc-1) 1];
+            matlabbatch{3}.spm.stats.con.consess{cc}.tcon.sessrep = 'none';
+        end
+        
+        matlabbatch{3}.spm.stats.con.delete = 1;
+        
+        % Save and run batch
+        save(fullfile(run_output_dir, ['batch_job_', run_id, '.mat']), 'matlabbatch');
+        spm_jobman('run', matlabbatch);
+        
+        %% Saving regressor names for traceability
+        % Load SPM.mat to extract regressor names
+        SPM_path = fullfile(run_output_dir, 'SPM.mat');
+        load(SPM_path, 'SPM');
+        
+        % Save regressor names
+        reg_names = SPM.xX.name;
+        save(fullfile(run_output_dir, 'regressor_names.mat'), 'reg_names');
+        
         disp(['Model for ', run_id, ' in ', sub_id, ' complete.']);
     end
 end
