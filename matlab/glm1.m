@@ -13,6 +13,11 @@ if ~exist(output_dir, 'dir')
     mkdir(output_dir);
 end
 
+% Start logging
+log_path = fullfile(output_dir, 'matlab_log.txt');
+diary(log_path);
+diary on;
+
 % Load behavioral data
 bbt = readtable(bbt_path);
 subjects = unique(bbt.sub_id);
@@ -30,7 +35,7 @@ spm('Defaults', 'fMRI');
 spm_jobman('initcfg');
 
 % Loop through subjects
-for s = 37:length(subjects)
+for s = 1:length(subjects)
     sub_id = subjects{s};
     if strcmp(sub_id,'sub-04') || strcmp(sub_id, 'sub-45')
         continue; % Skip these subjects, alpha_H is 0
@@ -79,9 +84,8 @@ for s = 37:length(subjects)
         block_data = block_data(~isnan(block_data.action), :);
         % Ignore trials with highest/lowest stimuli
         block_data = block_data(block_data.first_stim ~= 1, :);
-        block_data = block_data(block_data.first_stim ~= 1, :);
-        %block_data = block_data(block_data.left_stim ~= 8, :);
-        %block_data = block_data(block_data.right_stim ~= 8, :);
+        block_data = block_data(block_data.first_stim ~= 8, :);
+
         % Model specification for this run
         clear matlabbatch
         matlabbatch{1}.spm.stats.fmri_spec.dir = {run_output_dir};
@@ -174,3 +178,5 @@ for s = 37:length(subjects)
         disp(['Model for ', run_id, ' in ', sub_id, ' complete.']);
     end
 end
+
+diary off;
