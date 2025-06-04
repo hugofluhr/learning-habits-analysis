@@ -885,7 +885,8 @@ class Subject:
             raise FileNotFoundError(f"File {mask_file} not found.")
         return mask_file
     
-    def load_confounds(self, run, motion_type='basic', scrub=0, fd_thresh=0.5, std_dvars_thresh=2.5):
+    def load_confounds(self, run, motion_type='basic', include_cos = True, scrub=0, 
+                       fd_thresh=0.5, std_dvars_thresh=2.5):
         """ Load the confounds file for the specified run.
 
         Parameters
@@ -894,9 +895,12 @@ class Subject:
             The run for which to load the confounds file.
         """
         img_path = self.img.get(run)
+        strategy = ['motion', 'wm_csf', 'scrub']
+        if include_cos:
+            strategy.insert(1, 'high_pass')
         confounds, sample_mask = load_confounds(
             img_path,
-            strategy=('motion', 'high_pass', 'wm_csf', 'scrub'),
+            strategy=tuple(strategy),
             motion=motion_type,
             scrub=scrub,
             fd_threshold=fd_thresh,
