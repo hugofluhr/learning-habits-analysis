@@ -33,10 +33,13 @@ def prepare_bids_for_spm(bids_dir, output_dir):
         output_subject_dir = os.path.join(output_dir, 'sub-' + subject, "func")
         os.makedirs(output_subject_dir, exist_ok=True)
 
-        subject = Subject(base_dir, subject, include_modeling=False, include_imaging=True, bids_dir=bids_dir)        
+        subject = Subject(base_dir, subject, include_modeling=False, include_imaging=True, bids_dir=bids_dir)
+                
         for run in subject.runs:
-            confounds, sample_mask = subject.load_confounds(run, motion_type='basic')
-
+            confounds, _ = subject.load_confounds(run, include_cos=False)
+            physio_regressors = subject.load_physio_regressors(run)
+            confounds = confounds.join(physio_regressors)
+            
             bold_file = subject.img.get(run)
             mask_file = subject.brain_mask.get(run)
             events = getattr(subject, run).events
