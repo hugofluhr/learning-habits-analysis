@@ -2,13 +2,13 @@ clear;
 
 % Paths
 spmpath = '/home/ubuntu/repos/spm12';
-data_dir = '/home/ubuntu/data/learning-habits/spm_format';
-analysis_dir = '/home/ubuntu/data/learning-habits/spm_format';
+data_dir = '/home/ubuntu/data/learning-habits/spm_format_20250603';
+analysis_dir = '/home/ubuntu/data/learning-habits/spm_format_20250603';
 bbt_path = '/home/ubuntu/data/learning-habits/bbt.csv';
 addpath(spmpath);
 
 current_date = char(datetime('now', 'Format', 'yyyy-MM-dd-hh-mm'));
-output_dir = fullfile(analysis_dir, 'new_outputs', current_date);
+output_dir = fullfile(analysis_dir, 'outputs', ['glm1_' current_date]);
 if ~exist(output_dir, 'dir')
     mkdir(output_dir);
 end
