@@ -28,8 +28,8 @@ TR = 2.33384; % Repetition time
 high_pass_cutoff = 128; % High-pass filter in seconds
 
 % set up contrasts
-connames = {'first_stim', 'first_stimxQval', 'first_stimxHval', 'second_stim', ...
-'response', 'feedback'};
+connames = {'first_stim', 'first_stimxQval', 'first_stimxHval', ...
+            'second_stim', 'response', 'feedback'};
 
 spm('Defaults', 'fMRI');
 spm_jobman('initcfg');
@@ -42,7 +42,6 @@ for s = 1:length(subjects)
     end
     disp(['Processing subject: ', sub_id]);
     func_dir = fullfile(data_dir, sub_id, 'func');
-    disp(func_dir);
     
     % Identify unique runs based on BOLD file names
     bold_files = spm_select('FPList', func_dir, '^sub-.*_desc-preproc_bold.nii$');
@@ -88,7 +87,9 @@ for s = 1:length(subjects)
         block_incl = block_data(trial_mask,:);
         block_excl = block_data(~trial_mask,:);
         
-        % Model specification for this run
+        %% -----------------
+        % 1) SPEC + EST BATCH
+        %% -----------------
         clear matlabbatch
         matlabbatch{1}.spm.stats.fmri_spec.dir = {run_output_dir};
         matlabbatch{1}.spm.stats.fmri_spec.timing.units = 'secs';
@@ -116,8 +117,8 @@ for s = 1:length(subjects)
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(2).param = zscore(block_incl.first_stim_value_ck);
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(2).poly = 1;
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).orth = 0;
-
-        % First stimulus - exlcuded
+        
+        % First stimulus - excluded
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(5).name = 'first_stim_excl';
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(5).onset = block_excl.t_first_stim;
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(5).duration = block_excl.t_second_stim - block_excl.t_first_stim;
@@ -169,27 +170,36 @@ for s = 1:length(subjects)
         matlabbatch{2}.spm.stats.fmri_est.write_residuals = 0;
         matlabbatch{2}.spm.stats.fmri_est.method.Classical = 1;
         
-        %% Contrast definition
-        matlabbatch{3}.spm.stats.con.spmmat(1) = cfg_dep('Model estimation: SPM.mat File', substruct('.','val', '{}',{2}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','spmmat'));
-        
-        for cc = 1:length(connames)
-            matlabbatch{3}.spm.stats.con.consess{cc}.tcon.name = connames{cc};
-            matlabbatch{3}.spm.stats.con.consess{cc}.tcon.weights = [zeros(1,cc-1) 1];
-            matlabbatch{3}.spm.stats.con.consess{cc}.tcon.sessrep = 'none';
-        end
-        
-        matlabbatch{3}.spm.stats.con.delete = 1;
-        
-        % Save and run batch
-        save(fullfile(run_output_dir, ['batch_job_', run_id, '.mat']), 'matlabbatch');
+        save(fullfile(run_output_dir, ['batch_spec_est_', run_id, '.mat']), 'matlabbatch');
         spm_jobman('run', matlabbatch);
         
-        %% Saving regressor names for traceability
-        % Load SPM.mat to extract regressor names
+        %% -----------------
+        % 2) CONTRAST BATCH
+        %% -----------------
         SPM_path = fullfile(run_output_dir, 'SPM.mat');
         load(SPM_path, 'SPM');
         
-        % Save regressor names
+        matlabbatch_con = [];
+        matlabbatch_con{1}.spm.stats.con.spmmat = {SPM_path};
+        
+        for cc = 1:length(connames)
+            idx = find(contains(SPM.xX.name, connames{cc}));
+            if isempty(idx)
+                warning('No regressor found for %s in %s', connames{cc}, run_id);
+                continue
+            end
+            weights = zeros(1, length(SPM.xX.name));
+            weights(idx) = 1;
+            matlabbatch_con{1}.spm.stats.con.consess{cc}.tcon.name = connames{cc};
+            matlabbatch_con{1}.spm.stats.con.consess{cc}.tcon.weights = weights;
+            matlabbatch_con{1}.spm.stats.con.consess{cc}.tcon.sessrep = 'none';
+        end
+        matlabbatch_con{1}.spm.stats.con.delete = 1;
+        
+        save(fullfile(run_output_dir, ['batch_contrasts_', run_id, '.mat']), 'matlabbatch_con');
+        spm_jobman('run', matlabbatch_con);
+        
+        %% Save regressor names
         reg_names = SPM.xX.name;
         save(fullfile(run_output_dir, 'regressor_names.mat'), 'reg_names');
         
