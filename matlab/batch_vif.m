@@ -181,57 +181,93 @@ writetable(per_run_rows, per_run_csv);
 fprintf('Wrote per-run VIFs: %s\n', per_run_csv);
 
 %% ==== SUMMARY STATS ACROSS RUNS ====
-% Group by normalized regressor name
-G = findgroups(string(per_run_rows.NormName));
-
 % Helper aggregators (ignore NaNs)
 mean_no_nan = @(x) mean(x,'omitnan');
 med_no_nan  = @(x) median(x,'omitnan');
 max_no_nan  = @(x) max(x,[],'omitnan');
 p95_no_nan  = @(x) prctile(x,95);
+over5       = @(x) sum(x > thr5,  'omitnan');
+over10      = @(x) sum(x > thr10, 'omitnan');
+count_nonan = @(x) sum(~isnan(x));
 
-% Counts over thresholds
-over5_classic = @(x) sum(x > thr5, 'omitnan');
-over10_classic= @(x) sum(x > thr10,'omitnan');
+%% (A) Overall regressor-wise summary (as before)
+G_over = findgroups(string(per_run_rows.NormName));
+reg_names_over = splitapply(@(s) string(s(1)), string(per_run_rows.NormName), G_over);
 
-% Total counts per group
-N = splitapply(@(varargin) numel(varargin{1}), per_run_rows.VIF_classic, G);
+N_over        = splitapply(count_nonan, per_run_rows.VIF_classic, G_over);
+mean_classic  = splitapply(mean_no_nan, per_run_rows.VIF_classic, G_over);
+med_classic   = splitapply(med_no_nan,  per_run_rows.VIF_classic, G_over);
+max_classic   = splitapply(max_no_nan,  per_run_rows.VIF_classic, G_over);
+p95_classic   = splitapply(p95_no_nan,  per_run_rows.VIF_classic, G_over);
+n5_classic    = splitapply(over5,       per_run_rows.VIF_classic, G_over);
+n10_classic   = splitapply(over10,      per_run_rows.VIF_classic, G_over);
 
-% Aggregates
-mean_classic = splitapply(mean_no_nan, per_run_rows.VIF_classic, G);
-med_classic  = splitapply(med_no_nan,  per_run_rows.VIF_classic, G);
-max_classic  = splitapply(max_no_nan,  per_run_rows.VIF_classic, G);
-p95_classic  = splitapply(p95_no_nan,  per_run_rows.VIF_classic, G);
-n5_classic   = splitapply(over5_classic, per_run_rows.VIF_classic, G);
-n10_classic  = splitapply(over10_classic, per_run_rows.VIF_classic, G);
+mean_cond     = splitapply(mean_no_nan, per_run_rows.VIF_conditional, G_over);
+med_cond      = splitapply(med_no_nan,  per_run_rows.VIF_conditional, G_over);
+max_cond      = splitapply(max_no_nan,  per_run_rows.VIF_conditional, G_over);
+p95_cond      = splitapply(p95_no_nan,  per_run_rows.VIF_conditional, G_over);
+n5_cond       = splitapply(over5,       per_run_rows.VIF_conditional, G_over);
+n10_cond      = splitapply(over10,      per_run_rows.VIF_conditional, G_over);
 
-mean_cond = splitapply(mean_no_nan, per_run_rows.VIF_conditional, G);
-med_cond  = splitapply(med_no_nan,  per_run_rows.VIF_conditional, G);
-max_cond  = splitapply(max_no_nan,  per_run_rows.VIF_conditional, G);
-p95_cond  = splitapply(p95_no_nan,  per_run_rows.VIF_conditional, G);
-n5_cond   = splitapply(over5_classic, per_run_rows.VIF_conditional, G);
-n10_cond  = splitapply(over10_classic, per_run_rows.VIF_conditional, G);
-
-reg_names = splitapply(@(s) string(s(1)), string(per_run_rows.NormName), G);
-
-summary = table( ...
-    reg_names, N, ...
+summary_overall = table( ...
+    repmat("Overall", numel(reg_names_over), 1), ... % Scope
+    repmat("ALL",     numel(reg_names_over), 1), ... % Run
+    reg_names_over, N_over, ...
     mean_classic, med_classic, p95_classic, max_classic, n5_classic, n10_classic, ...
     mean_cond,    med_cond,    p95_cond,    max_cond,    n5_cond,    n10_cond, ...
     'VariableNames', { ...
-        'Regressor','NRuns', ...
+        'Scope','Run','Regressor','NRuns', ...
         'MeanVIF_classic','MedianVIF_classic','P95VIF_classic','MaxVIF_classic','CountVIFgt5_classic','CountVIFgt10_classic', ...
         'MeanVIF_cond','MedianVIF_cond','P95VIF_cond','MaxVIF_cond','CountVIFgt5_cond','CountVIFgt10_cond' ...
     });
+summary_overall.PctVIFgt5_classic  = 100 * summary_overall.CountVIFgt5_classic  ./ summary_overall.NRuns;
+summary_overall.PctVIFgt10_classic = 100 * summary_overall.CountVIFgt10_classic ./ summary_overall.NRuns;
+summary_overall.PctVIFgt5_cond     = 100 * summary_overall.CountVIFgt5_cond     ./ summary_overall.NRuns;
+summary_overall.PctVIFgt10_cond    = 100 * summary_overall.CountVIFgt10_cond    ./ summary_overall.NRuns;
 
-% Add percentages
-summary.PctVIFgt5_classic  = 100 * summary.CountVIFgt5_classic  ./ summary.NRuns;
-summary.PctVIFgt10_classic = 100 * summary.CountVIFgt10_classic ./ summary.NRuns;
-summary.PctVIFgt5_cond     = 100 * summary.CountVIFgt5_cond     ./ summary.NRuns;
-summary.PctVIFgt10_cond    = 100 * summary.CountVIFgt10_cond    ./ summary.NRuns;
+%% (B) Same regressor-wise summary, but split by run label (run-1/run-2/run-3)
+G_byrun = findgroups(string(per_run_rows.Run), string(per_run_rows.NormName));
+run_labels   = splitapply(@(s) string(s(1)), string(per_run_rows.Run),     G_byrun);
+reg_names_br = splitapply(@(s) string(s(1)), string(per_run_rows.NormName), G_byrun);
 
-summary = summary(:, {
-    'Regressor','NRuns', ...
+N_byrun        = splitapply(count_nonan, per_run_rows.VIF_classic, G_byrun);
+br_mean_class  = splitapply(mean_no_nan, per_run_rows.VIF_classic, G_byrun);
+br_med_class   = splitapply(med_no_nan,  per_run_rows.VIF_classic, G_byrun);
+br_max_class   = splitapply(max_no_nan,  per_run_rows.VIF_classic, G_byrun);
+br_p95_class   = splitapply(p95_no_nan,  per_run_rows.VIF_classic, G_byrun);
+br_n5_class    = splitapply(over5,       per_run_rows.VIF_classic, G_byrun);
+br_n10_class   = splitapply(over10,      per_run_rows.VIF_classic, G_byrun);
+
+br_mean_cond   = splitapply(mean_no_nan, per_run_rows.VIF_conditional, G_byrun);
+br_med_cond    = splitapply(med_no_nan,  per_run_rows.VIF_conditional, G_byrun);
+br_max_cond    = splitapply(max_no_nan,  per_run_rows.VIF_conditional, G_byrun);
+br_p95_cond    = splitapply(p95_no_nan,  per_run_rows.VIF_conditional, G_byrun);
+br_n5_cond     = splitapply(over5,       per_run_rows.VIF_conditional, G_byrun);
+br_n10_cond    = splitapply(over10,      per_run_rows.VIF_conditional, G_byrun);
+
+summary_byrun = table( ...
+    repmat("ByRun", numel(reg_names_br), 1), ... % Scope
+    run_labels, reg_names_br, N_byrun, ...
+    br_mean_class, br_med_class, br_p95_class, br_max_class, br_n5_class, br_n10_class, ...
+    br_mean_cond,  br_med_cond,  br_p95_cond,  br_max_cond,  br_n5_cond,  br_n10_cond, ...
+    'VariableNames', { ...
+        'Scope','Run','Regressor','NRuns', ...
+        'MeanVIF_classic','MedianVIF_classic','P95VIF_classic','MaxVIF_classic','CountVIFgt5_classic','CountVIFgt10_classic', ...
+        'MeanVIF_cond','MedianVIF_cond','P95VIF_cond','MaxVIF_cond','CountVIFgt5_cond','CountVIFgt10_cond' ...
+    });
+summary_byrun.PctVIFgt5_classic  = 100 * summary_byrun.CountVIFgt5_classic  ./ summary_byrun.NRuns;
+summary_byrun.PctVIFgt10_classic = 100 * summary_byrun.CountVIFgt10_classic ./ summary_byrun.NRuns;
+summary_byrun.PctVIFgt5_cond     = 100 * summary_byrun.CountVIFgt5_cond     ./ summary_byrun.NRuns;
+summary_byrun.PctVIFgt10_cond    = 100 * summary_byrun.CountVIFgt10_cond    ./ summary_byrun.NRuns;
+
+%% Combine and write (single CSV)
+summary_all = [summary_overall; summary_byrun];
+
+% Sort: show ByRun blocks grouped by run, worst (MaxVIF_cond) first; then Overall
+summary_all = sortrows(summary_all, {'Scope','Run','MaxVIF_cond'}, {'ascend','ascend','descend'});
+
+summary_all = summary_all(:, {
+    'Scope','Run','Regressor','NRuns', ...
     'MeanVIF_classic','MedianVIF_classic','P95VIF_classic','MaxVIF_classic', ...
     'CountVIFgt5_classic','PctVIFgt5_classic', ...
     'CountVIFgt10_classic','PctVIFgt10_classic', ...
@@ -240,12 +276,5 @@ summary = summary(:, {
     'CountVIFgt10_cond','PctVIFgt10_cond' ...
 });
 
-% Sort by worst (conditional) MaxVIF as default
-summary = sortrows(summary, 'MaxVIF_cond', 'descend');
-
-% Write summary CSV
-writetable(summary, summary_csv);
-fprintf('Wrote summary: %s\n', summary_csv);
-
-%% ==== DONE ====
-fprintf('Finished. Inspect %s and %s.\n', per_run_csv, summary_csv);
+writetable(summary_all, summary_csv);
+fprintf('Wrote summary (overall + by-run) to: %s\n', summary_csv);
