@@ -19,7 +19,7 @@ addpath('~/code/spm25/')
 
 % Paths
 plot_save_dir = '/Users/hugofluhr/phd_local/data/LearningHabits/sfnr'; % virtual machine path
-dataDir = '/Users/hugofluhr/phd_local/data/LearningHabits/dev_sample/raw_data'; % virtual machine path
+dataDir = '/Users/hugofluhr/Downloads/raw_data2'; % virtual machine path
 
 subjList = dir([dataDir filesep 'SNS_MRI_*']);
 
@@ -49,7 +49,7 @@ for subi= 1:height(subjList) % CHANGE BACK
         scan_name = fullfile(subjDir, scan_name);
 
         % ---- Output dirs/files
-        out_dir = fullfile(plot_save_dir, sprintf('S%s', subj), sprintf('run-%d', run_no));
+        out_dir = fullfile(plot_save_dir, sprintf('%s', subj), sprintf('run-%d', run_no));
         if ~exist(out_dir, 'dir'); mkdir(out_dir); end
         f_png   = fullfile(out_dir, sprintf('SFNR_check_S%s_R%i.png', subj, run_no));
         f_real  = fullfile(out_dir, 'realigned.nii');
@@ -70,7 +70,7 @@ for subi= 1:height(subjList) % CHANGE BACK
         rQAData = zeros(size(QAData)); % Pre-allocating data for realigned data set
 
         for i = 1:size(QAData,4)
-            display(['Realigning volume #' num2str(i)])
+            %display(['Realigning volume #' num2str(i)])
             TempTrans = imregtform(squeeze(QAData(:,:,:,i)), squeeze(QAData(:,:,:,1)),'rigid', optimizer, metric);
             rQAData(:,:,:,i) = imwarp(squeeze(QAData(:,:,:,i)),TempTrans,'OutputView', imref3d(size(squeeze(QAData(:,:,:,1)))));
 
@@ -85,7 +85,7 @@ for subi= 1:height(subjList) % CHANGE BACK
         ri32ch_3p0_TE30 = rQAData;
 
         % Save realigned 4D
-        write_4d_nii(HDRs, ri32ch_3p0_TE30, f_real);
+        % write_4d_nii(HDRs, ri32ch_3p0_TE30, f_real);
 
         % Also save motion as TSV
         M = [Trans, Rot];
@@ -99,7 +99,7 @@ for subi= 1:height(subjList) % CHANGE BACK
         dQAData = zeros(size(QAData));
 
         for x = 1:size(QAData,1)
-            display(['Working on #' num2str(x) ' out of ' num2str(size(QAData,1))])
+            %display(['Working on #' num2str(x) ' out of ' num2str(size(QAData,1))])
             for y = 1:size(QAData,2)
                 for z = 1:size(QAData,3)
                     VoxData = squeeze(QAData(x,y,z,1:(size(QAData,4)-1)));
@@ -113,7 +113,7 @@ for subi= 1:height(subjList) % CHANGE BACK
         dri32ch_3p0_TE30 = dQAData;
 
         % Save detrended 4D
-        write_4d_nii(HDRs(1:end-1), dri32ch_3p0_TE30, f_det);
+        % write_4d_nii(HDRs(1:end-1), dri32ch_3p0_TE30, f_det);
 
         %% Calculating temporal SNR from detrended  data
 
@@ -133,35 +133,35 @@ for subi= 1:height(subjList) % CHANGE BACK
         W = HDRs(1); W.fname = f_sfnr; W.n = [1 1];
         spm_write_vol(W, SFNR_i32ch_3p0_TE30);
 
-        %% Displaying final SFNR results
-        figure('name', 'Temporal SNR Results')
-
-        slices = [3,5,7,9,11,13,17,21,25,29,33,37];
-
-        for slice_ind = 1:length(slices)
-            slice_i = slices(slice_ind);
-
-            subplot(3,4,slice_ind),  imagesc(rot90(squeeze(SFNR_i32ch_3p0_TE30(:,:, slice_i, 1)),-1), [0 140]), title(sprintf('slice no %i', slice_i)), axis image
-        end
-
-        colormap jet
-        exportgraphics(gcf, f_png, 'Resolution', 800)
+        % %% Displaying final SFNR results
+        % figure('name', 'Temporal SNR Results')
+        % 
+        % slices = [3,5,7,9,11,13,17,21,25,29,33,37];
+        % 
+        % for slice_ind = 1:length(slices)
+        %     slice_i = slices(slice_ind);
+        % 
+        %     subplot(3,4,slice_ind),  imagesc(rot90(squeeze(SFNR_i32ch_3p0_TE30(:,:, slice_i, 1)),-1), [0 140]), title(sprintf('slice no %i', slice_i)), axis image
+        % end
+        % 
+        % colormap jet
+        % exportgraphics(gcf, f_png, 'Resolution', 800)
     end
     close all
 end
 end
 
 % ---------- Helper to write 4D NIfTI with SPM ----------
-function write_4d_nii(Vref, Y, out_file)
-if ~isstruct(Vref), error('Vref must be SPM vol struct(s)'); end
-if isscalar(Vref), Vref = repmat(Vref, 1, size(Y,4)); end
-Vout = Vref(1);
-Vout.fname = out_file;
-Vout.n = [1 1];
-Vout.dt = [spm_type('float32') spm_platform('bigend')];
-Vout = spm_create_vol(Vout);
-for t = 1:size(Y,4)
-    Vout.n = [t 1];
-    spm_write_vol(Vout, Y(:,:,:,t));
-end
-end
+% function write_4d_nii(Vref, Y, out_file)
+% if ~isstruct(Vref), error('Vref must be SPM vol struct(s)'); end
+% if isscalar(Vref), Vref = repmat(Vref, 1, size(Y,4)); end
+% Vout = Vref(1);
+% Vout.fname = out_file;
+% Vout.n = [1 1];
+% Vout.dt = [spm_type('float32') spm_platform('bigend')];
+% Vout = spm_create_vol(Vout);
+% for t = 1:size(Y,4)
+%     Vout.n = [t 1];
+%     spm_write_vol(Vout, Y(:,:,:,t));
+% end
+% end
