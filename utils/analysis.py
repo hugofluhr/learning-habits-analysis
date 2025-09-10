@@ -419,7 +419,7 @@ def est_c_vifs(desmat, contrasts):
                     desmat_copy.transpose() @ desmat_copy,
                     np.identity(desmat_copy.shape[1]),
                 )
-            )
+            ) # type: ignore
             @ contrast_cvec.transpose()
         )
         vifs_contrasts[contrast_name] = true_var_contrast / best_var_contrast
@@ -439,14 +439,14 @@ def est_vifs(desmat, regressors):
 
     Returns
     -------
-    pandas.DataFrame
-        DataFrame with VIFs for each requested regressor.
+    dict
+        Dictionary with VIFs for each requested regressor.
     """
     vifs = {}
     X = desmat.copy()
 
     # Remove constant columns (like intercepts / dummies)
-    X = X.loc[:, X.nunique() > 1]
+    X = X.loc[:, (X.nunique() > 1) | (X.isnull().any())]
 
     for reg in regressors:
         if reg not in X.columns:
@@ -463,3 +463,54 @@ def est_vifs(desmat, regressors):
         vifs[reg] = vif
 
     return vifs
+
+def est_efficiency(desmat, contrasts):
+    """
+    Compute design efficiency for given contrasts.
+
+    Efficiency is defined as the inverse of the variance of the contrast
+    estimate (ignoring the noise variance factor sigma^2):
+        Efficiency(c) = 1 / (c^T (X'X)^(-1) c)
+
+    Parameters
+    ----------
+    desmat : pandas.DataFrame
+        Design matrix (rows = time points, columns = regressors).
+    contrasts : dict
+        Dictionary of contrasts, where keys are contrast names and values
+        are contrast expressions (using column names from the design matrix).
+
+    Returns
+    -------
+    dict
+        Dictionary of efficiencies for each contrast.
+    """
+    desmat_copy = desmat.copy()
+
+    # Remove constant columns (e.g., intercepts / all-zero regressors)
+    desmat_copy = desmat_copy.loc[
+        :, (desmat_copy.nunique() > 1) | (desmat_copy.isnull().any())
+    ]
+
+    # Scale regressors (mean-center, divide by sqrt(N-1)*SD)
+    nsamp = desmat_copy.shape[0]
+    desmat_copy = (desmat_copy - desmat_copy.mean()) / (
+        (nsamp - 1) ** 0.5 * desmat_copy.std()
+    )
+
+    XtX_inv = np.linalg.inv(desmat_copy.T @ desmat_copy)
+
+    efficiencies = {}
+    for contrast_name, contrast_string in contrasts.items():
+        contrast_cvec = expression_to_contrast_vector(
+            contrast_string, desmat_copy.columns
+        )
+        var_contrast = (
+            contrast_cvec
+            @ XtX_inv
+            @ contrast_cvec.T
+        )
+        # Efficiency is inverse of variance (ignoring sigma^2 scaling)
+        efficiencies[contrast_name] = float(1.0 / var_contrast)
+
+    return efficiencies
