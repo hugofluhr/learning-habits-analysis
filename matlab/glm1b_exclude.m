@@ -8,7 +8,7 @@ bbt_path = '/home/ubuntu/data/learning-habits/bbt.csv';
 addpath(spmpath);
 
 current_date = char(datetime('now', 'Format', 'yyyy-MM-dd-hh-mm'));
-output_dir = fullfile(analysis_dir, 'outputs', ['glm1_' current_date]);
+output_dir = fullfile(analysis_dir, 'outputs', ['glm1b_exclude_' current_date]);
 if ~exist(output_dir, 'dir')
     mkdir(output_dir);
 end
@@ -81,6 +81,11 @@ for s = 1:length(subjects)
         block_data = bbt(strcmp(bbt.sub_id, sub_id) & strcmp(bbt.block, block_names{r}), :);
         % Ignore non response trials
         block_data = block_data(~isnan(block_data.action), :);
+        % Ignore trials with highest/lowest stimuli
+        % Create a mask for excluding specific trials
+        trial_mask = (block_data.first_stim ~= 1) & (block_data.first_stim ~= 8);
+        block_incl = block_data(trial_mask,:);
+        block_excl = block_data(~trial_mask,:);
         
         %% -----------------
         % 1) SPEC + EST BATCH
@@ -100,19 +105,26 @@ for s = 1:length(subjects)
         matlabbatch{1}.spm.stats.fmri_spec.sess.multi_reg = {confounds_file};
         matlabbatch{1}.spm.stats.fmri_spec.sess.hpf = high_pass_cutoff;
         
-        % First stimulus
+        % First stimulus - included 
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).name = 'first_stim';
-        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).onset = block_data.t_first_stim;
-        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).duration = block_data.t_second_stim - block_data.t_first_stim; % check duration
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).onset = block_incl.t_first_stim;
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).duration = block_incl.t_second_stim - block_incl.t_first_stim; % check duration
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).tmod = 0;   
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(1).name = 'Qval';
-        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(1).param = zscore(block_data.first_stim_value_rl);
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(1).param = zscore(block_incl.first_stim_value_rl);
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(1).poly = 1;
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(2).name = 'Hval';
-        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(2).param = zscore(block_data.first_stim_value_ck);
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(2).param = zscore(block_incl.first_stim_value_ck);
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(2).poly = 1;
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).orth = 0;
-    
+        
+        % First stimulus - excluded
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(5).name = 'first_stim_excl';
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(5).onset = block_excl.t_first_stim;
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(5).duration = block_excl.t_second_stim - block_excl.t_first_stim;
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(5).tmod = 0;   
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(5).pmod = struct('name', {}, 'param', {}, 'poly', {});
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(5).orth = 0;
 
         % Second stimulus
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).name = 'second_stim';
