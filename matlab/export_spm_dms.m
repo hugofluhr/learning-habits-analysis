@@ -10,6 +10,10 @@ function export_spm_dms(base_dir, varargin)
 %   'Overwrite'  (false by default)
 %   'SpmMatName' ('SPM.mat' by default)
 
+% add SPM to path
+spmpath = '/home/ubuntu/repos/spm12';
+addpath(spmpath);
+
 p = inputParser;
 p.addRequired('base_dir', @(s) ischar(s) || isstring(s));
 p.addParameter('Overwrite', false, @(x) islogical(x) && isscalar(x));
@@ -39,7 +43,9 @@ for k = 1:numel(spm_files)
 
     % --- derive BIDS-style prefix from path
     % look for sub-XX and run-YY in path
-    tokens = regexp(d, '(sub-[^/\\]+).*?(run-[^/\\]+)', 'tokens', 'once');
+    %tokens = regexp(d, '(sub-[^/\\]+).*?(run-[^/\\]+)', 'tokens', 'once');
+    % look for sub-XX and learning/test in path
+    tokens = regexp(d, '(sub-[^/\\]+).*?(learning|test)', 'tokens', 'once');
     if isempty(tokens)
         % fallback: just use folder name
         prefix = sprintf('dir-%03d', k);
