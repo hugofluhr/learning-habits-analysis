@@ -157,14 +157,7 @@ for s = 1:length(subjects)
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).tmod = 0;   
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).pmod = struct('name', {}, 'param', {}, 'poly', {});
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).orth = 0;
-        
-        % Other specifications
-        matlabbatch{1}.spm.stats.fmri_spec.sess.multi = {''};
-        matlabbatch{1}.spm.stats.fmri_spec.sess.regress = struct('name', {}, 'val', {});
-        % Use confounds from fmriprep
-        matlabbatch{1}.spm.stats.fmri_spec.sess.multi_reg = cellstr(confounds_file);
-        matlabbatch{1}.spm.stats.fmri_spec.sess.hpf = high_pass_cutoff;
-        
+               
         % Other specifications, from Jae-Chang's script
         matlabbatch{1}.spm.stats.fmri_spec.fact = struct('name', {}, 'levels', {});
         matlabbatch{1}.spm.stats.fmri_spec.bases.hrf.derivs = [0 0];

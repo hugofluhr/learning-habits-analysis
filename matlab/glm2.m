@@ -107,7 +107,7 @@ for s = 1:length(subjects)
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).name = 'first_stim';
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).onset = block_data.t_first_stim;
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).duration = block_data.t_second_stim - block_data.t_first_stim; % check duration
-        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).tmod = 0;
+        matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).tmod = 0;   
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(1).name = 'Qval';
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(1).param = zscore(block_data.first_stim_value_rl);
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(1).poly = 1;
@@ -115,6 +115,7 @@ for s = 1:length(subjects)
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(2).param = zscore(block_data.first_stim_value_ck);
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(2).poly = 1;
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).orth = 0;
+    
 
         % Second stimulus
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).name = 'second_stim';
@@ -144,14 +145,7 @@ for s = 1:length(subjects)
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).tmod = 0;   
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).pmod = struct('name', {}, 'param', {}, 'poly', {});
         matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).orth = 0;
-        
-        % Other specifications
-        matlabbatch{1}.spm.stats.fmri_spec.sess.multi = {''};
-        matlabbatch{1}.spm.stats.fmri_spec.sess.regress = struct('name', {}, 'val', {});
-        % Use confounds from fmriprep
-        matlabbatch{1}.spm.stats.fmri_spec.sess.multi_reg = cellstr(confounds_file);
-        matlabbatch{1}.spm.stats.fmri_spec.sess.hpf = high_pass_cutoff;
-        
+               
         % Other specifications, from Jae-Chang's script
         matlabbatch{1}.spm.stats.fmri_spec.fact = struct('name', {}, 'levels', {});
         matlabbatch{1}.spm.stats.fmri_spec.bases.hrf.derivs = [0 0];
