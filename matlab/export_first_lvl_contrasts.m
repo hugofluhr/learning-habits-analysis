@@ -80,7 +80,7 @@ function process_phase(phase_name, spms, firstlvl_root, outdir, in_place, opts)
 % Helper: run the original pipeline on a subset (one phase)
 
 sanitize = @(s) regexprep(lower(strrep(strtrim(s), ' ', '-')), '[^a-z0-9._-]', '');
-strip_all_sessions = @(s) regexprep(s, '^\s*All Sessions\s*-\s*', '', 'ignorecase');
+strip_all_sessions = @(s) regexprep(s, '\s*-\s*All Sessions\s*$', '', 'ignorecase');
 
 if ~in_place
     % Phase-specific export base to avoid mixing outputs
