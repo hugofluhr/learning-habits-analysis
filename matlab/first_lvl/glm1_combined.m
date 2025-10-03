@@ -85,8 +85,10 @@ for s = 1:length(subjects)
         
         % Get block data and filter trials
         block_data = bbt(strcmp(bbt.sub_id, sub_id) & strcmp(bbt.block, block_names{r}), :);
-        % Ignore non response trials
-        block_data = block_data(~isnan(block_data.action), :);
+        % Model non response trials separately
+        is_resp = ~isnan(block_data.action);
+        block_resp = block_data(is_resp, :);
+        block_nr   = block_data(~is_resp, :);
 
         % General stuff
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).scans = cellstr(currBOLD);
@@ -95,7 +97,7 @@ for s = 1:length(subjects)
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).multi_reg = {confounds_file};
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).hpf = high_pass_cutoff;
 
-        % First stimulus
+        % First stimulus - All trials
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).name = 'first_stim';
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).onset = block_data.t_first_stim;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).duration = block_data.t_second_stim - block_data.t_first_stim; % check duration
@@ -108,7 +110,7 @@ for s = 1:length(subjects)
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod(2).poly = 1;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).orth = 0;
 
-        % Second stimulus
+        % Second stimulus - All trials
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).name = 'second_stim';
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).onset = block_data.t_second_stim;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).duration = block_data.t_action - block_data.t_second_stim; % check duration
@@ -116,21 +118,29 @@ for s = 1:length(subjects)
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod = struct('name', {}, 'param', {}, 'poly', {});
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).orth = 0;
 
-        % Response
+        % Response - Resp trials
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(3).name = 'response';
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(3).onset = block_data.t_action;
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(3).onset = block_resp.t_action;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(3).duration = 0; % check duration
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(3).tmod = 0;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(3).pmod = struct('name', {}, 'param', {}, 'poly', {});
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(3).orth = 0;
 
-        % Feedback
+        % Feedback - Resp trials
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).name = 'feedback';
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).onset = block_data.t_purple_frame;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).duration = block_data.t_iti_onset - block_data.t_purple_frame; % check duration
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).onset = block_resp.t_purple_frame;
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).duration = block_resp.t_iti_onset - block_resp.t_purple_frame; % check duration
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).tmod = 0;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).pmod = struct('name', {}, 'param', {}, 'poly', {});
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).orth = 0;
+
+        % Feedback - NoResp trials
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(5).name = 'nresp_screen';
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(5).onset = block_nr.t_second_stim + 1; % No time stamp for non-response trials, so use second stimulus + 1s
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(5).duration = block_nr.t_iti_onset - block_nr.t_second_stim - 1; % check duration
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(5).tmod = 0;
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(5).pmod = struct('name', {}, 'param', {}, 'poly', {});
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(5).orth = 0;
     end
 
     % Other specifications, from Jae-Chang's script
@@ -220,8 +230,10 @@ for s = 1:length(subjects)
     
     % Get block data and filter trials
     block_data = bbt(strcmp(bbt.sub_id, sub_id) & strcmp(bbt.block, block_names{r}), :);
-    % Ignore non response trials
-    block_data = block_data(~isnan(block_data.action), :);
+    % Model non response trials separately
+    is_resp = ~isnan(block_data.action);
+    block_resp = block_data(is_resp, :);
+    block_nr   = block_data(~is_resp, :);
 
     % General stuff
     matlabbatch{1}.spm.stats.fmri_spec.sess.scans = cellstr(currBOLD);
@@ -230,7 +242,7 @@ for s = 1:length(subjects)
     matlabbatch{1}.spm.stats.fmri_spec.sess.multi_reg = {confounds_file};
     matlabbatch{1}.spm.stats.fmri_spec.sess.hpf = high_pass_cutoff;
 
-    % First stimulus
+    % First stimulus - All trials
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).name = 'first_stim';
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).onset = block_data.t_first_stim;
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).duration = block_data.t_second_stim - block_data.t_first_stim; % check duration
@@ -243,7 +255,7 @@ for s = 1:length(subjects)
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(2).poly = 1;
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).orth = 0;
 
-    % Second stimulus
+    % Second stimulus - All trials
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).name = 'second_stim';
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).onset = block_data.t_second_stim;
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).duration = block_data.t_action - block_data.t_second_stim; % check duration
@@ -251,21 +263,29 @@ for s = 1:length(subjects)
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod = struct('name', {}, 'param', {}, 'poly', {});
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).orth = 0;
 
-    % Response
+    % Response - Resp trials
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(3).name = 'response';
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(3).onset = block_data.t_action;
+    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(3).onset = block_resp.t_action;
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(3).duration = 0; % check duration
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(3).tmod = 0;
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(3).pmod = struct('name', {}, 'param', {}, 'poly', {});
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(3).orth = 0;
 
-    % Feedback
+    % Feedback - Resp trials
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).name = 'feedback';
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).onset = block_data.t_purple_frame;
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).duration = block_data.t_iti_onset - block_data.t_purple_frame; % check duration
+    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).onset = block_resp.t_purple_frame;
+    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).duration = block_resp.t_iti_onset - block_resp.t_purple_frame; % check duration
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).tmod = 0;
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).pmod = struct('name', {}, 'param', {}, 'poly', {});
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).orth = 0;
+
+    % Feedback - NoResp trials
+    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(5).name = 'nresp_screen';
+    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(5).onset = block_nr.t_second_stim + 1; % No time stamp for non-response trials, so use second stimulus + 1s
+    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(5).duration = block_nr.t_iti_onset - block_nr.t_second_stim - 1; % check duration
+    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(5).tmod = 0;
+    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(5).pmod = struct('name', {}, 'param', {}, 'poly', {});
+    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(5).orth = 0;
 
     % Other specifications, from Jae-Chang's script
     matlabbatch{1}.spm.stats.fmri_spec.fact = struct('name', {}, 'levels', {});
