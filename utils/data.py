@@ -7,16 +7,13 @@ import pandas as pd
 import json
 from nilearn.interfaces.fmriprep import load_confounds
 
-STIM_NAMES = [
-    'figure_circle',
-    'face_female',
-    'face_male',
-    'hand_back',
-    'hand_palm',
-    'house_1',
-    'house_2',
-    'figure_triangle'
-]
+# Load stimulus properties from JSON
+with open(os.path.join(os.path.dirname(__file__), 'stimuli_data.json'), 'r') as f:
+    _stimuli_json = json.load(f)
+    STIM_NAMES = _stimuli_json['STIM_NAMES']
+    STIM_REWARDS = {int(k): v for k, v in _stimuli_json['STIM_REWARDS'].items()}
+    STIM_FREQU = {int(k): v for k, v in _stimuli_json['STIM_FREQU'].items()}
+
 
 def load_subject_lut(base_dir):
     """
@@ -69,6 +66,21 @@ def load_participant_list(base_dir, file_name='participants_sne2024.tsv'):
         ids = [line.strip() for line in file.readlines()]
     return ids
 
+class StimuliInfo:
+    def __init__(self, assignment, values, frequencies, names):
+        self.assignment = assignment
+        self.values = values
+        self.frequ = frequencies
+        self.names = names
+
+    @classmethod
+    def from_subject_data(cls, subject_data):
+        assignment = list(subject_data['phase2_1'].stimuli_assignment)
+        values = STIM_REWARDS
+        frequencies = STIM_FREQU
+        names = {s+1: STIM_NAMES[assignment[s]-1] for s in range(len(assignment))}
+        return cls(assignment, values, frequencies, names)
+
 class Block:
     """
     A class to represent a block of trials in an experimental session.
@@ -109,7 +121,6 @@ class Block:
             The raw data for this block, containing sequences and timing information for each trial.
         """
         self.raw_block = raw_block
-        self.stim_names = STIM_NAMES
 
         # determine if the block is a learning block or a test block
         self.block_type = 'learning' if hasattr(raw_block.time, 'rewards_onset') else 'test'
@@ -644,7 +655,7 @@ class Subject:
         # Load the .mat file
         scanner_rp_data = scipy.io.loadmat(scanner_rp_file, squeeze_me=True, struct_as_record=False)
 
-        self.stimuli = self._load_stimuli_data(scanner_rp_data)
+        self.stimuli = StimuliInfo.from_subject_data(scanner_rp_data)
         self.metadata = self._load_metadata(scanner_rp_data)
         self.learning1, self.learning2 = self._load_learning_phase(scanner_rp_data)
         self.test = self._load_test_phase(scanner_rp_data)
@@ -669,25 +680,6 @@ class Subject:
         """
         return Block(block_data)
 
-    def _load_stimuli_data(self, subject_data):
-        """
-        Loads and returns the stimuli data from the subject data.
-
-        Parameters
-        ----------
-        subject_data : dict
-            Dictionary containing the subject's data, which includes stimuli information.
-
-        Returns
-        -------
-        dict
-            A dictionary with the stimuli assignment and corresponding values.
-        """
-        # Extract stimuli assignment and predefined values
-        assignment = subject_data['phase2_1'].stimuli_assignment
-        # To Do: find a better way to set this (always the same across subjects)
-        values = np.array([1, 2, 2, 3, 3, 4, 4, 5])
-        return {'stim_assignment': assignment, 'stim_values': values}
 
     def _load_metadata(self, subject_data):
         """

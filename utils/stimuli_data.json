@@ -1,0 +1,32 @@
+{
+    "STIM_NAMES": [
+        "figure_circle",
+        "face_female",
+        "face_male",
+        "hand_back",
+        "hand_palm",
+        "house_1",
+        "house_2",
+        "figure_triangle"
+    ],
+    "STIM_REWARDS": {
+        "1": 1,
+        "2": 2,
+        "3": 2,
+        "4": 3,
+        "5": 3,
+        "6": 4,
+        "7": 4,
+        "8": 5
+    },
+    "STIM_FREQU": {
+        "1": 0,
+        "2": -1,
+        "3": 1,
+        "4": -1,
+        "5": 1,
+        "6": -1,
+        "7": 1,
+        "8": 0
+    }
+}
