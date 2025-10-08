@@ -73,6 +73,15 @@ class StimuliInfo:
         self.frequ = frequencies
         self.names = names
 
+    def __repr__(self):
+        return (f"StimuliInfo(assignment={self.assignment!r}, \n"
+                f"values={self.values!r}, \n"
+                f"frequencies={self.frequ!r}, \n"
+                f"names={self.names!r})")
+
+    def __str__(self):
+        return self.__repr__()
+
     @classmethod
     def from_subject_data(cls, subject_data):
         assignment = list(subject_data['phase2_1'].stimuli_assignment)
@@ -80,6 +89,7 @@ class StimuliInfo:
         frequencies = STIM_FREQU
         names = {s+1: STIM_NAMES[assignment[s]-1] for s in range(len(assignment))}
         return cls(assignment, values, frequencies, names)
+
 
 class Block:
     """
@@ -111,7 +121,7 @@ class Block:
     trials : pd.DataFrame
         DataFrame containing detailed information about each trial in the block.
     """
-    def __init__(self, raw_block):
+    def __init__(self, raw_block, stimuli_info=None):
         """
         Initialize a Block object by loading trial data and correcting time references.
 
@@ -119,8 +129,14 @@ class Block:
         ----------
         raw_block : custom data structure
             The raw data for this block, containing sequences and timing information for each trial.
+        stimuli_info : StimuliInfo, optional
+            Stimuli information for the block.
         """
         self.raw_block = raw_block
+
+        # stimuli information
+        if stimuli_info is not None:
+            self.stimuli = stimuli_info
 
         # determine if the block is a learning block or a test block
         self.block_type = 'learning' if hasattr(raw_block.time, 'rewards_onset') else 'test'
@@ -146,6 +162,12 @@ class Block:
 
         # Add the events DataFrame
         self.create_event_df()
+
+    def __repr__(self):
+        return (f"Block(block_type={self.block_type!r}, n_trials={self.n_trials!r})")
+
+    def __str__(self):
+        return self.__repr__()
 
     def _load_trials(self, raw_block):
         """
@@ -199,16 +221,24 @@ class Block:
         trials['second_stim'] = np.where(trials['shift'] == 0, trials['left_stim'], trials['right_stim'])
         
         # Add stimuli type information
-        trials['left_stim_name'] = trials['left_stim'].apply(lambda x: self.stim_names[x-1])
-        trials['right_stim_name'] = trials['right_stim'].apply(lambda x: self.stim_names[x-1])
+        trials['left_stim_name'] = trials['left_stim'].map(self.stimuli.names)
+        trials['right_stim_name'] = trials['right_stim'].map(self.stimuli.names)
         trials['left_stim_cat'] = trials['left_stim_name'].apply(lambda x: x.split('_')[0])
         trials['right_stim_cat'] = trials['right_stim_name'].apply(lambda x: x.split('_')[0])
 
         # Same information for stimuli, by order of presentation
-        trials['first_stim_name'] = trials['first_stim'].apply(lambda x: self.stim_names[x-1])
-        trials['second_stim_name'] = trials['second_stim'].apply(lambda x: self.stim_names[x-1])
+        trials['first_stim_name'] = trials['first_stim'].map(self.stimuli.names)
+        trials['second_stim_name'] = trials['second_stim'].map(self.stimuli.names)
         trials['first_stim_cat'] = trials['first_stim_name'].apply(lambda x: x.split('_')[0])
         trials['second_stim_cat'] = trials['second_stim_name'].apply(lambda x: x.split('_')[0])
+
+        # Add stimuli values information
+        trials['first_stim_value'] = trials['first_stim'].map(self.stimuli.values)
+        trials['second_stim_value'] = trials['second_stim'].map(self.stimuli.values)
+
+        # Add stimuli frequency information
+        trials['first_stim_frequ'] = trials['first_stim'].map(self.stimuli.frequ)
+        trials['second_stim_frequ'] = trials['second_stim'].map(self.stimuli.frequ)
 
         # Specify the data types for each column
         trials = trials.astype({
@@ -232,7 +262,11 @@ class Block:
             'left_stim_name': 'str',
             'right_stim_name': 'str',
             'left_stim_cat': 'str',
-            'right_stim_cat': 'str'
+            'right_stim_cat': 'str',
+            'first_stim_value': 'int32',
+            'second_stim_value': 'int32',
+            'first_stim_frequ': 'int32',
+            'second_stim_frequ': 'int32',
         })
 
         return trials
@@ -554,6 +588,13 @@ class Subject:
             self.add_modeling_data()
             self.extended_trials = self._concatenate_trials(trial_type='extended_trials')
     
+    def __repr__(self):
+        return (f"Subject(sub_id={self.sub_id!r}, legacy_id={self.legacy_id!r}\n"
+                f"\truns={self.runs!r})")
+
+    def __str__(self):
+        return self.__repr__()
+    
     def _get_rp_files(self):
         """
         Search for .mat files in the given directory that contain the specified ID (case insensitive).
@@ -678,7 +719,7 @@ class Subject:
         Block
             Returns a Block object containing the block data.
         """
-        return Block(block_data)
+        return Block(block_data, self.stimuli)
 
 
     def _load_metadata(self, subject_data):
