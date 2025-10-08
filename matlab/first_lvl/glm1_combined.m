@@ -27,9 +27,10 @@ block_names = {'learning1', 'learning2', 'test'};
 TR = 2.33384; % Repetition time
 high_pass_cutoff = 128; % High-pass filter in seconds
 
-% set up contrasts
+% set up contrasts - not including non-response feedback because so few trials per subject
+% points_feedback only for learning runs
 connames = {'first_stim', 'first_stimxQval', 'first_stimxHval', ...
-            'second_stim', 'response', 'feedback'};
+            'second_stim', 'response', 'purple_frame', 'points_feedback'};
 
 spm('Defaults', 'fMRI');
 spm_jobman('initcfg');
@@ -100,7 +101,7 @@ for s = 1:length(subjects)
         % First stimulus - All trials
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).name = 'first_stim';
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).onset = block_data.t_first_stim;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).duration = block_data.t_second_stim - block_data.t_first_stim; % check duration
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).duration = block_data.t_second_stim - block_data.t_first_stim;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).tmod = 0;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod(1).name = 'Qval';
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod(1).param = zscore(block_data.first_stim_value_rl);
@@ -113,7 +114,7 @@ for s = 1:length(subjects)
         % Second stimulus - All trials
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).name = 'second_stim';
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).onset = block_data.t_second_stim;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).duration = block_data.t_action - block_data.t_second_stim; % check duration
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).duration = block_data.t_action - block_data.t_second_stim;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).tmod = 0;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod = struct('name', {}, 'param', {}, 'poly', {});
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).orth = 0;
@@ -121,26 +122,34 @@ for s = 1:length(subjects)
         % Response - Resp trials
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(3).name = 'response';
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(3).onset = block_resp.t_action;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(3).duration = 0; % check duration
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(3).duration = 0;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(3).tmod = 0;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(3).pmod = struct('name', {}, 'param', {}, 'poly', {});
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(3).orth = 0;
 
-        % Feedback - Resp trials
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).name = 'feedback';
+        % Purple frame - Resp trials
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).name = 'purple_frame';
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).onset = block_resp.t_purple_frame;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).duration = block_resp.t_iti_onset - block_resp.t_purple_frame; % check duration
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).duration = block_resp.t_points_feedback - block_resp.t_purple_frame;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).tmod = 0;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).pmod = struct('name', {}, 'param', {}, 'poly', {});
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).orth = 0;
 
-        % Feedback - NoResp trials
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(5).name = 'nresp_screen';
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(5).onset = block_nr.t_second_stim + 1; % No time stamp for non-response trials, so use second stimulus + 1s
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(5).duration = block_nr.t_iti_onset - block_nr.t_second_stim - 1; % check duration
+        % Points feedback - Resp trials
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(5).name = 'points_feedback';
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(5).onset = block_resp.t_points_feedback;
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(5).duration = block_resp.t_iti_onset - block_resp.t_points_feedback;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(5).tmod = 0;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(5).pmod = struct('name', {}, 'param', {}, 'poly', {});
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(5).orth = 0;
+
+        % Feedback - NoResp trials
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(6).name = 'nresp_screen';
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(6).onset = block_nr.t_second_stim + 1; % No time stamp for non-response trials, so use second stimulus + 1s
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(6).duration = block_nr.t_iti_onset - block_nr.t_second_stim - 1;
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(6).tmod = 0;
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(6).pmod = struct('name', {}, 'param', {}, 'poly', {});
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(6).orth = 0;
     end
 
     % Other specifications, from Jae-Chang's script
@@ -245,7 +254,7 @@ for s = 1:length(subjects)
     % First stimulus - All trials
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).name = 'first_stim';
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).onset = block_data.t_first_stim;
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).duration = block_data.t_second_stim - block_data.t_first_stim; % check duration
+    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).duration = block_data.t_second_stim - block_data.t_first_stim;
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).tmod = 0;
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(1).name = 'Qval';
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(1).param = zscore(block_data.first_stim_value_rl);
@@ -258,7 +267,7 @@ for s = 1:length(subjects)
     % Second stimulus - All trials
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).name = 'second_stim';
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).onset = block_data.t_second_stim;
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).duration = block_data.t_action - block_data.t_second_stim; % check duration
+    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).duration = block_data.t_action - block_data.t_second_stim;
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).tmod = 0;
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod = struct('name', {}, 'param', {}, 'poly', {});
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).orth = 0;
@@ -266,15 +275,15 @@ for s = 1:length(subjects)
     % Response - Resp trials
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(3).name = 'response';
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(3).onset = block_resp.t_action;
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(3).duration = 0; % check duration
+    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(3).duration = 0;
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(3).tmod = 0;
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(3).pmod = struct('name', {}, 'param', {}, 'poly', {});
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(3).orth = 0;
 
-    % Feedback - Resp trials
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).name = 'feedback';
+    % Purple frame - Resp trials
+    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).name = 'purple_frame';
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).onset = block_resp.t_purple_frame;
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).duration = block_resp.t_iti_onset - block_resp.t_purple_frame; % check duration
+    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).duration = block_resp.t_iti_onset - block_resp.t_purple_frame;
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).tmod = 0;
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).pmod = struct('name', {}, 'param', {}, 'poly', {});
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).orth = 0;
@@ -282,7 +291,7 @@ for s = 1:length(subjects)
     % Feedback - NoResp trials
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(5).name = 'nresp_screen';
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(5).onset = block_nr.t_second_stim + 1; % No time stamp for non-response trials, so use second stimulus + 1s
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(5).duration = block_nr.t_iti_onset - block_nr.t_second_stim - 1; % check duration
+    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(5).duration = block_nr.t_iti_onset - block_nr.t_second_stim - 1;
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(5).tmod = 0;
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(5).pmod = struct('name', {}, 'param', {}, 'poly', {});
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(5).orth = 0;
@@ -310,7 +319,7 @@ for s = 1:length(subjects)
     matlabbatch_con = [];
     matlabbatch_con{1}.spm.stats.con.spmmat = {fullfile(test_output_dir, 'SPM.mat')};
     
-    for cc = 1:length(connames)
+    for cc = 1:length(connames)-1 % Exclude points_feedback for test
         idx = find(contains(SPM.xX.name, connames{cc}));
         if isempty(idx)
             warning('No regressor found for %s in %s', connames{cc}, run_id);
