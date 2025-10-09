@@ -395,6 +395,16 @@ class Block:
         merged['first_stim_value_ck'] = merged.apply(lambda row: row[f"stim{row['first_stim']}_value_ck"], axis=1)
         merged['second_stim_value_ck'] = merged.apply(lambda row: row[f"stim{row['second_stim']}_value_ck"], axis=1)
 
+        # Add Choice Variable
+        merged['first_stim_choice_val'] = (
+            merged['beta_rl20'] * merged['first_stim_value_rl'] +
+            merged['beta_ck20'] * merged['first_stim_value_ck']
+        )
+        merged['second_stim_choice_val'] = (
+            merged['beta_rl20'] * merged['second_stim_value_rl'] +
+            merged['beta_ck20'] * merged['second_stim_value_ck']
+        )
+
         self.extended_trials = merged
 
     def create_event_df(self):
