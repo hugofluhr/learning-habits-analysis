@@ -2,8 +2,8 @@ clear;
 
 % Paths
 spmpath = '/home/ubuntu/repos/spm12';
-data_dir = '/home/ubuntu/data/learning-habits/spm_format_20250603';
-analysis_dir = '/home/ubuntu/data/learning-habits/spm_format_20250603';
+data_dir = '/home/ubuntu/data/learning-habits/spm_format_noSDC';
+analysis_dir = '/home/ubuntu/data/learning-habits/spm_format_noSDC';
 bbt_path = '/home/ubuntu/data/learning-habits/bbt.csv';
 addpath(spmpath);
 
