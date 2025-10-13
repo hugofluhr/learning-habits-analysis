@@ -4,7 +4,7 @@ spm('Defaults', 'fMRI');
 spm_jobman('initcfg');
 
 % Directory paths
-base_dir = '/home/ubuntu/data/learning-habits/spm_format_20250603';
+base_dir = '/home/ubuntu/data/learning-habits/spm_format_noSDC';
 
 % Parameters
 smoothing_fwhm = 5; % Smoothing kernel
