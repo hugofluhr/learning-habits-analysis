@@ -113,7 +113,10 @@ for s = 1:length(subjects)
         % Second stimulus - All trials
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).name = 'second_stim';
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).onset = block_data.t_second_stim;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).duration = block_data.t_action - block_data.t_second_stim;
+        % handle duration
+        duration = block_data.t_action - block_data.t_second_stim;
+        duration(duration < 0) = 1; % for non-response trials
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).duration = duration;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).tmod = 0;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(1).name = 'Choiceval';
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(1).param = zscore(block_data.second_stim_choice_val);
@@ -277,7 +280,10 @@ for s = 1:length(subjects)
     % Second stimulus - All trials
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).name = 'second_stim';
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).onset = block_data.t_second_stim;
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).duration = block_data.t_action - block_data.t_second_stim;
+    % handle duration
+    duration = block_data.t_action - block_data.t_second_stim;
+    duration(duration < 0) = 1; % for non-response trials
+    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).duration = duration;
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).tmod = 0;
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(1).name = 'Choiceval';
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(1).param = zscore(block_data.second_stim_choice_val);
