@@ -928,6 +928,28 @@ class Subject:
             raise FileNotFoundError(f"File {mask_file} not found.")
         return mask_file
     
+    def get_confounds_path(self, run):
+        """
+        Get the path to the confounds file for the specified run.
+
+        Parameters
+        ----------
+        run : str
+            The run for which to get the confounds file.
+
+        Returns
+        -------
+        str
+            The path to the confounds file for the specified run.
+        """
+        base_dir = self.get_base_dir()
+        f_task = 'learning' if 'learning' in run else 'test'
+        f_run = self.runs.index(run) + 1
+        confounds_file = os.path.join(base_dir, f"{self.sub_id}_ses-1_task-{f_task}_run-{f_run}_desc-confounds_timeseries.tsv")
+        if not os.path.exists(confounds_file):
+            raise FileNotFoundError(f"File {confounds_file} not found.")
+        return confounds_file
+    
     def load_confounds(self, run, motion_type='basic', include_cos = True, scrub=0, 
                        fd_thresh=0.5, std_dvars_thresh=2.5):
         """ Load the confounds file for the specified run.
