@@ -8,7 +8,7 @@ bbt_path = '/home/ubuntu/data/learning-habits/bbt.csv';
 addpath(spmpath);
 
 current_date = char(datetime('now', 'Format', 'yyyy-MM-dd-hh-mm'));
-output_dir = fullfile(analysis_dir, 'outputs', ['glm2_diff_timing_' current_date]);
+output_dir = fullfile(analysis_dir, 'outputs', ['glm2_chosen_' current_date]);
 if ~exist(output_dir, 'dir')
     mkdir(output_dir);
 end
@@ -113,6 +113,8 @@ for s = 1:length(subjects)
         % Second stimulus - Resp trials - All modulators here
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).name = 'second_stim';
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).onset = block_resp.t_second_stim;
+        % no need to handle duration since this model splits resp and nresp trials
+        % (needed to have chosen and unchosen stimuli)
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).duration = block_resp.t_action - block_resp.t_second_stim;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).tmod = 0;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(1).name = 'Qval_chosen';
@@ -288,24 +290,29 @@ for s = 1:length(subjects)
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod = struct('name', {}, 'param', {}, 'poly', {});
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).orth = 0;
 
-    % Second stimulus - All trials - All modulators here
+    % Second stimulus - Resp trials - All modulators here
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).name = 'second_stim';
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).onset = block_data.t_second_stim;
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).duration = block_data.t_action - block_data.t_second_stim;
+    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).onset = block_resp.t_second_stim;
+    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).duration = block_resp.t_action - block_resp.t_second_stim;
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).tmod = 0;
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(1).name = 'Qval_chosen';
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(1).param = zscore(block_data.chosen_value_rl);
+    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(1).param = zscore(block_resp.chosen_value_rl);
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(1).poly = 1;
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(2).name = 'Hval_chosen';
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(2).param = zscore(block_data.chosen_value_ck);
+    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(2).param = zscore(block_resp.chosen_value_ck);
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(2).poly = 1;
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(3).name = 'Qval_unchosen';
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(3).param = zscore(block_data.unchosen_value_rl);
+    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(3).param = zscore(block_resp.unchosen_value_rl);
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(3).poly = 1;
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(4).name = 'Hval_unchosen';
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(4).param = zscore(block_data.unchosen_value_ck);
+    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(4).param = zscore(block_resp.unchosen_value_ck);
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(4).poly = 1;
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).orth = 0;
+
+    % Second stimulus - NoResp trials (no modulators)
+    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(6).name = 'second_stim_nresp';
+    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(6).onset = block_nr.t_second_stim;
+    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(6).duration = block_nr.t_action - block_nr.t_second_stim;
 
     % Response - Resp trials
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(3).name = 'response';
