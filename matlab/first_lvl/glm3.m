@@ -188,7 +188,7 @@ for s = 1:length(subjects)
         % Build a single-session weight vector since I'm using 'repl'
         w = zeros(1, numel(sess1_cols));
         
-        idx = find(contains(sess1_names, connames{cc}));
+        idx = find(contains(sess1_names, connames{cc}), 1);
         if isempty(idx)
             warning('No regressor found for %s in %s', connames{cc}, run_id);
             continue
@@ -338,7 +338,7 @@ for s = 1:length(subjects)
     matlabbatch_con{1}.spm.stats.con.spmmat = {fullfile(test_output_dir, 'SPM.mat')};
     
     for cc = 1:length(connames)-1 % Exclude points_feedback for test
-        idx = find(contains(SPM.xX.name, connames{cc}));
+        idx = find(contains(SPM.xX.name, connames{cc}), 1);
         if isempty(idx)
             warning('No regressor found for %s in %s', connames{cc}, run_id);
             continue

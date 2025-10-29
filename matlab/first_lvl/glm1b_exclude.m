@@ -176,7 +176,7 @@ for s = 1:length(subjects)
         matlabbatch_con{1}.spm.stats.con.spmmat = {SPM_path};
         
         for cc = 1:length(connames)
-            idx = find(contains(SPM.xX.name, connames{cc}));
+            idx = find(contains(SPM.xX.name, connames{cc}), 1);
             if isempty(idx)
                 warning('No regressor found for %s in %s', connames{cc}, run_id);
                 continue
