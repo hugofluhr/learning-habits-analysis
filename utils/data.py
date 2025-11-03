@@ -880,7 +880,7 @@ class Subject:
         
         physio_dir = os.path.join(actual_bids, 'physIO', self.sub_id, 'ses-1', 'func')
         if not os.path.exists(physio_dir):
-            raise FileNotFoundError("No fmriprep directory found in derivatives.")
+            raise FileNotFoundError("No physIO directory found in derivatives.")
         
         return physio_dir
 
@@ -971,6 +971,10 @@ class Subject:
             fd_threshold=fd_thresh,
             std_dvars_threshold=std_dvars_thresh
         )
+
+        # if mask is None, all frames should be included
+        if sample_mask is None:
+            sample_mask = np.arange(confounds.shape[0])
 
         # Filter to keep only the first 5 cosine columns
         cosine_columns = [col for col in confounds.columns if col.startswith('cosine')]
