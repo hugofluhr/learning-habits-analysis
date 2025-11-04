@@ -1,9 +1,12 @@
 clear;
 
+% Which confounds to use
+confound_pattern = '_.*_motion_with_dummies.txt$';
+
 % Paths
 spmpath = '/home/ubuntu/repos/spm12';
-data_dir = '/home/ubuntu/data/learning-habits/spm_format_20250603';
-analysis_dir = '/home/ubuntu/data/learning-habits/spm_format_20250603';
+data_dir = '/home/ubuntu/data/learning-habits/spm_format_noSDC';
+analysis_dir = '/home/ubuntu/data/learning-habits/spm_format_noSDC';
 bbt_path = '/home/ubuntu/data/learning-habits/bbt.csv';
 addpath(spmpath);
 
@@ -70,7 +73,7 @@ for s = 1:length(subjects)
         % Select BOLD files for the current run
         currBOLD = spm_select('FPList', func_dir, ['^smoothed_.*' run_id '_.*_bold.nii$']);
         brain_mask = spm_select('FPList', func_dir, ['^sub-.*' run_id '_.*_desc-brain_mask.nii$']);
-        confounds_file = spm_select('FPList', func_dir, ['^sub-.*' run_id '_.*_motion.txt$']);
+        confounds_file = spm_select('FPList', func_dir, ['^sub-.*' run_id confound_pattern]);
         
         % Sanity check for missing files
         if isempty(currBOLD)
@@ -184,9 +187,13 @@ for s = 1:length(subjects)
     sess1_cols = SPM.Sess(1).col;  % column indices belonging to session 1
     sess1_names = SPM.xX.name(sess1_cols);
 
+    % Get the minimum number of columns across sessions - necessary for 'repl'
+    % because of volume censoring, sessions may have different number of columns
+    min_cols = min(cellfun(@numel, {SPM.Sess.col}));
+
     for cc = 1:length(connames)
         % Build a single-session weight vector since I'm using 'repl'
-        w = zeros(1, numel(sess1_cols));
+        w = zeros(1, min_cols);
         
         idx = find(contains(sess1_names, connames{cc}), 1);
         if isempty(idx)
@@ -208,7 +215,7 @@ for s = 1:length(subjects)
     for ec = 1:size(extra_contrasts, 1)
         matlabbatch_con{1}.spm.stats.con.consess{end+1}.tcon.name    = extra_contrasts{ec, 1};
         matlabbatch_con{1}.spm.stats.con.consess{end}.tcon.weights   = extra_contrasts{ec, 2};
-        matlabbatch_con{1}.spm.stats.con.consess{end}.tcon.sessrep   = 'none';
+        matlabbatch_con{1}.spm.stats.con.consess{end}.tcon.sessrep   = 'repl';
     end
     
     save(fullfile(learn_output_dir, 'batch_contrasts_.mat'), 'matlabbatch_con');
@@ -237,7 +244,7 @@ for s = 1:length(subjects)
     % Select BOLD files for the current run
     currBOLD = spm_select('FPList', func_dir, ['^smoothed_.*' run_id '_.*_bold.nii$']);
     brain_mask = spm_select('FPList', func_dir, ['^sub-.*' run_id '_.*_desc-brain_mask.nii$']);
-    confounds_file = spm_select('FPList', func_dir, ['^sub-.*' run_id '_.*_motion.txt$']);
+    confounds_file = spm_select('FPList', func_dir, ['^sub-.*' run_id confound_pattern]);
     
     % Sanity check for missing files
     if isempty(currBOLD)
@@ -351,11 +358,6 @@ for s = 1:length(subjects)
     end
     matlabbatch_con{1}.spm.stats.con.delete = 1;
 
-    % Add custom extra contrasts
-    extra_contrasts = {
-        'Choiceval_sum',  [0 1 0 0 1 0];
-        'Choiceval_diff', [0 1 0 0 -1 0];
-    };
     % Append each extra contrast
     for ec = 1:size(extra_contrasts, 1)
         matlabbatch_con{1}.spm.stats.con.consess{end+1}.tcon.name    = extra_contrasts{ec, 1};
