@@ -1,9 +1,14 @@
 clear;
 
+% List of subjects to exclude due to excessive motion
+excluded_learning = {
+    'sub-44', 'sub-48', 'sub-68'};
+excluded_test = {
+    'sub-17', 'sub-31', 'sub-48', 'sub-68'};
+
 % Define paths
-%spmpath = '/home/ubuntu/repos/spm12';
-spmpath = '/Users/hugofluhr/code/spm25';
-first_lvl_dir = '/Users/hugofluhr/phd_local/data/LearningHabits/spm_outputs/glm2_combined_2025-09-15-03-26_b';
+spmpath = '/home/ubuntu/repos/spm12';
+first_lvl_dir = '/home/ubuntu/data/learning-habits/spm_outputs/glm2_mf_2025-10-29-11-27';
 base_output_dir = fullfile(first_lvl_dir, 'second-lvl');
 addpath(spmpath);
 
@@ -82,6 +87,32 @@ for p = 1:numel(phases)
         end
         
         fprintf('Found %d contrast files for %s in phase %s\n', numel(con_files), contrast_name, phase);
+
+        % === Filter out excluded subjects ===
+        switch phase
+            case 'learning'
+                excl_list = excluded_learning;
+            case 'test'
+                excl_list = excluded_test;
+        end
+
+        keep_mask = true(size(con_files));
+        for e = 1:numel(excl_list)
+            excl_pattern = excl_list{e};
+            match_idx = contains(con_files, excl_pattern);
+            if any(match_idx)
+                fprintf('Excluding %d files matching %s from phase %s\n', sum(match_idx), excl_pattern, phase);
+                keep_mask(match_idx) = false;
+            end
+        end
+
+        con_files = con_files(keep_mask);
+
+        fprintf('Remaining subjects after exclusion: %d\n', numel(con_files));
+        if isempty(con_files)
+            warning('No subjects left after exclusion for contrast %s (%s phase). Skipping.', contrast_name, phase);
+            continue;
+        end
         
         % Define output directory using phase and contrast name
         output_dir = fullfile(base_output_dir, phase, contrast_name_sanitized);
