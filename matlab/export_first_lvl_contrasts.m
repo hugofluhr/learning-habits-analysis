@@ -92,6 +92,8 @@ end
 
 manifest_rows_global = {}; % only used when exporting to outdir
 ref_names = string.empty(1,0);
+n_processed = 0;
+n_skipped   = 0;
 
 for k = 1:numel(spms)
     spm_path = fullfile(spms(k).folder, spms(k).name);
@@ -104,10 +106,27 @@ for k = 1:numel(spms)
     token_parts = parts(1:max(1, numel(parts)-1)); % everything up to, but excluding, SPM.mat
     subj_token = sanitize(strjoin(token_parts, '_'));
 
-    % Contrast names for this SPM (strip "All Sessions - ")
+    % skip SPMs with no contrast definitions
+    if ~isfield(SPM, 'xCon') || isempty(SPM.xCon)
+        fprintf(2, '[%s] No contrasts defined in %s (only betas?) - skipping.\n', ...
+                upper(phase_name), subj_token);
+        n_skipped = n_skipped + 1;
+        continue;
+    end
+
     xCon  = SPM.xCon(:);
     names = string({xCon.name});
     names = arrayfun(strip_all_sessions, names);
+
+    % quick check for actual contrast images (defined but not estimated)
+    src_dir = spms(k).folder;
+    first_con_guess = fullfile(src_dir, sprintf('con_%04d.nii', 1));
+    if ~isfile(first_con_guess)
+        fprintf(2, '[%s] No contrast images found for %s (only betas?) - skipping.\n', ...
+                upper(phase_name), subj_token);
+        n_skipped = n_skipped + 1;
+        continue;
+    end
 
     % Validate name/order across all SPMs in this phase
     if isempty(ref_names)
@@ -121,9 +140,11 @@ for k = 1:numel(spms)
         end
     end
 
-    % Where to put outputs for this SPM (either in-place or under outdir/<phase>)
-    src_dir = spms(k).folder;
+    % At this point we have a valid, usable SPM with contrasts + con images
+    n_processed = n_processed + 1;
 
+    % Where to put outputs for this SPM (either in-place or under outdir/<phase>)
+    % (src_dir already set above)
     % Per-folder manifest if in-place; otherwise we'll also write a global one
     if in_place
         mf_path = fullfile(src_dir, 'contrast_manifest.tsv');
@@ -143,6 +164,7 @@ for k = 1:numel(spms)
         else
             con_src = fullfile(src_dir, sprintf('con_%04d.nii', i));
         end
+
         if ~isfile(con_src)
             error('Missing contrast image: %s', con_src);
         end
