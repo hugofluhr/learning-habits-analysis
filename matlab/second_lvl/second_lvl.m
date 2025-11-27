@@ -8,7 +8,7 @@ excluded_test = {
 
 % Define paths
 spmpath = '/home/ubuntu/repos/spm12';
-first_lvl_dir = '/home/ubuntu/data/learning-habits/spm_outputs/glm2_mf_2025-10-29-11-27';
+first_lvl_dir = '/home/ubuntu/data/learning-habits/spm_outputs_noSDC/glm2_chosen_2025-11-18-11-32';
 base_output_dir = fullfile(first_lvl_dir, 'second-lvl');
 addpath(spmpath);
 
@@ -43,6 +43,10 @@ end
 % Loop over phases and contrasts
 for p = 1:numel(phases)
     phase = phases{p};
+    phase_out_dir = fullfile(base_output_dir, phase);
+    if ~exist(phase_out_dir, 'dir')
+        mkdir(phase_out_dir);
+    end
     
     if ~isfield(contrast_info, phase)
         warning('No contrast information for phase %s, skipping.', phase);
@@ -50,6 +54,8 @@ for p = 1:numel(phases)
     end
     
     fprintf('\n===== Processing phase %s =====\n', phase);
+    % collect subjects included in this phase (across contrasts)
+    included_subs = {};
     
     % Loop over contrasts for this phase
     for c = 1:numel(contrast_info.(phase).names)
@@ -115,10 +121,20 @@ for p = 1:numel(phases)
         end
         
         % Define output directory using phase and contrast name
-        output_dir = fullfile(base_output_dir, phase, contrast_name_sanitized);
+        output_dir = fullfile(phase_out_dir, contrast_name_sanitized);
         if ~exist(output_dir, 'dir')
             mkdir(output_dir);
         end
+
+        % collect subject IDs from the available contrast files
+        for iCon = 1:numel(con_files)
+            cf = con_files{iCon};
+            tk = regexp(cf, 'sub-([A-Za-z0-9]+)', 'tokens', 'once');
+            if ~isempty(tk)
+                included_subs{end+1} = tk{1};
+            end
+        end
+        included_subs = unique(included_subs);
 
         % === STEP 1: Design Specification ===
         clear matlabbatch
@@ -152,4 +168,14 @@ for p = 1:numel(phases)
 
         spm_jobman('run', matlabbatch);
     end
+
+    % After processing all contrasts for this phase, write a manifest of included subjects
+    manifest_path = fullfile(phase_out_dir, 'subjects_included.txt');
+    fid = fopen(manifest_path, 'w');
+    for ii = 1:numel(included_subs)
+        fprintf(fid, 'sub-%s\n', included_subs{ii});
+    end
+    fclose(fid);
+    fprintf('Wrote subjects manifest for phase %s to %s\n', phase, manifest_path);
+
 end
