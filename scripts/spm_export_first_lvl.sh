@@ -3,8 +3,12 @@
 # Simple script to run export_first_lvl_contrasts
 # Edit the paths below as needed
 
-FIRSTLVL_ROOT="/home/ubuntu/data/learning-habits/spm_format_20250603/outputs/glm2_combined_long_pmod_2025-09-22-05-42"
-OUTDIR="/home/ubuntu/data/learning-habits/spm_outputs/glm2_combined_long_pmod_2025-09-22-05-42"  # Leave empty for in-place aliasing, or set to output directory
+FIRSTLVL_ROOT="/home/ubuntu/data/learning-habits/spm_format_noSDC/outputs/glm2_chosen_2025-11-18-11-32"
+OUTDIR="/home/ubuntu/data/learning-habits/spm_outputs_noSDC/glm2_chosen_2025-11-18-11-32_copy"
+# Leave empty for in-place aliasing, or set to output directory
+
+# Default behavior: create symlinks (do not copy).
+COPY_MODE=true
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MATLAB_DIR="$(dirname "$SCRIPT_DIR")/matlab"
@@ -16,6 +20,16 @@ if [[ -n "$OUTDIR" ]]; then
 else
     echo "Mode: In-place aliasing"
 fi
+if [[ "$COPY_MODE" == true ]]; then
+    echo "Copy mode: enabled (will pass 'copy', true to MATLAB)"
+else
+    echo "Copy mode: disabled (will create symlinks when possible)"
+fi
 
 module load matlab
-matlab -nodisplay -nosplash -nodesktop -r "addpath('/home/ubuntu/repos/spm12'); addpath('$MATLAB_DIR'); export_first_lvl_contrasts('$FIRSTLVL_ROOT', '$OUTDIR'); exit"
+# Build optional MATLAB argument for copy mode (pass in as additional args)
+MATLAB_COPY_ARG=""
+if [[ "$COPY_MODE" == true ]]; then
+    MATLAB_COPY_ARG=", 'copy', true"
+fi
+matlab -nodisplay -nosplash -nodesktop -r "addpath('/home/ubuntu/repos/spm12'); addpath('$MATLAB_DIR'); export_first_lvl_contrasts('$FIRSTLVL_ROOT', '$OUTDIR'$MATLAB_COPY_ARG); exit"
