@@ -237,17 +237,20 @@ for s = 1:length(subjects)
     end
     
     save(fullfile(learn_output_dir, 'batch_contrasts_.mat'), 'matlabbatch_con');
+    learning_failed = false;
     try
         spm_jobman('run', matlabbatch_con);
     catch ME
-        if contains(ME.message, 'invalid contrast', 'IgnoreCase', true) || contains(ME.message, 'error in contrast specification', 'IgnoreCase', true)
-            warning('SPM reported invalid contrast for %s; skipping.', sub_id);
-        else
-            rethrow(ME); % something else is wrong ? don?t hide it
-        end
+        warning('Contrast estimation FAILED for %s (learning): %s', sub_id, ME.message);
+        learning_failed = true;
+        % No rethrow ? continue to next subject
     end
 
-    disp(['Model for learning in ', sub_id, ' complete.']);
+    if learning_failed
+        disp(['Model for learning in ', sub_id, ' FAILED.']);
+    else
+        disp(['Model for learning in ', sub_id, ' complete.']);
+    end
 
 
     %% ===========================
@@ -404,17 +407,20 @@ for s = 1:length(subjects)
     end
     
     save(fullfile(test_output_dir, 'batch_contrasts_.mat'), 'matlabbatch_con');
+    test_failed = false;
     try
         spm_jobman('run', matlabbatch_con);
     catch ME
-        if contains(ME.message, 'invalid contrast', 'IgnoreCase', true) || contains(ME.message, 'error in contrast specification', 'IgnoreCase', true)
-            warning('SPM reported invalid contrast for %s; skipping.', sub_id);
-        else
-            rethrow(ME); % something else is wrong ? don?t hide it
-        end
+        warning('Contrast estimation FAILED for %s (test): %s', sub_id, ME.message);
+        test_failed = true;
+        % No rethrow ? continue to next subject
     end
 
-    disp(['Model for test in ', sub_id, ' complete.']);
+    if test_failed
+        disp(['Model for test in ', sub_id, ' FAILED.']);
+    else
+        disp(['Model for test in ', sub_id, ' complete.']);
+    end
 end
 
 diary off;
