@@ -109,7 +109,7 @@ for s = 1:length(subjects)
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).duration = block_data.t_second_stim - block_data.t_first_stim;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).tmod = 0;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod(1).name = 'Choiceval';
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod(1).param = zscore(block_data.first_stim_choice_val);
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod(1).param = block_data.first_stim_choice_val_zscore;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod(1).poly = 1;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).orth = 0;
 
@@ -122,7 +122,7 @@ for s = 1:length(subjects)
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).duration = duration;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).tmod = 0;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(1).name = 'Choiceval';
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(1).param = zscore(block_data.second_stim_choice_val);
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(1).param = block_data.second_stim_choice_val_zscore;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(1).poly = 1;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).orth = 0;
 
@@ -280,7 +280,7 @@ for s = 1:length(subjects)
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).duration = block_data.t_second_stim - block_data.t_first_stim;
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).tmod = 0;
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(1).name = 'Choiceval';
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(1).param = zscore(block_data.first_stim_choice_val);
+    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(1).param = block_data.first_stim_choice_val_zscore;
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(1).poly = 1;
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).orth = 0;
 
@@ -293,7 +293,7 @@ for s = 1:length(subjects)
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).duration = duration;
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).tmod = 0;
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(1).name = 'Choiceval';
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(1).param = zscore(block_data.second_stim_choice_val);
+    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(1).param = block_data.second_stim_choice_val_zscore;
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(1).poly = 1;
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).orth = 0;
 
