@@ -35,7 +35,6 @@ high_pass_cutoff = 128; % High-pass filter in seconds
 connames = {
     'first_stim', 'second_stim', ...
     'second_stimxQval_chosen', 'second_stimxHval_chosen', ...
-    'second_stimxQval_unchosen', 'second_stimxHval_unchosen', ...
     'response', 'purple_frame', 'points_feedback'
     };
 
@@ -126,12 +125,6 @@ for s = 1:length(subjects)
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(2).name = 'Hval_chosen';
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(2).param = block_resp.chosen_value_ck_zscore;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(2).poly = 1;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(3).name = 'Qval_unchosen';
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(3).param = block_resp.unchosen_value_rl_zscore;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(3).poly = 1;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(4).name = 'Hval_unchosen';
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(4).param = block_resp.unchosen_value_ck_zscore;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(4).poly = 1;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).orth = 0;
 
         % Second stimulus - NoResp trials (no modulators)
@@ -322,12 +315,6 @@ for s = 1:length(subjects)
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(2).name = 'Hval_chosen';
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(2).param = block_resp.chosen_value_ck_zscore;
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(2).poly = 1;
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(3).name = 'Qval_unchosen';
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(3).param = block_resp.unchosen_value_rl_zscore;
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(3).poly = 1;
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(4).name = 'Hval_unchosen';
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(4).param = block_resp.unchosen_value_ck_zscore;
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(4).poly = 1;
     matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).orth = 0;
 
     % Second stimulus - NoResp trials (no modulators)
