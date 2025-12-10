@@ -41,16 +41,18 @@ for k = 1:numel(spm_files)
     d = spm_files(k).folder;
     spm_path = fullfile(d, spm_files(k).name);
 
-    % --- derive BIDS-style prefix from path
-    % look for sub-XX and run-YY in path
-    %tokens = regexp(d, '(sub-[^/\\]+).*?(run-[^/\\]+)', 'tokens', 'once');
-    % look for sub-XX and learning/test in path
-    tokens = regexp(d, '(sub-[^/\\]+).*?(learning|test)', 'tokens', 'once');
-    if isempty(tokens)
-        % fallback: just use folder name
-        prefix = sprintf('dir-%03d', k);
-    else
+
+    % --- derive BIDS-style prefix from path (learning/test or just sub-XX)
+    tokens = regexp(d, '(sub-[^/\\]+)[/\\](learning|test)', 'tokens', 'once');
+    if ~isempty(tokens)
         prefix = sprintf('%s_%s', tokens{1}, tokens{2});
+    else
+        tokens = regexp(d, '(sub-[^/\\]+)', 'tokens', 'once');
+        if ~isempty(tokens)
+            prefix = tokens{1};
+        else
+            prefix = sprintf('dir-%03d', k);
+        end
     end
 
     out_csv  = fullfile(d, [prefix '_design_matrix.csv']);
