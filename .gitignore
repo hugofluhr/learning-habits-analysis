@@ -1,3 +1,6 @@
+# cached results
+cache/
+
 # stupid macos stuff
 *.DS_Store
 
