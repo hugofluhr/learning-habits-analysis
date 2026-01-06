@@ -37,7 +37,8 @@ high_pass_cutoff = 128; % High-pass filter in seconds
 connames = {
     'first_stim', ...
     'second_stim', ...
-    'response', 'purple_frame'
+    'response', 'purple_frame', ...
+    'face'
     };
 
 spm('Defaults', 'fMRI');
