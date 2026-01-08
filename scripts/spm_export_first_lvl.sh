@@ -3,12 +3,12 @@
 # Simple script to run export_first_lvl_contrasts
 # Edit the paths below as needed
 
-FIRSTLVL_ROOT="/home/ubuntu/data/learning-habits/spm_format_noSDC/outputs/glm2_chosen_2025-11-18-11-32"
-OUTDIR="/home/ubuntu/data/learning-habits/spm_outputs_noSDC/glm2_chosen_2025-11-18-11-32_copy"
+FIRSTLVL_ROOT="/home/ubuntu/data/learning-habits/spm_format_noSDC/outputs/glm_sc2_houses_2026-01-08-11-04"
+OUTDIR="/home/ubuntu/data/learning-habits/spm_outputs_noSDC/glm_sc2_houses_2026-01-08-11-04"
 # Leave empty for in-place aliasing, or set to output directory
 
 # Default behavior: create symlinks (do not copy).
-COPY_MODE=true
+COPY_MODE=false
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MATLAB_DIR="$(dirname "$SCRIPT_DIR")/matlab"
