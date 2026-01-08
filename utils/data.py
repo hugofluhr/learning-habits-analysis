@@ -578,7 +578,7 @@ class Subject:
     test : Block
         Contains a Block object representing the subject's test phase data.
     """
-    def __init__(self, base_dir, subject_id, include_imaging=False, include_modeling=False, bids_dir=None, modeling_version='2025'):
+    def __init__(self, base_dir, subject_id, include_imaging=False, include_modeling=False, bids_dir=None, modeling_dir='modeling_data'):
         """
         Initializes the Subject class by loading the necessary data.
 
@@ -591,6 +591,7 @@ class Subject:
         self.legacy_id = load_subject_lut(base_dir).get(self.sub_id, None)
         self.rp_files = self._get_rp_files()
         self.runs = ['learning1', 'learning2', 'test']
+        self.modeling_dir = os.path.join(self.base_dir, modeling_dir)
 
         # Load the Reward Pairing Task data 
         self._load_scanner_behav_data()
@@ -674,25 +675,19 @@ class Subject:
         # Return None if no file matches the pattern
         return None
     
-    def _get_rp_modeling_files(self, modeling_dir='modeling_data'):
+    def _get_rp_modeling_files(self):
         """
         Find the modeling files for the subject based on the legacy ID.
-        
-        Parameters
-        -------
-        self
-        modeling_dir : str
-            The directory containing the modeling files.
-
         Returns
         -------
         dict
             A dictionary containing the modeling files for the subject.
         """
-        modeling_dir = os.path.join(self.base_dir, modeling_dir)
-        self.modeling_dir = modeling_dir
+        modeling_dir = self.modeling_dir
         modeling_files = {}
-        for file in os.listdir(modeling_dir):
+        if self.legacy_id is None:
+            return modeling_files
+        for file in os.listdir(self.modeling_dir):
             if file.startswith(self.legacy_id.lower()) and file.endswith('.csv'):
                 if '_learning' in file:
                     modeling_files['learning'] = file
@@ -1027,12 +1022,11 @@ class Subject:
             self.img[run] = self.get_img_path(run)
             self.brain_mask[run] = self.get_brain_mask(run)
 
-    def _load_modeling_data(self, modeling_dir = 'modeling_data'):
+    def _load_modeling_data(self):
         """
         Load the modeling data for the subject.
         """
-
-        modeling_files = self._get_rp_modeling_files(modeling_dir)
+        modeling_files = self._get_rp_modeling_files()
         modeling_data = {}
         for key, file in modeling_files.items():
             df = pd.read_csv(os.path.join(self.modeling_dir, file))
@@ -1054,16 +1048,15 @@ class Subject:
         for key, block in self.modeling_data.items():
             getattr(self,key).add_modeling_data(block)
 
-    def add_modeling_data(self, modeling_dir = 'modeling_data'):
+    def add_modeling_data(self, modeling_dir=None):
         """
         Add modeling data to the subject's trials DataFrame.
-        
-        Parameters
-        ----------
-        modeling_dir : str
-            The directory containing the modeling data.
+        Optionally specify a new modeling_dir to use for this call.
         """
-        self._load_modeling_data(modeling_dir)
+        # else it uses the one defined during init
+        if modeling_dir is not None:
+            self.modeling_dir = os.path.join(self.base_dir, modeling_dir)
+        self._load_modeling_data()
         self._combine_modeling_data()
         self.extended_trials = self._concatenate_trials(trial_type='extended_trials')
 
