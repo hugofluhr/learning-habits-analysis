@@ -11,7 +11,7 @@ bbt_path = '/home/ubuntu/data/learning-habits/bbt.csv';
 addpath(spmpath);
 
 current_date = char(datetime('now', 'Format', 'yyyy-MM-dd-hh-mm'));
-output_dir = fullfile(analysis_dir, 'outputs', ['glm2_all_runs_scrubbed_' current_date]);
+output_dir = fullfile(analysis_dir, 'outputs', ['glm_sc2_faces_' current_date]);
 if ~exist(output_dir, 'dir')
     mkdir(output_dir);
 end
@@ -23,6 +23,8 @@ diary on;
 
 % Load behavioral data
 bbt = readtable(bbt_path);
+bbt.first_stim_face = double(strcmp(bbt.first_stim_cat, 'face'));
+bbt.second_stim_face = double(strcmp(bbt.second_stim_cat, 'face'));
 subjects = unique(bbt.sub_id);
 block_names = {'learning1', 'learning2', 'test'};
 
@@ -33,9 +35,10 @@ high_pass_cutoff = 128; % High-pass filter in seconds
 % set up contrasts - not including non-response feedback because so few trials per subject
 % points_feedback excluded from contrasts as it is absent in test run
 connames = {
-    'first_stim', 'first_stimxQval', 'first_stimxHval', ...
-    'second_stim', 'second_stimxQval', 'second_stimxHval', ...
-    'response', 'purple_frame'
+    'first_stim', ...
+    'second_stim', ...
+    'response', 'purple_frame', ...
+    'face'
     };
 
 spm('Defaults', 'fMRI');
@@ -44,9 +47,6 @@ spm_jobman('initcfg');
 % Loop through subjects
 for s = 1:length(subjects)
     sub_id = subjects{s};
-    if strcmp(sub_id,'sub-04') || strcmp(sub_id, 'sub-45')
-        continue; % Skip these subjects, alpha_H is 0
-    end
     disp(['Processing subject: ', sub_id]);
     func_dir = fullfile(data_dir, sub_id, 'func');
     
@@ -109,12 +109,7 @@ for s = 1:length(subjects)
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).onset = block_data.t_first_stim;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).duration = block_data.t_second_stim - block_data.t_first_stim;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).tmod = 0;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod(1).name = 'Qval';
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod(1).param = block_data.first_stim_value_rl_zscore;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod(1).poly = 1;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod(2).name = 'Hval';
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod(2).param = block_data.first_stim_value_ck_zscore;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod(2).poly = 1;
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod = struct('name', {}, 'param', {}, 'poly', {});
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).orth = 0;
 
         % Second stimulus - All trials
@@ -125,12 +120,7 @@ for s = 1:length(subjects)
         duration(duration < 0) = 1; % for non-response trials
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).duration = duration;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).tmod = 0;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(1).name = 'Qval';
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(1).param = block_data.second_stim_value_rl_zscore;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(1).poly = 1;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(2).name = 'Hval';
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(2).param = block_data.second_stim_value_ck_zscore;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(2).poly = 1;
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod = struct('name', {}, 'param', {}, 'poly', {});
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).orth = 0;
 
         % Response - Resp trials
@@ -171,6 +161,25 @@ for s = 1:length(subjects)
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(k).tmod = 0;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(k).pmod = struct('name', {}, 'param', {}, 'poly', {});
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(k).orth = 0;
+
+        % Seeing face - from first appearance of a face to ITI onset
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(k+1).name = 'face';
+        % Face present if either stimulus is a face
+        is_face = (block_data.first_stim_face == 1) | (block_data.second_stim_face == 1);
+        % Compute onset per trial, then subset
+        face_onset_all = block_data.t_first_stim;
+        % If face appears only at second stim, onset should be second stim
+        second_only_face = (block_data.first_stim_face == 0) & (block_data.second_stim_face == 1);
+        face_onset_all(second_only_face) = block_data.t_second_stim(second_only_face);
+        face_onset = face_onset_all(is_face);
+        % Duration from face onset to ITI onset
+        face_duration = block_data.t_iti_onset(is_face) - face_onset;
+        face_duration(face_duration < 0) = 0; % safety
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(k+1).onset = face_onset;
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(k+1).duration = face_duration;
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(k+1).tmod = 0;
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(k+1).pmod = struct('name', {}, 'param', {}, 'poly', {});
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(k+1).orth = 0;
     end
 
     % Other specifications, from Jae-Chang's script
@@ -230,19 +239,6 @@ for s = 1:length(subjects)
         matlabbatch_con{1}.spm.stats.con.consess{cc}.tcon.sessrep = 'none';
     end
 
-    % Add custom extra contrasts
-    extra_contrasts = {
-        'Qval_sum',  [0 1 0 0 1 0];
-        'Hval_sum',  [0 0 1 0 0 1];
-        'Qval_diff', [0 1 0 0 -1 0];
-        'Hval_diff', [0 0 1 0 0 -1]
-    };
-    % Append each extra contrast
-    for ec = 1:size(extra_contrasts, 1)
-        matlabbatch_con{1}.spm.stats.con.consess{end+1}.tcon.name    = extra_contrasts{ec, 1};
-        matlabbatch_con{1}.spm.stats.con.consess{end}.tcon.weights   = extra_contrasts{ec, 2};
-        matlabbatch_con{1}.spm.stats.con.consess{end}.tcon.sessrep   = 'repl';
-    end
     matlabbatch_con{1}.spm.stats.con.delete = 0;
     save(fullfile(sub_output_dir, 'batch_contrasts.mat'), 'matlabbatch_con');
     spm_jobman('run', matlabbatch_con);

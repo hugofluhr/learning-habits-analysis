@@ -11,7 +11,7 @@ bbt_path = '/home/ubuntu/data/learning-habits/bbt.csv';
 addpath(spmpath);
 
 current_date = char(datetime('now', 'Format', 'yyyy-MM-dd-hh-mm'));
-output_dir = fullfile(analysis_dir, 'outputs', ['glm2_all_runs_scrubbed_' current_date]);
+output_dir = fullfile(analysis_dir, 'outputs', ['glm3_all_runs_scrubbed_' current_date]);
 if ~exist(output_dir, 'dir')
     mkdir(output_dir);
 end
@@ -33,9 +33,8 @@ high_pass_cutoff = 128; % High-pass filter in seconds
 % set up contrasts - not including non-response feedback because so few trials per subject
 % points_feedback excluded from contrasts as it is absent in test run
 connames = {
-    'first_stim', 'first_stimxQval', 'first_stimxHval', ...
-    'second_stim', 'second_stimxQval', 'second_stimxHval', ...
-    'response', 'purple_frame'
+    'first_stim', 'first_stimxChoiceval', 'second_stimxChoiceval', ...
+    'response', 'purple_frame', 'points_feedback'
     };
 
 spm('Defaults', 'fMRI');
@@ -109,12 +108,9 @@ for s = 1:length(subjects)
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).onset = block_data.t_first_stim;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).duration = block_data.t_second_stim - block_data.t_first_stim;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).tmod = 0;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod(1).name = 'Qval';
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod(1).param = block_data.first_stim_value_rl_zscore;
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod(1).name = 'Choiceval';
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod(1).param = block_data.first_stim_choice_val_zscore;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod(1).poly = 1;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod(2).name = 'Hval';
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod(2).param = block_data.first_stim_value_ck_zscore;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod(2).poly = 1;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).orth = 0;
 
         % Second stimulus - All trials
@@ -125,12 +121,9 @@ for s = 1:length(subjects)
         duration(duration < 0) = 1; % for non-response trials
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).duration = duration;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).tmod = 0;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(1).name = 'Qval';
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(1).param = block_data.second_stim_value_rl_zscore;
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(1).name = 'Choiceval';
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(1).param = block_data.second_stim_choice_val_zscore;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(1).poly = 1;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(2).name = 'Hval';
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(2).param = block_data.second_stim_value_ck_zscore;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(2).poly = 1;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).orth = 0;
 
         % Response - Resp trials
@@ -224,7 +217,7 @@ for s = 1:length(subjects)
             warning('No columns found for contrast "%s"', cname);
             continue
         end
-
+        
         matlabbatch_con{1}.spm.stats.con.consess{cc}.tcon.name    = cname;
         matlabbatch_con{1}.spm.stats.con.consess{cc}.tcon.weights = w_all;
         matlabbatch_con{1}.spm.stats.con.consess{cc}.tcon.sessrep = 'none';
@@ -232,10 +225,8 @@ for s = 1:length(subjects)
 
     % Add custom extra contrasts
     extra_contrasts = {
-        'Qval_sum',  [0 1 0 0 1 0];
-        'Hval_sum',  [0 0 1 0 0 1];
-        'Qval_diff', [0 1 0 0 -1 0];
-        'Hval_diff', [0 0 1 0 0 -1]
+        'Choiceval_sum',  [0 1 0 0 1 0];
+        'Choiceval_diff', [0 1 0 0 -1 0];
     };
     % Append each extra contrast
     for ec = 1:size(extra_contrasts, 1)
@@ -243,6 +234,7 @@ for s = 1:length(subjects)
         matlabbatch_con{1}.spm.stats.con.consess{end}.tcon.weights   = extra_contrasts{ec, 2};
         matlabbatch_con{1}.spm.stats.con.consess{end}.tcon.sessrep   = 'repl';
     end
+
     matlabbatch_con{1}.spm.stats.con.delete = 0;
     save(fullfile(sub_output_dir, 'batch_contrasts.mat'), 'matlabbatch_con');
     spm_jobman('run', matlabbatch_con);

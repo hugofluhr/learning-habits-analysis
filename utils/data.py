@@ -367,18 +367,28 @@ class Block:
         # drop columns that are redundant
         columns2drop = ['action', 'stim1', 'stim2', 'rt1', 'corr_choice']
         modeling_df.drop(columns2drop, axis=1, inplace=True)
-        
-        # perform the merge
-        merged = pd.merge(self.trials, modeling_df, on='trial', how='left')
+
+        # Dynamically map RL/CK parameter columns using startswith
+        param_prefixes = ['alpha_rl', 'beta_rl', 'alpha_ck', 'beta_ck']
+        param_cols = {}
+        for prefix in param_prefixes:
+            matches = [c for c in modeling_df.columns if c.startswith(prefix)]
+            if matches:
+                param_cols[prefix] = matches[0]
+            else:
+                raise ValueError(f"No column found for prefix {prefix}")
+
+        # Also map stim*_value_rl and stim*_value_ck columns
+        stim_value_rl_cols = [c for c in modeling_df.columns if c.startswith('stim') and c.endswith('_value_rl')]
+        stim_value_ck_cols = [c for c in modeling_df.columns if c.startswith('stim') and c.endswith('_value_ck')]
 
         # fill the missing values for non response trials
-        columns2fill = ['flag_therapy1', 'flag_accuracy', 'flag_include', 'alpha_rl20',
-                        'beta_rl20', 'alpha_ck20', 'beta_ck20', 'choice_prob_left',
-                        'choice_prob_right', 'action_prob', 'stim1_value_rl', 'stim2_value_rl',
-                        'stim3_value_rl', 'stim4_value_rl', 'stim5_value_rl', 'stim6_value_rl',
-                        'stim7_value_rl', 'stim8_value_rl', 'stim1_value_ck', 'stim2_value_ck',
-                        'stim3_value_ck', 'stim4_value_ck', 'stim5_value_ck', 'stim6_value_ck',
-                        'stim7_value_ck', 'stim8_value_ck']
+        columns2fill = ['flag_therapy1', 'flag_accuracy', 'flag_include',
+                        param_cols['alpha_rl'], param_cols['beta_rl'],
+                        param_cols['alpha_ck'], param_cols['beta_ck'],
+                        'choice_prob_left', 'choice_prob_right', 'action_prob']
+        columns2fill += stim_value_rl_cols + stim_value_ck_cols
+        merged = pd.merge(self.trials, modeling_df, on='trial', how='left')
         for col in columns2fill:
             merged.loc[self.trials['action'].isna(), col] = merged[col].ffill()
         
@@ -395,14 +405,14 @@ class Block:
         merged['first_stim_value_ck'] = merged.apply(lambda row: row[f"stim{row['first_stim']}_value_ck"], axis=1)
         merged['second_stim_value_ck'] = merged.apply(lambda row: row[f"stim{row['second_stim']}_value_ck"], axis=1)
 
-        # Add Choice Variable
+        # Add Choice Variable using mapped column names
         merged['first_stim_choice_val'] = (
-            merged['beta_rl20'] * merged['first_stim_value_rl'] +
-            merged['beta_ck20'] * merged['first_stim_value_ck']
+            merged[param_cols['beta_rl']] * merged['first_stim_value_rl'] +
+            merged[param_cols['beta_ck']] * merged['first_stim_value_ck']
         )
         merged['second_stim_choice_val'] = (
-            merged['beta_rl20'] * merged['second_stim_value_rl'] +
-            merged['beta_ck20'] * merged['second_stim_value_ck']
+            merged[param_cols['beta_rl']] * merged['second_stim_value_rl'] +
+            merged[param_cols['beta_ck']] * merged['second_stim_value_ck']
         )
 
         self.extended_trials = merged
@@ -568,7 +578,7 @@ class Subject:
     test : Block
         Contains a Block object representing the subject's test phase data.
     """
-    def __init__(self, base_dir, subject_id, include_imaging=False, include_modeling=False, bids_dir=None):
+    def __init__(self, base_dir, subject_id, include_imaging=False, include_modeling=False, bids_dir=None, modeling_version='2025'):
         """
         Initializes the Subject class by loading the necessary data.
 
@@ -585,7 +595,7 @@ class Subject:
         # Load the Reward Pairing Task data 
         self._load_scanner_behav_data()
 
-        #�Can skip loading imaging data if not needed
+        # Can skip loading imaging data if not needed
         if include_imaging:
             if bids_dir is None:
                 raise ValueError("BIDS directory must be provided to load imaging data.")
@@ -596,7 +606,6 @@ class Subject:
         # Load modeling data if needed
         if include_modeling:
             self.add_modeling_data()
-            self.extended_trials = self._concatenate_trials(trial_type='extended_trials')
     
     def __repr__(self):
         return (f"Subject(sub_id={self.sub_id!r}, legacy_id={self.legacy_id!r}\n"
@@ -1056,6 +1065,8 @@ class Subject:
         """
         self._load_modeling_data(modeling_dir)
         self._combine_modeling_data()
+        self.extended_trials = self._concatenate_trials(trial_type='extended_trials')
+
 
 def create_dummy_regressors(sample_mask, n_scans):
     """
