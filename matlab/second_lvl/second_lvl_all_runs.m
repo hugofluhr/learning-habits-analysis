@@ -7,7 +7,7 @@ excluded_subjects = {
 
 % Define paths
 spmpath = '/home/ubuntu/repos/spm12';
-first_lvl_dir = '/home/ubuntu/data/learning-habits/spm_outputs_noSDC/glm2_all_runs_scrubbed_2025-12-09-04-27';
+first_lvl_dir = '/home/ubuntu/data/learning-habits/spm_outputs_noSDC/glm2_all_runs_sustained_2026-02-05-03-03';
 base_output_dir = fullfile(first_lvl_dir, 'second-lvl');
 addpath(spmpath);
 
