@@ -3,12 +3,9 @@ clear;
 %% ===========================
 %% Paths
 %% ===========================
-%spmpath     = '/home/ubuntu/repos/spm12';
-%analysis_dir= '/home/ubuntu/data/learning-habits/spm_format_noSDC/outputs';
-%bbt_path    = '/home/ubuntu/data/learning-habits/bbt.csv';
-spmpath = '/Users/hugofluhr/code/spm12';
-analysis_dir = '/Users/hugofluhr/phd_local/data/LearningHabits/spm_first_lvl_full';
-bbt_path = '/Users/hugofluhr/phd_local/data/LearningHabits/dev_sample/bbt.csv';
+spmpath     = '/home/ubuntu/repos/spm12';
+analysis_dir= '/home/ubuntu/data/learning-habits/spm_format_noSDC/outputs';
+bbt_path    = '/home/ubuntu/data/learning-habits/bbt.csv';
 addpath(spmpath);
 
 %% ===========================
