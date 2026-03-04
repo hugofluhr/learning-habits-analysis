@@ -69,13 +69,14 @@ P.Region = seed_region_name;
 P.VOI = seed_region_mask;
 P.FLmask = 1; % use the first-level mask to constrain VOI extraction
 P.equalroi = 0; % allow seed to be different size across subjects
-P.contrast = 0; % no adjustment for now
+% P.contrast = 0; % no adjustment for now. commented to leave default
 P.Estimate = 1; % estimate the gPPI model immediately
+P.CompContrasts = 1; % compute contrasts immediately
 % Defining the events (called Tasks)
 P.Tasks = { '0',... % PPPI convention
             'first_stim', ...
             'second_stim', ...
-            'second_stimxHval_chosen', ...
+            'second_stimxHval_chosen^1', ...
             'response', ...
             'purple_frame', ...
             'points_feedback' ...
@@ -85,9 +86,9 @@ P.Tasks = { '0',... % PPPI convention
 %% Defining contrasts
 %% ===========================
 % Define contrasts in a loop
-for j = 2:numel(P.Tasks)
-    P.Contrasts(j).name = P.Tasks{j};
-    P.Contrasts(j).left = {P.Tasks{j}};
+for j = 1:(numel(P.Tasks)-1) % skip the '0' condition
+    P.Contrasts(j).name = P.Tasks{j+1};
+    P.Contrasts(j).left = {P.Tasks{j+1}};
     P.Contrasts(j).right = {'none'};
     P.Contrasts(j).STAT = 'T';
     P.Contrasts(j).Weighted = 0;
@@ -139,18 +140,21 @@ for i = 1:numel(subjects)
     end
 
     % Set subject-specific fields in P
-    P.subject = sub_id;
-    P.directory = sub_outdir; % to ensure the first-lvl directory is untouched
-    P.outdir = sub_outdir; % maybe not needed
+    Psub = P; % start with the common settings
+    Psub.subject = sub_id;
+    Psub.directory = sub_outdir; % to ensure the first-lvl directory is untouched
+    Psub.outdir = sub_outdir; % maybe not needed
 
     % Save P structure for this subject
-    save(fullfile(sub_outdir, 'P.mat'), 'P');
+    save(fullfile(sub_outdir, 'P.mat'), 'Psub');
 
     % Run PPPI
     try
-        PPPI(P);
+        PPPI(Psub);
         disp(['gPPI completed for subject: ' sub_id]);
     catch ME
         warning('Error running gPPI for subject %s: %s', sub_id, ME.message);
     end
 end
+
+diary off;
