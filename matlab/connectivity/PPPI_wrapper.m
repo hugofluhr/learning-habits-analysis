@@ -3,8 +3,12 @@ clear;
 %% ===========================
 %% Paths
 %% ===========================
-spmpath      = '/home/ubuntu/repos/spm12';
-pppi_path    = '/home/ubuntu/repos/PPPIv13.1';
+% spmpath      = '/home/ubuntu/repos/spm12';
+% pppi_path    = '/home/ubuntu/repos/PPPIv13.1';
+% analysis_dir = '/home/ubuntu/data/learning-habits/spm_format_noSDC/outputs';
+% bbt_path     = '/home/ubuntu/data/learning-habits/bbt.csv';
+spmpath      = '/Users/hugofluhr/code/spm12';
+pppi_path    = '/Users/hugofluhr/phd_local/repositories/PPPI';
 analysis_dir = '/home/ubuntu/data/learning-habits/spm_format_noSDC/outputs';
 bbt_path     = '/home/ubuntu/data/learning-habits/bbt.csv';
 
