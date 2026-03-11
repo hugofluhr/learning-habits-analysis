@@ -1,4 +1,4 @@
-addpath('/home/ubuntu/repos/spm12');
+addpath('/Users/hugofluhr/code/spm12');
 
 spm('Defaults', 'fMRI');
 spm_jobman('initcfg');
@@ -8,6 +8,7 @@ base_dir = '/home/ubuntu/data/learning-habits/spm_format';
 
 % Parameters
 smoothing_fwhm = 5; % Smoothing kernel
+smooth_prefix = 'smoothed_5mm_';
 
 % Subjects to process
 sub_dirs = dir(fullfile(base_dir, 'sub-*'));
@@ -39,6 +40,16 @@ for i = 1:length(subjects)
         run_bold_files = spm_select('FPList', func_dir, ['^sub-.*' run_id '_.*_desc-preproc_bold.nii$']);
         if isempty(run_bold_files)
             warning(['    No BOLD file found for run: ' run_id]);
+            continue;
+        end
+
+        input_file = strtrim(run_bold_files);
+        [in_path, in_name, in_ext] = fileparts(input_file);
+        smoothed_file = fullfile(in_path, [smooth_prefix in_name in_ext]);
+
+        % Skip if smoothed file already exists
+        if exist(smoothed_file, 'file')
+            disp(['Skipping already smoothed file: ' smoothed_file]);
             continue;
         end
         

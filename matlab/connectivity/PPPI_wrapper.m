@@ -73,7 +73,7 @@ P.Region = seed_region_name;
 P.VOI = seed_region_mask;
 P.FLmask = 1; % use the first-level mask to constrain VOI extraction
 P.equalroi = 0; % allow seed to be different size across subjects
-% P.contrast = 0; % no adjustment for now. commented to leave default
+% P.contrast = 0; % commented to leave default: Omnibus F-contrast
 P.Estimate = 1; % estimate the gPPI model immediately
 P.CompContrasts = 1; % compute contrasts immediately
 % Defining the events (called Tasks)
@@ -90,19 +90,32 @@ P.Tasks = { '0',... % PPPI convention
 %% Defining contrasts
 %% ===========================
 % Define contrasts in a loop
-for j = 1:(numel(P.Tasks)-1) % skip the '0' condition
-    P.Contrasts(j).name = P.Tasks{j+1};
-    P.Contrasts(j).left = {P.Tasks{j+1}};
-    P.Contrasts(j).right = {'none'};
-    P.Contrasts(j).STAT = 'T';
-    P.Contrasts(j).Weighted = 0;
-    P.Contrasts(j).MinEvents = 1;
-end
+
+P.Contrasts(1).name = 'first_stim';
+P.Contrasts(1).left = {'first_stim'};
+P.Contrasts(1).right = {'none'};
+P.Contrasts(1).STAT = 'T';
+P.Contrasts(1).Weighted = 0;
+P.Contrasts(1).MinEvents = 1;
+
+P.Contrasts(2).name = 'second_stim';
+P.Contrasts(2).left = {'second_stim'};
+P.Contrasts(2).right = {'none'};
+P.Contrasts(2).STAT = 'T';
+P.Contrasts(2).Weighted = 0;
+P.Contrasts(2).MinEvents = 1;
+
+P.Contrasts(3).name = 'second_stimxHval_chosen^1';
+P.Contrasts(3).left = {'second_stimxHval_chosen^1'};
+P.Contrasts(3).right = {'none'};
+P.Contrasts(3).STAT = 'T';
+P.Contrasts(3).Weighted = 0;
+P.Contrasts(3).MinEvents = 1;
 
 %% ===========================
 %% Run gPPI for each subject
 %% ===========================
-for i = 1:numel(subjects)
+for i = 1:3 %numel(subjects)
     sub_id = subjects{i};
     disp('==================================================');
     disp(['Processing subject: ' sub_id]);
