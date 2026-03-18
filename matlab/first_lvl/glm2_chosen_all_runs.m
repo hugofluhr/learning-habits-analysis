@@ -5,8 +5,8 @@ confound_pattern = '_.*_motion_with_dummies.txt$';
 
 % Paths
 spmpath = '/home/ubuntu/repos/spm12';
-data_dir = '/home/ubuntu/data/learning-habits/spm_format_noSDC';
-analysis_dir = '/home/ubuntu/data/learning-habits/spm_format_noSDC';
+data_dir = '/home/ubuntu/data/learning-habits/spm_format';
+analysis_dir = '/home/ubuntu/data/learning-habits/spm_format';
 bbt_path = '/home/ubuntu/data/learning-habits/bbt.csv';
 addpath(spmpath);
 
