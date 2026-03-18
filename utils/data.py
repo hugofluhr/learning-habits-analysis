@@ -881,11 +881,13 @@ class Subject:
         # I call the fmriprep bids_dir for simplicity (bad decision)
         if 'fmriprep' in self.bids_dir:
             actual_bids = os.path.dirname(self.bids_dir)
-        
+        else:
+            actual_bids = self.bids_dir
+
         physio_dir = os.path.join(actual_bids, 'physIO', self.sub_id, 'ses-1', 'func')
         if not os.path.exists(physio_dir):
             raise FileNotFoundError("No physIO directory found in derivatives.")
-        
+    
         return physio_dir
 
     def get_img_path (self, run):

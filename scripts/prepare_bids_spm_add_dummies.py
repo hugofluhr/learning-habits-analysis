@@ -25,10 +25,18 @@ def prepare_bids_for_spm(bids_dir, output_dir):
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
 
+    # Setup log file with datestamp
+    log_file = os.path.join(output_dir, f"prepare_bids_for_spm_log_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.txt")
+    log_f = open(log_file, 'a')
+    def log(message):
+        print(message)
+        log_f.write(message + '\n')
+        log_f.flush()
+
     # Loop through all subjects in the BIDS directory
     subjects = load_participant_list(base_dir)
     for subject in subjects:
-        print(f"Processing {subject}...")
+        log(f"Processing {subject}...")
         output_subject_dir = os.path.join(output_dir, 'sub-' + subject, "func")
         os.makedirs(output_subject_dir, exist_ok=True)
 
@@ -49,10 +57,13 @@ def prepare_bids_for_spm(bids_dir, output_dir):
             # save regressors with dummies file
             output_regressors = os.path.join(output_subject_dir, os.path.basename(bold_file).replace(".nii.gz", "_motion_with_dummies.txt"))
             pd.DataFrame(confounds_with_dummies).to_csv(output_regressors, sep='\t', header=False, index=False)
-            print(f"Saved motion regressors to {output_regressors}")
+            log(f"Saved motion regressors to {output_regressors}")
 
 
-    print("Preparation complete.")
+    log("Preparation complete.")
+    log_f.close()
+    print(f"Log saved to {log_file}")
+
 
 if __name__ == "__main__":
     # Argument parser

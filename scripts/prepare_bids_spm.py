@@ -26,10 +26,18 @@ def prepare_bids_for_spm(bids_dir, output_dir):
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
 
+    # Setup log file with datestamp
+    log_file = os.path.join(output_dir, f"prepare_bids_for_spm_log_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.txt")
+    log_f = open(log_file, 'a')
+    def log(message):
+        print(message)
+        log_f.write(message + '\n')
+        log_f.flush()
+
     # Loop through all subjects in the BIDS directory
     subjects = load_participant_list(base_dir)
     for subject in subjects:
-        print(f"Processing {subject}...")
+        log(f"Processing {subject}...")
         output_subject_dir = os.path.join(output_dir, 'sub-' + subject, "func")
         os.makedirs(output_subject_dir, exist_ok=True)
 
@@ -46,14 +54,14 @@ def prepare_bids_for_spm(bids_dir, output_dir):
 
             # save BOLD file
             bold_output = os.path.join(output_subject_dir, os.path.basename(bold_file).replace(".gz", ""))
-            print(f"Unzipping {bold_file} -> {bold_output}")
+            log(f"Unzipping {bold_file} -> {bold_output}")
             with gzip.open(bold_file, 'rb') as f_in:
                 with open(bold_output, 'wb') as f_out:
                     shutil.copyfileobj(f_in, f_out)
 
             # save mask file
             mask_output = os.path.join(output_subject_dir, os.path.basename(mask_file).replace(".gz", ""))
-            print(f"Unzipping {mask_file} -> {mask_output}")
+            log(f"Unzipping {mask_file} -> {mask_output}")
             with gzip.open(mask_file, 'rb') as f_in:
                 with open(mask_output, 'wb') as f_out:
                     shutil.copyfileobj(f_in, f_out)
@@ -61,7 +69,7 @@ def prepare_bids_for_spm(bids_dir, output_dir):
             # save regressors file
             output_regressors = os.path.join(output_subject_dir, os.path.basename(bold_file).replace(".nii.gz", "_motion.txt"))
             pd.DataFrame(confounds).to_csv(output_regressors, sep='\t', header=False, index=False)
-            print(f"Saved motion regressors to {output_regressors}")
+            log(f"Saved motion regressors to {output_regressors}")
 
             # save events file
             # Convert DataFrame columns to NumPy arrays (which can be saved as MATLAB cell arrays)
@@ -88,9 +96,12 @@ def prepare_bids_for_spm(bids_dir, output_dir):
 
             output_events = os.path.join(output_subject_dir, os.path.basename(bold_file).replace(".nii.gz", "_events.mat")) 
             savemat(output_events, {"names": names_cell, "onsets": onsets_cell, "durations": durations_cell})
-            print(f"Saved events to {output_events}")
+            log(f"Saved events to {output_events}")
 
-    print("Preparation complete.")
+    log("Preparation complete.")
+    log_f.close()
+    print(f"Log saved to {log_file}")
+
 
 if __name__ == "__main__":
     # Argument parser
