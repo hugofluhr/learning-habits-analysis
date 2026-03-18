@@ -3,18 +3,18 @@ clear;
 %% ===========================
 %% Paths
 %% ===========================
-% spmpath      = '/home/ubuntu/repos/spm12';
-% analysis_dir = '/home/ubuntu/data/learning-habits/spm_format_noSDC/outputs';
+spmpath      = '/home/ubuntu/repos/spm12';
+analysis_dir = '/home/ubuntu/data/learning-habits/spm_format/outputs';
 
-spmpath      = '/Users/hugofluhr/code/spm12';
-analysis_dir = '/Users/hugofluhr/phd_local/data/LearningHabits/dev_sample/spm_format_noSDC/outputs';
+% spmpath      = '/Users/hugofluhr/code/spm12';
+% analysis_dir = '/Users/hugofluhr/phd_local/data/LearningHabits/dev_sample/spm_format_noSDC/outputs';
 
 addpath(spmpath);
 
 %% ===========================
 %% FIRST-LEVEL model to use
 %% ===========================
-model_name = 'glm2_chosen_all_runs_scrubbed_2025-12-11-11-22';
+model_name = 'glm2_chosen_all_runs_scrubbed_2026-03-17-02-53';
 first_lvl_dir = fullfile(analysis_dir, model_name);
 
 if ~exist(first_lvl_dir, 'dir')

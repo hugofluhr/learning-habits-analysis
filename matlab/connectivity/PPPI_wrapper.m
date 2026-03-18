@@ -3,14 +3,14 @@ clear;
 %% ===========================
 %% Paths
 %% ===========================
-% spmpath      = '/home/ubuntu/repos/spm12';
-% pppi_path    = '/home/ubuntu/repos/PPPIv13.1';
+spmpath      = '/home/ubuntu/repos/spm12';
+pppi_path    = '/home/ubuntu/repos/PPPI';
+analysis_dir = '/home/ubuntu/data/learning-habits/spm_format/outputs';
+bbt_path     = '/home/ubuntu/data/learning-habits/bbt.csv';
+% spmpath      = '/Users/hugofluhr/code/spm12';
+% pppi_path    = '/Users/hugofluhr/phd_local/repositories/PPPI';
 % analysis_dir = '/home/ubuntu/data/learning-habits/spm_format_noSDC/outputs';
 % bbt_path     = '/home/ubuntu/data/learning-habits/bbt.csv';
-spmpath      = '/Users/hugofluhr/code/spm12';
-pppi_path    = '/Users/hugofluhr/phd_local/repositories/PPPI';
-analysis_dir = '/home/ubuntu/data/learning-habits/spm_format_noSDC/outputs';
-bbt_path     = '/home/ubuntu/data/learning-habits/bbt.csv';
 
 addpath(spmpath);
 addpath(genpath(pppi_path));
@@ -20,7 +20,7 @@ addpath(genpath(pppi_path));
 %% ===========================
 % This should be the multi-session GLM whose timing/events you want to use for gPPI.
 % (Typically your chosen-stim model; if you?ve got a ?chosen model without Qval? use that.)
-model_name = 'glm2_chosen_all_runs_scrubbed_2025-12-11-11-22';
+model_name = 'glm2_chosen_all_runs_scrubbed_2026-03-17-02-53';
 first_lvl_dir = fullfile(analysis_dir, model_name);
 if ~exist(first_lvl_dir, 'dir')
     error('First-level model folder not found: %s', first_lvl_dir);
@@ -56,7 +56,7 @@ spm_jobman('initcfg');
 %% Seed region
 %% ===========================
 seed_region_name = 'putamen';
-seed_region_mask = '/mnt/data/learning-habits/masks/MNI152NLin2009cAsym/putamen_AAL_MNI152NLin2009cAsym.nii';
+seed_region_mask = '/mnt/data/learning-habits/masks/MNI152NLin2009cAsym/glm_chosen_peaks_spheres6mm_MNI152NLin2009cAsym.nii';
 if ~exist(seed_region_mask,'file')
     error('Seed region mask not found: %s', seed_region_mask);
 end
