@@ -3,8 +3,8 @@
 # Simple script to run export_first_lvl_contrasts
 # Edit the paths below as needed
 
-FIRSTLVL_ROOT="/home/ubuntu/data/learning-habits/spm_format_noSDC/outputs/glm2_all_runs_sustained_2026-02-05-03-03"
-OUTDIR="/home/ubuntu/data/learning-habits/spm_outputs_noSDC/glm2_all_runs_sustained_2026-02-05-03-03"
+FIRSTLVL_ROOT="/home/ubuntu/data/learning-habits/spm_format/outputs/glm3_chosen_choice_var_scrubbed_2026-04-01-01-29"
+OUTDIR="/home/ubuntu/data/learning-habits/spm_outputs/glm3_chosen_choice_var_scrubbed_2026-04-01-01-29"
 # Leave empty for in-place aliasing, or set to output directory
 
 # Default behavior: create symlinks (do not copy).
