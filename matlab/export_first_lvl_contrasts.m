@@ -235,7 +235,7 @@ else
             fid = fopen(mf_path, 'w');
             fprintf(fid, 'subject_token\tcontrast_index\tcontrast_name\tpath_dst\tpath_src\n');
         end
-        for i = 1:numel(xCon)
+        for i = 1:numel(xCon)-1
             cname   = char(ref_names(i));
             cname_s = sanitize(cname);
             if isfield(xCon(i), 'Vcon') && ~isempty(xCon(i).Vcon) && isfield(xCon(i).Vcon, 'fname')
