@@ -3,7 +3,7 @@
 # Simple script to run export_spm_dms
 # Edit the paths below as needed
 
-BASE_DIR="/home/ubuntu/data/learning-habits/spm_format_noSDC/outputs/glm_sc1_faces_2026-01-05-09-40"
+BASE_DIR="/home/ubuntu/data/learning-habits/spm_format/outputs/glm3_chosen_choice_var_scrubbed_2026-04-01-01-29"
 # Add any extra options as needed, e.g. OVERWRITE="true"
 OVERWRITE="false"
 
