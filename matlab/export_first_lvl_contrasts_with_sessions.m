@@ -153,6 +153,7 @@ for k = 1:numel(spms)
         cname   = char(ref_allruns(ii));
         cname_s = sanitize(cname);
         con_src = resolve_con_src(xCon, i, src_dir);
+        if isempty(con_src), continue; end
 
         if in_place
             con_dst = fullfile(src_dir, sprintf('con_%04d_%s.nii', i, cname_s));
@@ -190,6 +191,7 @@ for k = 1:numel(spms)
             base = char(sess_base(ii));
             cname_s  = sanitize(base);
             con_src  = resolve_con_src(xCon, i, src_dir);
+            if isempty(con_src), continue; end
             % Index of this contrast within its session's list
             si_within = sum(sess_nums(1:ii) == sn);
 
@@ -417,7 +419,8 @@ else
     src = fullfile(src_dir, sprintf('con_%04d.nii', i));
 end
 if ~isfile(src)
-    error('Missing contrast image: %s', src);
+    fprintf(2, '[SKIP] Contrast %d has no image on disk (%s) - skipping.\n', i, src);
+    src = '';
 end
 end
 

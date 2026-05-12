@@ -10,7 +10,9 @@
 % Usage: set glm_root below and run.
 
 spmpath  = '/home/ubuntu/repos/spm12';  % <-- SET if different
-glm_root = '';  % <-- SET: full path to glm2_chosen_all_runs_* directory
+if ~exist('glm_root', 'var') || isempty(glm_root)
+    glm_root = '';  % <-- SET: full path to glm2_chosen_all_runs_* directory
+end
 
 addpath(spmpath);
 

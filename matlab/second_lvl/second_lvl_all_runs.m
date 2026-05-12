@@ -1,14 +1,14 @@
 
-clear;
-
 % List of subjects to exclude due to excessive motion (edit as needed)
 excluded_subjects = {
     'sub-44', 'sub-48', 'sub-68', 'sub-17', 'sub-31'};
 
 % Define paths
 spmpath = '/home/ubuntu/repos/spm12';
-export_root = '';  % <-- SET: root export directory produced by export_first_lvl_contrasts_with_sessions
-                   %         (contains allruns/, session-01/, session-02/, session-03/)
+if ~exist('export_root', 'var') || isempty(export_root)
+    export_root = '/mnt/data/learning-habits/spm_outputs/glm2_all_runs_scrubbed_demeaned_2026-05-11-04-23'  % <-- SET: root export directory produced by export_first_lvl_contrasts_with_sessions
+                       %         (contains allruns/, session-01/, session-02/, session-03/)
+end
 addpath(spmpath);
 
 % Initialize SPM
