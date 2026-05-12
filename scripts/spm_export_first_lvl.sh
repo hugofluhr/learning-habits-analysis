@@ -3,8 +3,12 @@
 # Simple script to run export_first_lvl_contrasts
 # Edit the paths below as needed
 
-FIRSTLVL_ROOT="/home/ubuntu/data/learning-habits/spm_format/outputs/glm2_chosen_all_runs_scrubbed_2026-03-17-02-53"
-OUTDIR="/home/ubuntu/data/learning-habits/spm_outputs/glm2_chosen_all_runs_scrubbed_2026-03-17-02-53"
+FIRSTLVL_ROOT=$(ls -td /home/ubuntu/data/learning-habits/spm_format/outputs/glm2_chosen_all_runs_scrubbed_demeaned_* 2>/dev/null | head -1)
+if [[ -z "$FIRSTLVL_ROOT" ]]; then
+    echo "ERROR: No glm2_chosen_all_runs_scrubbed_demeaned_* directory found." >&2
+    exit 1
+fi
+OUTDIR="/home/ubuntu/data/learning-habits/spm_outputs/$(basename "$FIRSTLVL_ROOT")"
 # Leave empty for in-place aliasing, or set to output directory
 
 # Default behavior: create symlinks (do not copy).
@@ -26,7 +30,7 @@ else
     echo "Copy mode: disabled (will create symlinks when possible)"
 fi
 
-module load matlab
+module load matlab/r2023a
 # Build optional MATLAB argument for copy mode (pass in as additional args)
 MATLAB_COPY_ARG=""
 if [[ "$COPY_MODE" == true ]]; then
