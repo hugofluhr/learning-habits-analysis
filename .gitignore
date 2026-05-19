@@ -1,7 +1,7 @@
-# cached results
+#ï¿½cached results
 cache/
 
-# stupid macos stuff
+#ï¿½stupid macos stuff
 *.DS_Store
 
 # MATLAB stuff
@@ -182,5 +182,8 @@ cython_debug/
 # Built Visual Studio Code Extensions
 *.vsix
 
-# Claude Code
-.claude/
+# Claude Code: ignore session-specific dirs, track commands and settings
+.claude/worktrees
+.claude/plans
+.claude/memory
+.claude/settings.local.json
