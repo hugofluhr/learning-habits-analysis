@@ -7,11 +7,11 @@ confound_pattern = '_.*_motion_with_dummies.txt$';
 spmpath = '/home/ubuntu/repos/spm12';
 data_dir = '/home/ubuntu/data/learning-habits/spm_format';
 analysis_dir = '/home/ubuntu/data/learning-habits/spm_format';
-bbt_path = '/home/ubuntu/data/learning-habits/bbt.csv';
+bbt_path = '/home/ubuntu/data/learning-habits/bbt_052026_reduced.csv';
 addpath(spmpath);
 
 current_date = char(datetime('now', 'Format', 'yyyy-MM-dd-hh-mm'));
-output_dir = fullfile(analysis_dir, 'outputs', ['glm2_chosen_all_runs_scrubbed_' current_date]);
+output_dir = fullfile(analysis_dir, 'outputs', ['glm2_chosen_all_runs_reduced_Q5_Hpretest_scrubbed_' current_date]);
 if ~exist(output_dir, 'dir')
     mkdir(output_dir);
 end
