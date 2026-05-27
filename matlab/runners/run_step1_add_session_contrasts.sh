@@ -10,9 +10,7 @@ REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 MATLAB_SCRIPT="$REPO/matlab/first_lvl/add_session_contrasts_glm2.m"
 
 GLM_ROOTS=(
-    "/mnt/data/learning-habits/spm_format/outputs/glm2_all_runs_scrubbed_2025-12-11-12-44"
-    "/mnt/data/learning-habits/spm_format/outputs/glm2_chosen_all_runs_scrubbed_2025-12-11-11-22"
-    "/mnt/data/learning-habits/spm_format/outputs/glm2_chosen_all_runs_scrubbed_2026-03-17-02-53"
+    "/mnt/data/learning-habits/spm_format/outputs/glm2_chosen_Qval_2026-05-26-02-43"
 )
 
 for glm_root in "${GLM_ROOTS[@]}"; do
