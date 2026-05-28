@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Jupyter notebooks
+
+Always use `NotebookEdit` to create or edit `.ipynb` files — never `Write`.
+
 ## Project overview
 
 Neuroimaging (fMRI) analysis pipeline for a reward-learning habits study. The experiment has three sessions per subject: `learning1`, `learning2`, and `test`. Analysis uses both SPM12 (MATLAB) for GLM estimation and nilearn (Python) for design matrix inspection and secondary analyses.
