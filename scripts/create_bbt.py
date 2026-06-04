@@ -11,12 +11,12 @@ import numpy as np
 import pandas as pd
 import sys
 sys.path.append('/home/ubuntu/repos/learning-habits-analysis')
-from utils.data import Subject, load_participant_list
+from utils.data import Subject, load_participant_list, STIM_REWARDS, STIM_FREQU
 
 # ── Config ────────────────────────────────────────────────────────────────────
 base_dir     = '/home/ubuntu/data/learning-habits'
-modeling_dir = 'modeling_data/2026-05-combined'   # change for combined
-output_path  = '/home/ubuntu/data/learning-habits/bbt_052026_combined.csv'  # change for combined
+modeling_dir = 'modeling_data/2024-09-27'   # change for combined
+output_path  = '/home/ubuntu/data/learning-habits/bbt_062026_mf_cols.csv'  # change for combined
 # ──────────────────────────────────────────────────────────────────────────────
 
 sub_ids  = load_participant_list(base_dir)
@@ -57,6 +57,14 @@ bbt['chosen_value_ck']   = bbt.apply(lambda r: _get_stim_value(r, 'stim_chosen',
 bbt['unchosen_value_rl'] = bbt.apply(lambda r: _get_stim_value(r, 'stim_unchosen', 'rl'), axis=1)
 bbt['unchosen_value_ck'] = bbt.apply(lambda r: _get_stim_value(r, 'stim_unchosen', 'ck'), axis=1)
 
+# Model-free chosen stimulus value and frequency
+bbt['chosen_stim_value'] = bbt['stim_chosen'].apply(
+    lambda x: STIM_REWARDS[int(x)] if not pd.isna(x) else np.nan
+)
+bbt['chosen_stim_frequ'] = bbt['stim_chosen'].apply(
+    lambda x: STIM_FREQU[int(x)] if not pd.isna(x) else np.nan
+)
+
 # Combined choice value for chosen stimulus
 beta_rl_col = [c for c in bbt.columns if c.startswith('beta_rl')][0]
 beta_ck_col = [c for c in bbt.columns if c.startswith('beta_ck')][0]
@@ -74,6 +82,7 @@ columns_to_normalize = [
     'chosen_value_rl',  'chosen_value_ck',
     'unchosen_value_rl', 'unchosen_value_ck',
     'chosen_choice_val',
+    'chosen_stim_value',
 ]
 
 for col in columns_to_normalize:
