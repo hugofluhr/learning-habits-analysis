@@ -10,7 +10,7 @@ REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 MATLAB_SCRIPT="$REPO/matlab/second_lvl/second_lvl_all_runs.m"
 
 EXPORT_ROOTS=(
-    "/mnt/data/learning-habits/spm_outputs/session_contrasts_exports/glm2_chosen_Qval_2026-05-26-02-43"
+    "/mnt/data/learning-habits/spm_outputs/session_contrasts_exports/glm_sc_motor2026-06-03-03-11"
 )
 
 for export_root in "${EXPORT_ROOTS[@]}"; do
