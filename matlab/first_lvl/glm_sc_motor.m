@@ -11,7 +11,7 @@ bbt_path = '/home/ubuntu/data/learning-habits/bbt.csv';
 addpath(spmpath);
 
 current_date = char(datetime('now', 'Format', 'yyyy-MM-dd-hh-mm'));
-output_dir = fullfile(analysis_dir, 'outputs', ['glm_sc_motor' current_date]);
+output_dir = fullfile(analysis_dir, 'outputs', ['glm_sc_motor_collapsed_' current_date]);
 if ~exist(output_dir, 'dir')
     mkdir(output_dir);
 end
@@ -33,7 +33,7 @@ high_pass_cutoff = 128; % High-pass filter in seconds
 % set up contrasts - not including non-response feedback because so few trials per subject
 % points_feedback excluded from contrasts as it is absent in test run
 connames = {
-    'first_stim', 'second_stim', ...
+    'stim_presentation', ...
     'response_feedback'
     };
 
@@ -103,48 +103,48 @@ for s = 1:length(subjects)
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).multi_reg = {confounds_file};
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).hpf = high_pass_cutoff;
 
-        % First stimulus - All trials
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).name = 'first_stim';
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).onset = block_data.t_first_stim;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).duration = block_data.t_second_stim - block_data.t_first_stim;
+        % First stimulus - All trials -> become both stim, block_resp now
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).name = 'stim_presentation';
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).onset = block_resp.t_first_stim;
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).duration = block_resp.t_action - block_resp.t_first_stim;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).tmod = 0;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod = struct('name', {}, 'param', {}, 'poly', {});
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).orth = 0;
 
-        % Second stimulus - Resp trials - All modulators here
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).name = 'second_stim';
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).onset = block_resp.t_second_stim;
-        % no need to handle duration since this model splits resp and nresp trials
-        % (needed to have chosen and unchosen stimuli)
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).duration = block_resp.t_action - block_resp.t_second_stim;
+        % % Second stimulus - Resp trials - All modulators here
+        % matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).name = 'second_stim';
+        % matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).onset = block_resp.t_second_stim;
+        % % no need to handle duration since this model splits resp and nresp trials
+        % % (needed to have chosen and unchosen stimuli)
+        % matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).duration = block_resp.t_action - block_resp.t_second_stim;
+        % matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).tmod = 0;
+        % matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod = struct('name', {}, 'param', {}, 'poly', {});
+        % matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).orth = 0;
+
+        % Response - Resp trials
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).name = 'response_feedback';
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).onset = block_resp.t_action;
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).duration = 0.5; % feedback duration
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).tmod = 0;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod = struct('name', {}, 'param', {}, 'poly', {});
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).orth = 0;
 
-        % Response - Resp trials
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(3).name = 'response_feedback';
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(3).onset = block_resp.t_action;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(3).duration = 0.5; % feedback duration
+
+        % Feedback - NoResp trials
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(3).name = 'nresp_screen';
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(3).onset = block_nr.t_second_stim + 1; % No time stamp for non-response trials, so use second stimulus + 1s
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(3).duration = block_nr.t_iti_onset - block_nr.t_second_stim - 1;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(3).tmod = 0;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(3).pmod = struct('name', {}, 'param', {}, 'poly', {});
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(3).orth = 0;
 
-
-        % Feedback - NoResp trials
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).name = 'nresp_screen';
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).onset = block_nr.t_second_stim + 1; % No time stamp for non-response trials, so use second stimulus + 1s
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).duration = block_nr.t_iti_onset - block_nr.t_second_stim - 1;
+        % Second stimulus - NoResp trials (no modulators)
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).name = 'stim_nresp';
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).onset = block_nr.t_second_stim;
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).duration = block_nr.t_second_stim - block_nr.t_first_stim + 1;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).tmod = 0;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).pmod = struct('name', {}, 'param', {}, 'poly', {});
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).orth = 0;
-
-        % Second stimulus - NoResp trials (no modulators)
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(5).name = 'second_stim_nresp';
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(5).onset = block_nr.t_second_stim;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(5).duration = 1;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(5).tmod = 0;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(5).pmod = struct('name', {}, 'param', {}, 'poly', {});
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(5).orth = 0;
     end
 
     % Other specifications, from Jae-Chang's script
@@ -154,6 +154,18 @@ for s = 1:length(subjects)
     matlabbatch{1}.spm.stats.fmri_spec.global = 'None';
     matlabbatch{1}.spm.stats.fmri_spec.mask = cellstr(brain_mask);
     matlabbatch{1}.spm.stats.fmri_spec.cvi = 'AR(1)';
+
+
+    %% Checks
+    % check that all durations are non-negative, fail if not
+    for r = 1:3
+        for c = 1:4
+            dur = matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(c).duration;
+            if any(dur < 0)
+                error('Negative duration found in run %d, condition %d for subject %s', r, c, sub_id);
+            end
+        end
+    end
     
     %% Model estimation
     matlabbatch{2}.spm.stats.fmri_est.spmmat(1) = cfg_dep('fMRI model specification: SPM.mat File', substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','spmmat'));
