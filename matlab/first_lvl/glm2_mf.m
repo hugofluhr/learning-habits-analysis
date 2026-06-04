@@ -5,13 +5,13 @@ confound_pattern = '_.*_motion_with_dummies.txt$';
 
 % Paths
 spmpath = '/home/ubuntu/repos/spm12';
-data_dir = '/home/ubuntu/data/learning-habits/spm_format_noSDC';
-analysis_dir = '/home/ubuntu/data/learning-habits/spm_format_noSDC';
-bbt_path = '/home/ubuntu/data/learning-habits/bbt.csv';
+data_dir = '/home/ubuntu/data/learning-habits/spm_format';
+analysis_dir = '/home/ubuntu/data/learning-habits/spm_format';
+bbt_path = '/home/ubuntu/data/learning-habits/bbt_062026_mf_cols.csv';
 addpath(spmpath);
 
 current_date = char(datetime('now', 'Format', 'yyyy-MM-dd-hh-mm'));
-output_dir = fullfile(analysis_dir, 'outputs', ['glm2_mf_' current_date]);
+output_dir = fullfile(analysis_dir, 'outputs', ['glm2_mf_chosen_' current_date]);
 if ~exist(output_dir, 'dir')
     mkdir(output_dir);
 end
@@ -33,9 +33,9 @@ high_pass_cutoff = 128; % High-pass filter in seconds
 % set up contrasts - not including non-response feedback because so few trials per subject
 % points_feedback only for learning runs
 connames = {
-    'first_stim', 'first_stimxVal', 'first_stimxFrequ', ...
-    'second_stim', 'second_stimxVal', 'second_stimxFrequ', ...
-    'response', 'purple_frame', 'points_feedback'
+    'first_stim', ...
+    'second_stim', 'second_stimxChosenVal', 'second_stimxChosenFrequ', ...
+    'response', 'purple_frame'
     };
 
 spm('Defaults', 'fMRI');
@@ -55,14 +55,14 @@ for s = 1:length(subjects)
     run_ids = unique(regexp(cellstr(bold_files), 'run-\d+', 'match', 'once'));
     
     %% ===========================
-    %% A) LEARNING MODEL (run01+run02)  ->  outputs/<sub>/learning
+    %% FULL MODEL (run01+run02)  ->  outputs/<sub>/
     %% ===========================
-    learn_output_dir = fullfile(output_dir, sub_id, 'learning');
-    if ~exist(learn_output_dir, 'dir'); mkdir(learn_output_dir); end
+    sub_output_dir = fullfile(output_dir, sub_id);
+    if ~exist(sub_output_dir, 'dir'); mkdir(sub_output_dir); end
 
     % Initialize batch
     clear matlabbatch
-    matlabbatch{1}.spm.stats.fmri_spec.dir = {learn_output_dir};
+    matlabbatch{1}.spm.stats.fmri_spec.dir = {sub_output_dir};
     matlabbatch{1}.spm.stats.fmri_spec.timing.units = 'secs';
     matlabbatch{1}.spm.stats.fmri_spec.timing.RT = TR;
     % TO DO: check if these are correct, these are default values
@@ -109,27 +109,21 @@ for s = 1:length(subjects)
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).onset = block_data.t_first_stim;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).duration = block_data.t_second_stim - block_data.t_first_stim;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).tmod = 0;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod(1).name = 'Val';
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod(1).param = zscore(block_data.first_stim_value);
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod(1).poly = 1;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod(2).name = 'Frequ';
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod(2).param = zscore(block_data.first_stim_frequ);
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod(2).poly = 1;
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).pmod = struct('name', {}, 'param', {}, 'poly', {});
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(1).orth = 0;
 
-        % Second stimulus - All trials
+        % Second stimulus - Resp trials
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).name = 'second_stim';
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).onset = block_data.t_second_stim;
-        % handle duration
-        duration = block_data.t_action - block_data.t_second_stim;
-        duration(duration < 0) = 1; % for non-response trials
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).duration = duration;
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).onset = block_resp.t_second_stim;
+        % no need to handle duration since this model splits resp and nresp trials
+        % (needed to have chosen and unchosen stimuli)
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).duration = block_resp.t_action - block_resp.t_second_stim;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).tmod = 0;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(1).name = 'Val';
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(1).param = zscore(block_data.second_stim_value);
+        matllabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(1).name = 'ChosenVal';
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(1).param = block_resp.chosen_stim_value_zscore;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(1).poly = 1;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(2).name = 'Frequ';
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(2).param = zscore(block_data.second_stim_frequ);
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(2).name = 'ChosenFrequ';
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(2).param = block_resp.chosen_stim_frequ;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).pmod(2).poly = 1;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(2).orth = 0;
 
@@ -149,21 +143,36 @@ for s = 1:length(subjects)
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).pmod = struct('name', {}, 'param', {}, 'poly', {});
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).orth = 0;
 
-        % Points feedback - Resp trials
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(5).name = 'points_feedback';
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(5).onset = block_resp.t_points_feedback;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(5).duration = block_resp.t_iti_onset - block_resp.t_points_feedback;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(5).tmod = 0;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(5).pmod = struct('name', {}, 'param', {}, 'poly', {});
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(5).orth = 0;
+        % Points feedback - Resp trials - different for learning and test
+        if r == 3
+            % Test run - no points feedback -> set as empty
+            k = 5; % next condition index
+        else
+            % Learning runs
+            matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(5).name = 'points_feedback';
+            matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(5).onset = block_resp.t_points_feedback;
+            matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(5).duration = block_resp.t_iti_onset - block_resp.t_points_feedback;
+            matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(5).tmod = 0;
+            matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(5).pmod = struct('name', {}, 'param', {}, 'poly', {});
+            matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(5).orth = 0;
+            k = 6; % next condition index
+        end
 
         % Feedback - NoResp trials
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(6).name = 'nresp_screen';
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(6).onset = block_nr.t_second_stim + 1; % No time stamp for non-response trials, so use second stimulus + 1s
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(6).duration = block_nr.t_iti_onset - block_nr.t_second_stim - 1;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(6).tmod = 0;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(6).pmod = struct('name', {}, 'param', {}, 'poly', {});
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(6).orth = 0;
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(k).name = 'nresp_screen';
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(k).onset = block_nr.t_second_stim + 1; % No time stamp for non-response trials, so use second stimulus + 1s
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(k).duration = block_nr.t_iti_onset - block_nr.t_second_stim - 1;
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(k).tmod = 0;
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(k).pmod = struct('name', {}, 'param', {}, 'poly', {});
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(k).orth = 0;
+
+        % Second stimulus - NoResp trials (no modulators)
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(k+1).name = 'second_stim_nresp';
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(k+1).onset = block_nr.t_second_stim;
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(k+1).duration = 1;
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(k+1).tmod = 0;
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(k+1).pmod = struct('name', {}, 'param', {}, 'poly', {});
+        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(k+1).orth = 0;
     end
 
     % Other specifications, from Jae-Chang's script
@@ -179,211 +188,56 @@ for s = 1:length(subjects)
     matlabbatch{2}.spm.stats.fmri_est.write_residuals = 0;
     matlabbatch{2}.spm.stats.fmri_est.method.Classical = 1;
     
-    save(fullfile(learn_output_dir, 'batch_spec_est.mat'), 'matlabbatch');
+    save(fullfile(sub_output_dir, 'batch_spec_est.mat'), 'matlabbatch');
     spm_jobman('run', matlabbatch);
     
-    % Learning Contrasts (combined) 
-    SPM_path = fullfile(learn_output_dir, 'SPM.mat');
+    % Contrasts (combined) 
+    SPM_path = fullfile(sub_output_dir, 'SPM.mat');
     load(SPM_path);
 
     matlabbatch_con = [];
-    matlabbatch_con{1}.spm.stats.con.spmmat = {fullfile(learn_output_dir, 'SPM.mat')};
-    matlabbatch_con{1}.spm.stats.con.delete = 1;
-
-    % Indices for session 1 columns in the design matrix
-    sess1_cols = SPM.Sess(1).col;  % column indices belonging to session 1
-    sess1_names = SPM.xX.name(sess1_cols);
-
-    % Get the minimum number of columns across sessions - necessary for 'repl'
-    % because of volume censoring, sessions may have different number of columns
-    min_cols = min(cellfun(@numel, {SPM.Sess.col}));
+    matlabbatch_con{1}.spm.stats.con.spmmat = {fullfile(sub_output_dir, 'SPM.mat')};
+    colnames = SPM.xX.name;
+    nCols    = numel(colnames);
+    nSess    = numel(SPM.Sess);
 
     for cc = 1:length(connames)
-        % Build a single-session weight vector since I'm using 'repl'
-        w = zeros(1, min_cols);
+        cname = connames{cc};
+        w_all = zeros(1, nCols);   % full-length contrast vector
         
-        idx = find(contains(sess1_names, connames{cc}), 1);
-        if isempty(idx)
-            warning('No regressor found for %s in %s', connames{cc}, run_id);
+        for s = 1:nSess
+            cols_s  = SPM.Sess(s).col;        % global column indices for this session
+            names_s = colnames(cols_s);       % names for this session
+
+            % Just match the condition name (main or pmod)
+            idx_local = find(contains(names_s, cname), 1);  
+
+            if isempty(idx_local)
+                % regressor absent in this session - always create a warning for safety
+                warning('Regressor "%s" not found in session %d', cname, s);
+                continue
+            end
+
+            col_global = cols_s(idx_local);
+            w_all(col_global) = 1;
+        end
+        
+        if all(w_all == 0)
+            warning('No columns found for contrast "%s"', cname);
             continue
         end
-        w(idx) = 1;
-        matlabbatch_con{1}.spm.stats.con.consess{cc}.tcon.name = connames{cc};
-        matlabbatch_con{1}.spm.stats.con.consess{cc}.tcon.weights = w;
-        matlabbatch_con{1}.spm.stats.con.consess{cc}.tcon.sessrep = 'repl';
-    end
-
-    % Add custom extra contrasts
-    extra_contrasts = {
-        'val_sum',  [0 1 0 0 1 0];
-        'frequ_sum',  [0 0 1 0 0 1];
-        'val_diff', [0 1 0 0 -1 0];
-        'frequ_diff', [0 0 1 0 0 -1]
-    };
-    % Append each extra contrast
-    for ec = 1:size(extra_contrasts, 1)
-        matlabbatch_con{1}.spm.stats.con.consess{end+1}.tcon.name    = extra_contrasts{ec, 1};
-        matlabbatch_con{1}.spm.stats.con.consess{end}.tcon.weights   = extra_contrasts{ec, 2};
-        matlabbatch_con{1}.spm.stats.con.consess{end}.tcon.sessrep   = 'repl';
-    end
-    
-    save(fullfile(learn_output_dir, 'batch_contrasts_.mat'), 'matlabbatch_con');
-    spm_jobman('run', matlabbatch_con);
-
-    disp(['Model for learning in ', sub_id, ' complete.']);
-
-
-    %% ===========================
-    %% B) TEST MODEL (run03 only)  ->  outputs/<sub>/test
-    %% ===========================
-    test_output_dir = fullfile(output_dir, sub_id, 'test');
-    if ~exist(test_output_dir, 'dir'); mkdir(test_output_dir); end
-
-    % Initialize batch
-    clear matlabbatch
-    matlabbatch{1}.spm.stats.fmri_spec.dir = {test_output_dir};
-    matlabbatch{1}.spm.stats.fmri_spec.timing.units = 'secs';
-    matlabbatch{1}.spm.stats.fmri_spec.timing.RT = TR;
-    % TO DO: check if these are correct, these are default values
-    matlabbatch{1}.spm.stats.fmri_spec.timing.fmri_t = 16;
-    matlabbatch{1}.spm.stats.fmri_spec.timing.fmri_t0 = 8;
-
-    r = 3; % Only test run
-    run_id = run_ids{r};
-    % Select BOLD files for the current run
-    currBOLD = spm_select('FPList', func_dir, ['^smoothed_.*' run_id '_.*_bold.nii$']);
-    brain_mask = spm_select('FPList', func_dir, ['^sub-.*' run_id '_.*_desc-brain_mask.nii$']);
-    confounds_file = spm_select('FPList', func_dir, ['^sub-.*' run_id confound_pattern]);
-    
-    % Sanity check for missing files
-    if isempty(currBOLD)
-        warning(['No BOLD files found for ', run_id, ' in subject ', sub_id]);
-        continue;
-    end
-    if isempty(brain_mask)
-        warning(['Brain mask not found for ', run_id, ' in subject ', sub_id]);
-        continue;
-    end
-    if isempty(confounds_file)
-        warning(['Confounds not found for ', run_id, ' in subject ', sub_id]);
-        continue;
-    end
-    
-    % Get block data and filter trials
-    block_data = bbt(strcmp(bbt.sub_id, sub_id) & strcmp(bbt.block, block_names{r}), :);
-    % Model non response trials separately
-    is_resp = ~isnan(block_data.action);
-    block_resp = block_data(is_resp, :);
-    block_nr   = block_data(~is_resp, :);
-
-    % General stuff
-    matlabbatch{1}.spm.stats.fmri_spec.sess.scans = cellstr(currBOLD);
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond = struct('name', {}, 'onset', {}, 'duration', {}, 'tmod', {}, 'pmod', {});
-    matlabbatch{1}.spm.stats.fmri_spec.sess.multi = {''};
-    matlabbatch{1}.spm.stats.fmri_spec.sess.multi_reg = {confounds_file};
-    matlabbatch{1}.spm.stats.fmri_spec.sess.hpf = high_pass_cutoff;
-
-    % First stimulus - All trials
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).name = 'first_stim';
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).onset = block_data.t_first_stim;
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).duration = block_data.t_second_stim - block_data.t_first_stim;
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).tmod = 0;
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(1).name = 'Val';
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(1).param = zscore(block_data.first_stim_value);
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(1).poly = 1;
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(2).name = 'Frequ';
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(2).param = zscore(block_data.first_stim_frequ);
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).pmod(2).poly = 1;
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(1).orth = 0;
-
-    % Second stimulus - All trials
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).name = 'second_stim';
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).onset = block_data.t_second_stim;
-    % handle duration
-    duration = block_data.t_action - block_data.t_second_stim;
-    duration(duration < 0) = 1; % for non-response trials
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).duration = duration;
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).tmod = 0;
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(1).name = 'Val';
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(1).param = zscore(block_data.second_stim_value);
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(1).poly = 1;
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(2).name = 'Frequ';
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(2).param = zscore(block_data.second_stim_frequ);
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).pmod(2).poly = 1;
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(2).orth = 0;
-
-    % Response - Resp trials
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(3).name = 'response';
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(3).onset = block_resp.t_action;
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(3).duration = 0;
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(3).tmod = 0;
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(3).pmod = struct('name', {}, 'param', {}, 'poly', {});
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(3).orth = 0;
-
-    % Purple frame - Resp trials
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).name = 'purple_frame';
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).onset = block_resp.t_purple_frame;
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).duration = block_resp.t_iti_onset - block_resp.t_purple_frame;
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).tmod = 0;
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).pmod = struct('name', {}, 'param', {}, 'poly', {});
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(4).orth = 0;
-
-    % Feedback - NoResp trials
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(5).name = 'nresp_screen';
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(5).onset = block_nr.t_second_stim + 1; % No time stamp for non-response trials, so use second stimulus + 1s
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(5).duration = block_nr.t_iti_onset - block_nr.t_second_stim - 1;
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(5).tmod = 0;
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(5).pmod = struct('name', {}, 'param', {}, 'poly', {});
-    matlabbatch{1}.spm.stats.fmri_spec.sess.cond(5).orth = 0;
-
-    % Other specifications, from Jae-Chang's script
-    matlabbatch{1}.spm.stats.fmri_spec.fact = struct('name', {}, 'levels', {});
-    matlabbatch{1}.spm.stats.fmri_spec.bases.hrf.derivs = [0 0];
-    matlabbatch{1}.spm.stats.fmri_spec.volt = 1;
-    matlabbatch{1}.spm.stats.fmri_spec.global = 'None';
-    matlabbatch{1}.spm.stats.fmri_spec.mask = cellstr(brain_mask);
-    matlabbatch{1}.spm.stats.fmri_spec.cvi = 'AR(1)';
-    
-    %% Model estimation
-    matlabbatch{2}.spm.stats.fmri_est.spmmat(1) = cfg_dep('fMRI model specification: SPM.mat File', substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','spmmat'));
-    matlabbatch{2}.spm.stats.fmri_est.write_residuals = 0;
-    matlabbatch{2}.spm.stats.fmri_est.method.Classical = 1;
-    
-    save(fullfile(test_output_dir, 'batch_spec_test.mat'), 'matlabbatch');
-    spm_jobman('run', matlabbatch);
-    
-    % Test Contrasts
-    SPM_path = fullfile(test_output_dir, 'SPM.mat');
-    load(SPM_path);
-
-    matlabbatch_con = [];
-    matlabbatch_con{1}.spm.stats.con.spmmat = {fullfile(test_output_dir, 'SPM.mat')};
-    
-    for cc = 1:length(connames)-1 % Exclude points_feedback for test
-        idx = find(contains(SPM.xX.name, connames{cc}), 1);
-        if isempty(idx)
-            warning('No regressor found for %s in %s', connames{cc}, run_id);
-            continue
-        end
-        weights = zeros(1, length(SPM.xX.name));
-        weights(idx) = 1;
-        matlabbatch_con{1}.spm.stats.con.consess{cc}.tcon.name = connames{cc};
-        matlabbatch_con{1}.spm.stats.con.consess{cc}.tcon.weights = weights;
+        
+        matlabbatch_con{1}.spm.stats.con.consess{cc}.tcon.name    = cname;
+        matlabbatch_con{1}.spm.stats.con.consess{cc}.tcon.weights = w_all;
         matlabbatch_con{1}.spm.stats.con.consess{cc}.tcon.sessrep = 'none';
     end
-    matlabbatch_con{1}.spm.stats.con.delete = 1;
 
-    % Append each extra contrast
-    for ec = 1:size(extra_contrasts, 1)
-        matlabbatch_con{1}.spm.stats.con.consess{end+1}.tcon.name    = extra_contrasts{ec, 1};
-        matlabbatch_con{1}.spm.stats.con.consess{end}.tcon.weights   = extra_contrasts{ec, 2};
-        matlabbatch_con{1}.spm.stats.con.consess{end}.tcon.sessrep   = 'none';
-    end
-    
-    save(fullfile(test_output_dir, 'batch_contrasts_.mat'), 'matlabbatch_con');
+    matlabbatch_con{1}.spm.stats.con.delete = 0;
+    save(fullfile(sub_output_dir, 'batch_contrasts.mat'), 'matlabbatch_con');
     spm_jobman('run', matlabbatch_con);
 
-    disp(['Model for test in ', sub_id, ' complete.']);
+    disp(['Model for ', sub_id, ' complete.']);
+    
 end
 
 diary off;
