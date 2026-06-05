@@ -11,11 +11,11 @@ MATLAB_DIR="$REPO/matlab"
 SPM_PATH="/home/ubuntu/repos/spm12"
 
 declare -a GLM_ROOTS=(
-    "/mnt/data/learning-habits/spm_format/outputs/glm_sc_motor2026-06-03-03-11"
+    "/mnt/data/learning-habits/spm_format/outputs/glm2_mf_chosenval_2026-06-05-09-17"
 )
 
 declare -a EXPORT_ROOTS=(
-    "/mnt/data/learning-habits/spm_outputs/session_contrasts_exports/glm_sc_motor2026-06-03-03-11"
+    "/mnt/data/learning-habits/spm_outputs/glm2_mf_chosenval_2026-06-05-09-17"
 )
 
 for i in "${!GLM_ROOTS[@]}"; do

@@ -5,6 +5,7 @@ spmpath = '/home/ubuntu/repos/spm12';
 data_dir = '/home/ubuntu/data/learning-habits/spm_format';
 analysis_dir = '/home/ubuntu/data/learning-habits/spm_format';
 bbt_path = '/home/ubuntu/data/learning-habits/bbt_062026_mf_cols.csv';
+confound_pattern = '_.*_motion_with_dummies.txt$';
 addpath(spmpath);
 
 current_date = char(datetime('now', 'Format', 'yyyy-MM-dd-hh-mm'));

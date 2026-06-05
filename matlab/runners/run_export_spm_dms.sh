@@ -9,7 +9,7 @@ REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 MATLAB_DIR="$REPO/matlab"
 
 declare -a GLM_DIRS=(
-    "/mnt/data/learning-habits/spm_format/outputs/glm_sc_motor2026-06-03-03-11"
+    "/mnt/data/learning-habits/spm_format/outputs/glm2_mf_chosenfrequ_2026-06-04-12-12"
 )
 
 for glm_dir in "${GLM_DIRS[@]}"; do
