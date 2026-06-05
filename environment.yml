@@ -1,0 +1,16 @@
+name: learning-habits
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - numpy=1.26
+  - scipy=1.13
+  - pandas=2.2
+  - matplotlib=3.9
+  - nibabel=5.2
+  - nilearn=0.10
+  - scikit-learn=1.4
+  - pip
+  - pip:
+    - glmsingle==1.2
