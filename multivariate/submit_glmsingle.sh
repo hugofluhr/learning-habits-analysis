@@ -14,9 +14,9 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 # Paths — edit for cluster
 # ---------------------------------------------------------------------------
-BASE_DIR="/mnt/data/learning-habits"
-BIDS_DIR="${BASE_DIR}/bids_dataset/derivatives/fmriprep-24.0.1-noSDC"
-OUTPUT_DIR="${BASE_DIR}/bids_dataset/derivatives/glmsingle"
+BASE_DIR="/home/hfluhr/data/learninghabits"
+BIDS_DIR="/home/hfluhr/shares-hare/ds-learning-habits/derivatives/fmriprep-24.0.1-noSDC"
+OUTPUT_DIR="/home/hfluhr/shares-hare/ds-learning-habits/derivatives/glmsingle"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 LOG_DIR="${OUTPUT_DIR}/logs"
 
@@ -72,9 +72,9 @@ export OPENBLAS_NUM_THREADS=\$SLURM_CPUS_PER_TASK
 export NUMEXPR_NUM_THREADS=\$SLURM_CPUS_PER_TASK
 export MALLOC_ARENA_MAX=2
 
-module load anaconda3
+module load miniforge3
 source \$(conda info --base)/etc/profile.d/conda.sh
-conda activate neuroim   # adjust to your cluster env name
+conda activate learning-habits
 
 SUBJECT=\$(sed -n "\${SLURM_ARRAY_TASK_ID}p" "${SUBJECTS_FILE}")
 
