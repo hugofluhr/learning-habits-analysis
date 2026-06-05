@@ -7,14 +7,22 @@ multivariate/references/glmsingle_pipeline_withOutcomes.py (Rishabh & Sarah).
 
 Usage
 -----
-# Local (default paths)
+# Single subject (local default paths)
 python multivariate/run_glmsingle.py --subject 01
 
-# Cluster (override paths)
+# All subjects from participants_mvpa.tsv (sequential)
+python multivariate/run_glmsingle.py
+
+# Cluster (override paths, single subject — called from submit_glmsingle.sh)
 python multivariate/run_glmsingle.py --subject 01 \
     --base-dir /mnt/data/learning-habits \
     --bids-dir /mnt/data/learning-habits/bids_dataset/derivatives/fmriprep-24.0.1-noSDC \
     --output-dir /mnt/data/learning-habits/bids_dataset/derivatives/glmsingle
+
+Subject list
+------------
+The canonical MVPA analysis sample is read from participants_mvpa.tsv (relative to
+--base-dir) via utils.data.load_participant_list. Override with --participants-file.
 
 Outputs (per subject)
 ---------------------
@@ -52,7 +60,7 @@ from nilearn import image
 from glmsingle.glmsingle import GLM_single
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from utils.data import Subject
+from utils.data import Subject, load_participant_list
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -216,10 +224,15 @@ def run_subject(subject, base_dir, bids_dir, output_dir, overwrite=False):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Run GLMsingle single-trial estimation for one subject."
+        description="Run GLMsingle single-trial estimation. "
+                    "If --subject is omitted, all subjects in --participants-file are run."
     )
-    parser.add_argument("--subject", required=True,
-                        help="Subject ID without 'sub-' prefix, e.g. 01")
+    parser.add_argument("--subject", default=None,
+                        help="Subject ID without 'sub-' prefix, e.g. 01. "
+                             "If omitted, all subjects in --participants-file are run.")
+    parser.add_argument("--participants-file", default="participants_mvpa.tsv",
+                        help="TSV filename (relative to --base-dir) listing subject IDs "
+                             "(default: participants_mvpa.tsv)")
     parser.add_argument("--base-dir",
                         default="/home/ubuntu/data/learning-habits",
                         help="Root data dir containing spm_format/")
@@ -235,28 +248,40 @@ def main():
                         help="Rerun even if outputs already exist")
     args = parser.parse_args()
 
-    output_dir     = Path(args.output_dir)
-    subject_output = output_dir / f"sub-{args.subject}"
-    subject_output.mkdir(parents=True, exist_ok=True)
+    base_dir   = Path(args.base_dir)
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Resolve subject list and log destination
+    if args.subject:
+        subjects = [args.subject]
+        log_dir  = output_dir / f"sub-{args.subject}"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file = log_dir / f"glmsingle_sub-{args.subject}.log"
+    else:
+        subjects = load_participant_list(str(base_dir), file_name=args.participants_file)
+        log_file = output_dir / "glmsingle_batch.log"
 
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s  %(levelname)s  %(message)s",
         handlers=[
             logging.StreamHandler(sys.stdout),
-            logging.FileHandler(
-                subject_output / f"glmsingle_sub-{args.subject}.log"
-            ),
+            logging.FileHandler(log_file),
         ],
     )
 
-    run_subject(
-        subject    = args.subject,
-        base_dir   = Path(args.base_dir),
-        bids_dir   = Path(args.bids_dir),
-        output_dir = output_dir,
-        overwrite  = args.overwrite,
-    )
+    logging.info(f"Processing {len(subjects)} subject(s) "
+                 f"[source: {args.participants_file if not args.subject else '--subject flag'}]")
+
+    for subject in subjects:
+        run_subject(
+            subject    = subject,
+            base_dir   = base_dir,
+            bids_dir   = Path(args.bids_dir),
+            output_dir = output_dir,
+            overwrite  = args.overwrite,
+        )
 
 
 if __name__ == "__main__":

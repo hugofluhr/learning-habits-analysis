@@ -21,7 +21,7 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 LOG_DIR="${OUTPUT_DIR}/logs"
 
 # Single source of truth for the analysis sample (excludes motion/QC failures)
-PARTICIPANTS_TSV="${BASE_DIR}/participants_sne2024.tsv"
+PARTICIPANTS_TSV="${BASE_DIR}/participants_mvpa.tsv"
 
 # ---------------------------------------------------------------------------
 # Build subject list
