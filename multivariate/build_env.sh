@@ -20,6 +20,7 @@ set -eo pipefail
 
 module load miniforge3
 source "\$(conda info --base)/etc/profile.d/conda.sh"
+export CONDA_PKGS_DIRS="\$HOME/data/conda/pkgs"
 
 conda env create -p "${ENV_PATH}" -f "${REPO}/environment.yml"
 echo "Done. Env at: ${ENV_PATH}"
