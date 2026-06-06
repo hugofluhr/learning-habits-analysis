@@ -55,7 +55,7 @@ echo
 # SLURM submission
 # ---------------------------------------------------------------------------
 sbatch <<EOF
-#!/bin/bash
+#!/bin/bash -l
 #SBATCH --job-name=glmsingle
 #SBATCH --output=${LOG_DIR}/glmsingle_%A_%a.out
 #SBATCH --error=${LOG_DIR}/glmsingle_%A_%a.err
@@ -65,22 +65,21 @@ sbatch <<EOF
 #SBATCH --time=0:45:00
 #SBATCH --array=1-${N}
 
+set -eo pipefail
+
 # Cap threaded libs to the allocated CPUs
 export OMP_NUM_THREADS=\$SLURM_CPUS_PER_TASK
 export MKL_NUM_THREADS=\$SLURM_CPUS_PER_TASK
 export OPENBLAS_NUM_THREADS=\$SLURM_CPUS_PER_TASK
 export NUMEXPR_NUM_THREADS=\$SLURM_CPUS_PER_TASK
 export MALLOC_ARENA_MAX=2
-
-module load miniforge3
-source \$(conda info --base)/etc/profile.d/conda.sh
-conda activate learning-habits
+export PYTHONUNBUFFERED=1
 
 SUBJECT=\$(sed -n "\${SLURM_ARRAY_TASK_ID}p" "${SUBJECTS_FILE}")
 
 echo "=== sub-\${SUBJECT}  (task \${SLURM_ARRAY_TASK_ID}/\${SLURM_ARRAY_TASK_COUNT}) ==="
 
-python "${REPO}/multivariate/run_glmsingle.py" \\
+/home/hfluhr/data/conda/envs/learning-habits/bin/python -u "${REPO}/multivariate/run_glmsingle.py" \\
     --subject "\$SUBJECT" \\
     --base-dir "${BASE_DIR}" \\
     --bids-dir "${BIDS_DIR}" \\
