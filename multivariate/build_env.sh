@@ -21,14 +21,21 @@ set -eo pipefail
 module load miniforge3
 source "\$(conda info --base)/etc/profile.d/conda.sh"
 export CONDA_PKGS_DIRS="\$HOME/data/conda/pkgs"
-export REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
-export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 
-# env may already exist (partial build) — update rather than recreate
+# Strip pip dependencies so conda doesn't invoke pip itself
+# Removes "  - pip:" header and any indented pip packages below it
+awk '!/^  - pip:/ && !/glmsingle/' "${REPO}/environment.yml" > /tmp/env_nopip.yml
+
 if [ -d "${ENV_PATH}" ]; then
-    conda env update -p "${ENV_PATH}" -f "${REPO}/environment.yml" --prune
+    conda env update -p "${ENV_PATH}" -f /tmp/env_nopip.yml --prune
 else
-    conda env create -p "${ENV_PATH}" -f "${REPO}/environment.yml"
+    conda env create -p "${ENV_PATH}" -f /tmp/env_nopip.yml
 fi
+
+# Install pip packages separately with explicit SSL cert
+"${ENV_PATH}/bin/pip" install \
+    --cert /etc/ssl/certs/ca-certificates.crt \
+    glmsingle==1.2
+
 echo "Done. Env at: ${ENV_PATH}"
 EOF

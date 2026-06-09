@@ -13,4 +13,4 @@ dependencies:
   - scikit-learn=1.4
   - pip
   - pip:
-    - glmsingle==1.2
+    - git+https://github.com/cvnlab/GLMsingle.git

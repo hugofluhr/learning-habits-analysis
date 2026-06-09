@@ -33,20 +33,19 @@ def rename_bids_files(root_dir, old_sub_id, new_sub_id):
                 os.rename(old_path, new_path)
                 print(f"Renamed directory: {old_path} -> {new_path}")
 
-def update_json_parameters(root_dir, echo_spacing, readout_time):
+def update_json_parameters(root_dir, params):
     """
-    Update EffectiveEchoSpacing and TotalReadoutTime in all func JSON sidecar files.
-    
+    Update specified parameters in all func JSON sidecar files.
+
     Parameters:
         root_dir (str): Path to the root directory of the BIDS dataset.
-        echo_spacing (float): New value for EffectiveEchoSpacing.
-        readout_time (float): New value for TotalReadoutTime.
+        params (dict): Dictionary of parameters to update with their new values.
     """
     func_dir = os.path.join(root_dir, "ses-1/func")
     if not os.path.exists(func_dir):
         print(f"No 'func' directory found in {root_dir}. Skipping JSON update.")
         return
-    
+
     for dirpath, _, filenames in os.walk(func_dir):
         for filename in filenames:
             if filename.endswith(".json"):
@@ -55,8 +54,8 @@ def update_json_parameters(root_dir, echo_spacing, readout_time):
                     with open(json_path, "r", encoding="utf-8") as file:
                         data = json.load(file)
                     
-                    data["EffectiveEchoSpacing"] = echo_spacing
-                    data["TotalReadoutTime"] = readout_time
+                    # Update parameters
+                    data.update(params)
 
                     with open(json_path, "w", encoding="utf-8") as file:
                         json.dump(data, file, indent=4)
@@ -121,17 +120,11 @@ if __name__ == "__main__":
         type=str,
         help="The new subject ID to replace the old one (e.g., 'sub-91')."
     )
-    parser.add_argument(
-        "--echo_spacing",
-        type=float,
+    parser.add_argument(    
+        "--params",
+        type=str,
         default=None,
-        help="New value for EffectiveEchoSpacing in func JSON files."
-    )
-    parser.add_argument(
-        "--readout_time",
-        type=float,
-        default=None,
-        help="New value for TotalReadoutTime in func JSON files."
+        help="JSON string of parameters to update (e.g., '{\"EffectiveEchoSpacing\": 0.00058, \"TotalReadoutTime\": 0.045}')."
     )
 
     args = parser.parse_args()
@@ -140,10 +133,15 @@ if __name__ == "__main__":
         print(f"Error: The specified path '{args.root_dir}' does not exist.")
     else:
         rename_bids_files(args.root_dir, args.old_sub_id, args.new_sub_id)
-        
-        if args.echo_spacing is not None and args.readout_time is not None:
-            update_json_parameters(args.root_dir, args.echo_spacing, args.readout_time)
+
+        if args.params:
+            try:
+                # Parse the JSON string of parameters into a dictionary
+                params = json.loads(args.params)
+                update_json_parameters(args.root_dir, params)
+            except json.JSONDecodeError as e:
+                print(f"Error decoding JSON parameters: {e}")
         else:
-            print("Skipping JSON parameter update as no values were provided.")
-        
+            print("Skipping JSON parameter update as no parameters were provided.")
+
         update_fmap_intended_for(args.root_dir, args.old_sub_id, args.new_sub_id)
