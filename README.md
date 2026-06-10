@@ -12,11 +12,15 @@ fMRI analysis pipeline for a reward-learning habits study. Subjects complete thr
 | `matlab/second_lvl/` | Second-level one-sample t-tests |
 | `matlab/connectivity/` | PPI analyses (PPPI toolbox) |
 | `matlab/runners/` | Shell scripts that loop the 3-step session-contrast pipeline over all GLMs |
+| `multivariate/` | GLMsingle single-trial betas, stimulus category decoding, and searchlight — runs on SLURM cluster |
 | `modeling/` | RL/CK agent classes generating trial-level Q- and H-values |
 | `utils/` | Python data model (`data.py`) and analysis helpers (`analysis.py`) |
 | `scripts/` | One-off Python/R/shell scripts (BIDS conversion, data prep, export) |
 | `notebooks/` | Development and inspection notebooks |
 | `results_notebooks/` | Results-facing notebooks (figures, second-level summaries) |
+| `physio/` | Physiological noise modelling (TAPAS PhysIO, SPM batch) |
+| `cluster/` | Cluster-side data management scripts |
+| `defacing/` | Defacing pipeline scripts |
 
 ---
 
@@ -41,7 +45,21 @@ fMRI analysis pipeline for a reward-learning habits study. Subjects complete thr
 
 ---
 
+## Multivariate pipeline
+
+Single-trial betas are estimated with GLMsingle, then used for stimulus category decoding and searchlight. All three steps run per-subject on the SLURM cluster:
+
+```bash
+bash multivariate/submit_glmsingle.sh    # GLMsingle type-D betas
+bash multivariate/submit_decoding.sh     # whole-brain + visual cortex LinearSVC
+bash multivariate/submit_searchlight.sh  # whole-brain searchlight (6 mm radius)
+```
+
+Each script wraps the corresponding `run_*.py` and injects cluster paths. QC notebooks are in `multivariate/glmsingle_qc.ipynb` and `multivariate/decoding_results.ipynb`.
+
+---
+
 ## Infrastructure
 
-- SPM12 at `/home/ubuntu/repos/spm12` (remote VM)
-- Data at `/mnt/data/learning-habits/spm_format/outputs/` (raw GLM outputs) and `/mnt/data/learning-habits/spm_outputs/` (exported contrasts)
+- **VM** (`uzh.vm`): SPM12 at `/home/ubuntu/repos/spm12`; data at `/mnt/data/learning-habits/spm_format/outputs/` (raw GLM outputs) and `/mnt/data/learning-habits/spm_outputs/` (exported contrasts)
+- **SLURM cluster** (`uzh.cluster`): multivariate pipeline; outputs at `shares-hare/derivatives/glmsingle` and `shares-hare/derivatives/decoding`

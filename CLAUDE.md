@@ -75,7 +75,7 @@ GLM output directories are timestamped, e.g. `glm2_all_runs_scrubbed_2025-12-11-
 | `glm2` | Q/H-value modulation on both stimuli — main workhorse |
 | `glm2_all_runs` | GLM2 pooling all runs (no session separation in design matrix) |
 | `glm2_chosen*` | Variants using the chosen-stimulus value instead of H-value |
-| `glm3` | Prediction error modulation |
+| `glm3` | Choice variable (weighted sum of Q + H-values) |
 | `glm4_learning_reward_chosen` | Learning/reward/chosen combined |
 
 ### Python data model (utils/data.py)
