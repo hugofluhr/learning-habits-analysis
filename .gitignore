@@ -187,3 +187,6 @@ cython_debug/
 .claude/plans
 .claude/memory
 .claude/settings.local.json
+
+# Generated figures
+figures/
