@@ -31,6 +31,15 @@ Always pipe through `tee` to log output:
 matlab -nodisplay -r "..." 2>&1 | tee logfile.log
 ```
 
+## Subject lists
+
+Always use `participants_mvpa.tsv` as the canonical subject list for multivariate analyses — never construct subject ranges (e.g. `seq 01 73`) since not all IDs exist. All `submit_*.sh` scripts default to this file when called with no arguments:
+
+```bash
+bash multivariate/submit_searchlight.sh        # correct — uses participants_mvpa.tsv
+bash multivariate/submit_searchlight.sh 01 05  # correct — specific subjects only when intentional
+```
+
 ## Session contrasts + export + second-level pipeline
 
 The three-step pipeline is documented in `INSTRUCTIONS_session_contrasts_and_secondlvl.md`. Runner scripts that loop over all three GLMs are in `matlab/runners/`:
