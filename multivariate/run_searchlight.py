@@ -16,7 +16,8 @@ python multivariate/run_searchlight.py --subject 01 \\
 Outputs (per subject)
 ---------------------
 <output-dir>/sub-<id>/
-    sub-<id>_searchlight_stim_cat.nii.gz   — voxel-wise decoding accuracy map
+    sub-<id>_searchlight_stim_cat.nii.gz          — overall 4-class accuracy map
+    sub-<id>_searchlight_stim_cat_<cat>.nii.gz    — one-vs-rest accuracy per category
     searchlight_sub-<id>.log
 """
 
@@ -37,11 +38,7 @@ def run_subject(subject, bids_dir, glmsingle_dir, output_dir,
                 radius=6., n_jobs=1, overwrite=False):
 
     subject_output = output_dir / f"sub-{subject}"
-    done_flag = subject_output / f"sub-{subject}_searchlight_stim_cat.nii.gz"
-
-    if done_flag.exists() and not overwrite:
-        logging.info(f"sub-{subject}: output exists, skipping (pass --overwrite to rerun)")
-        return
+    overall_out = subject_output / f"sub-{subject}_searchlight_stim_cat.nii.gz"
 
     subject_output.mkdir(parents=True, exist_ok=True)
 
@@ -56,6 +53,7 @@ def run_subject(subject, bids_dir, glmsingle_dir, output_dir,
 
     y      = trial_info['stim_cat'].values
     groups = trial_info['run'].values
+    categories = sorted(trial_info['stim_cat'].unique())
 
     # --- Brain mask: fMRIPrep functional brain mask (first run, MNI space) ---
     # rglob handles session-structured layouts (ses-1/func/) transparently
@@ -70,22 +68,41 @@ def run_subject(subject, bids_dir, glmsingle_dir, output_dir,
     brain_mask_img = nib.load(mask_candidates[0])
     logging.info(f"sub-{subject}: brain mask {mask_candidates[0].name}")
 
-    logging.info(f"sub-{subject}: running searchlight (radius={radius}mm, n_jobs={n_jobs})")
+    def _make_searchlight():
+        return SearchLight(
+            mask_img=brain_mask_img,
+            radius=radius,
+            estimator=LinearSVC(max_iter=10000, dual='auto'),
+            cv=LeaveOneGroupOut(),
+            scoring='accuracy',
+            n_jobs=n_jobs,
+            verbose=1,
+        )
 
-    sl = SearchLight(
-        mask_img=brain_mask_img,
-        radius=radius,
-        estimator=LinearSVC(max_iter=10000, dual='auto'),
-        cv=LeaveOneGroupOut(),
-        scoring='accuracy',
-        n_jobs=n_jobs,
-        verbose=1,
-    )
-    sl.fit(betas_img, y, groups=groups)
+    # --- Overall 4-class searchlight ---
+    if overall_out.exists() and not overwrite:
+        logging.info(f"sub-{subject}: overall output exists, skipping")
+    else:
+        logging.info(f"sub-{subject}: running overall searchlight (radius={radius}mm, n_jobs={n_jobs})")
+        sl = _make_searchlight()
+        sl.fit(betas_img, y, groups=groups)
+        new_img_like(brain_mask_img, sl.scores_).to_filename(str(overall_out))
+        logging.info(f"sub-{subject}: saved {overall_out.name}")
 
-    acc_img = new_img_like(brain_mask_img, sl.scores_)
-    acc_img.to_filename(str(done_flag))
-    logging.info(f"sub-{subject}: done — saved {done_flag.name}")
+    # --- Per-category one-vs-rest searchlights ---
+    for cat in categories:
+        cat_out = subject_output / f"sub-{subject}_searchlight_stim_cat_{cat}.nii.gz"
+        if cat_out.exists() and not overwrite:
+            logging.info(f"sub-{subject}: {cat} output exists, skipping")
+            continue
+        logging.info(f"sub-{subject}: running one-vs-rest searchlight for '{cat}'")
+        y_binary = (y == cat).astype(int)
+        sl = _make_searchlight()
+        sl.fit(betas_img, y_binary, groups=groups)
+        new_img_like(brain_mask_img, sl.scores_).to_filename(str(cat_out))
+        logging.info(f"sub-{subject}: saved {cat_out.name}")
+
+    logging.info(f"sub-{subject}: all searchlights complete")
 
 
 def main():
