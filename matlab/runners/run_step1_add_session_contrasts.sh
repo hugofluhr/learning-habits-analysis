@@ -1,16 +1,15 @@
 #!/bin/bash
-# Step 1: Append per-session contrasts to each GLM's SPM.mat files.
-# Run this before step 2 or 3.
-
 set -euo pipefail
 
+source /etc/profile.d/z00-lmod.sh
 module load matlab/r2023a
 
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 MATLAB_SCRIPT="$REPO/matlab/first_lvl/add_session_contrasts_glm2.m"
 
 GLM_ROOTS=(
-    "/mnt/data/learning-habits/spm_format/outputs/glm2_mf_chosenval_2026-06-05-09-17"
+    "/mnt/data/learning-habits/spm_format/outputs/glm2_all_runs_run_zscore_scrubbed_2026-06-23-10-00"
+    "/mnt/data/learning-habits/spm_format/outputs/glm2_chosen_all_runs_run_zscore_scrubbed_2026-06-23-11-35"
 )
 
 for glm_root in "${GLM_ROOTS[@]}"; do
@@ -21,9 +20,7 @@ for glm_root in "${GLM_ROOTS[@]}"; do
     echo "===== Step 1: $(basename "$glm_root") ====="
     echo "Log: $log_file"
 
-    matlab -nodisplay -r \
-        "glm_root = '$glm_root'; run('$MATLAB_SCRIPT'); exit" \
-        2>&1 | tee "$log_file"
+    matlab -nodisplay -r         "glm_root = '$glm_root'; run('$MATLAB_SCRIPT'); exit"         2>&1 | tee "$log_file"
     matlab_exit=${PIPESTATUS[0]}
 
     if [ "$matlab_exit" -ne 0 ]; then
