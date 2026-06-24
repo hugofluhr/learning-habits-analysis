@@ -16,8 +16,15 @@ fMRI analysis pipeline for a reward-learning habits study. Subjects complete thr
 | `modeling/` | RL/CK agent classes generating trial-level Q- and H-values |
 | `utils/` | Python data model (`data.py`) and analysis helpers (`analysis.py`) |
 | `scripts/` | One-off Python/R/shell scripts (BIDS conversion, data prep, export) |
-| `notebooks/` | Development and inspection notebooks |
-| `results_notebooks/` | Results-facing notebooks (figures, second-level summaries) |
+| `notebooks/behavior/` | Behavioral analysis and computational modeling |
+| `notebooks/data_prep/` | BIDS conversion and participant identification |
+| `notebooks/glm/` | SPM GLM inspection (design matrices, VIFs, residuals, model comparisons) |
+| `notebooks/nilearn_pipeline/` | Archived nilearn first/second-level pipeline development |
+| `notebooks/ppi/` | PPI/connectivity inspection |
+| `notebooks/qc/` | fMRI data quality control (SFNR, tSNR, scrubbing, timing) |
+| `notebooks/results/` | Results-facing notebooks (figures, second-level summaries) |
+| `notebooks/roi/` | ROI masks, PFC signal, coordinate decoding |
+| `notebooks/social_risk/` | Social-risk task (separate dataset) |
 | `physio/` | Physiological noise modelling (TAPAS PhysIO, SPM batch) |
 | `cluster/` | Cluster-side data management scripts |
 | `defacing/` | Defacing pipeline scripts |
