@@ -2,6 +2,13 @@ modeling_data_dir <- "/Users/hugofluhr/phd_local/data/LearningHabits/dev_sample/
 
 configs <- list(
   list(
+    R_file_path      = file.path(modeling_data_dir, "data_RP_MRI_model_RL_CK_reduced_Q1.RData"),
+    output_directory = file.path(modeling_data_dir, "2026-02-09"),
+    test_var         = "data_test_RL_CK2_extended",
+    train_var        = "data_train_RL_CK2_extended",
+    suffix           = "compmodelQ1"
+  ),
+  list(
     R_file_path      = file.path(modeling_data_dir, "data_RP_MRI_model_RL_CK_reduced_20260206.RData"),
     output_directory = file.path(modeling_data_dir, "2026-02-06"),
     test_var         = "data_test_RL_CK2_extended",
