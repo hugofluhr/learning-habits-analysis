@@ -6,6 +6,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Always use `NotebookEdit` to create or edit `.ipynb` files — never `Write`.
 
+## Python environment
+
+For anything involving brain images (NIfTI files, fMRI data, nilearn, nibabel, etc.) use the `neuroim` conda environment:
+
+```bash
+conda run -n neuroim python script.py
+# or activate it first:
+conda activate neuroim
+```
+
 ## Project overview
 
 Neuroimaging (fMRI) analysis pipeline for a reward-learning habits study. The experiment has three sessions per subject: `learning1`, `learning2`, and `test`. Analysis uses both SPM12 (MATLAB) for GLM estimation and nilearn (Python) for design matrix inspection and secondary analyses.
