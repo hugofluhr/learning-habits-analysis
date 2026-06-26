@@ -30,7 +30,7 @@ for i in "${!GLM_ROOTS[@]}"; do
     echo "  -> $export_root"
     echo "Log: $log_file"
 
-    matlab -nodisplay -r         "addpath('$MATLAB_DIR'); addpath('$SPM_PATH'); spm('Defaults','fMRI'); spm_jobman('initcfg'); export_first_lvl_contrasts_with_sessions('$glm_root', '$export_root', 'copy', true); exit"         2>&1 | tee "$log_file"
+    matlab -nodisplay -r         "addpath('$MATLAB_DIR'); addpath('$SPM_PATH'); spm('Defaults','fMRI'); spm_jobman('initcfg'); export_first_lvl_contrasts_with_sessions('$glm_root', '$export_root', 'copy', false); exit"         2>&1 | tee "$log_file"
     matlab_exit=${PIPESTATUS[0]}
 
     if [ "$matlab_exit" -ne 0 ]; then
