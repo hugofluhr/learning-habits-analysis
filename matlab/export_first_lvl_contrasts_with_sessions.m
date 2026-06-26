@@ -430,7 +430,13 @@ if do_copy || ~isunix
     if ~isfile(dst), copyfile(src, dst); end
 else
     if ~isfile(dst)
-        system(sprintf('/bin/ln -s "%s" "%s"', src, dst));
+        try
+            import java.nio.file.Files
+            import java.nio.file.Paths
+            Files.createSymbolicLink(Paths.get(dst), Paths.get(src));
+        catch me
+            fprintf(2, '[WARN] symlink failed for %s: %s\n', dst, me.message);
+        end
     end
 end
 end
