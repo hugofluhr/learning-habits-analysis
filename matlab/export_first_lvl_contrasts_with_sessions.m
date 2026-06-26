@@ -430,7 +430,7 @@ if do_copy || ~isunix
     if ~isfile(dst), copyfile(src, dst); end
 else
     if ~isfile(dst)
-        system(sprintf('ln -s "%s" "%s"', src, dst));
+        system(sprintf('/bin/ln -s "%s" "%s"', src, dst));
     end
 end
 end
