@@ -1,0 +1,148 @@
+{
+  "trial_type": {
+    "Description": "Type of experimental event within a trial.",
+    "Levels": {
+      "first_stim_presentation": "Onset of the first stimulus shown temporally on screen.",
+      "second_stim_presentation": "Onset of the second stimulus shown temporally on screen.",
+      "response": "Time of the participant's button press.",
+      "purple_frame": "Onset of the purple frame highlighting the chosen stimulus.",
+      "points_feedback": "Onset of the points feedback display showing the reward received.",
+      "non_response_feedback": "Feedback shown when no response was made within the allowed time.",
+      "iti": "Inter-trial interval."
+    }
+  },
+  "trial": {
+    "Description": "Trial number within the run."
+  },
+  "shift": {
+    "Description": "Indicates which stimulus was presented first temporally. 1 = left stimulus shown first; 0 = right stimulus shown first.",
+    "Levels": {
+      "0": "Right stimulus shown first.",
+      "1": "Left stimulus shown first."
+    }
+  },
+  "left_stim": {
+    "Description": "Numerical ID (1-8) of the stimulus shown on the left side of the screen."
+  },
+  "right_stim": {
+    "Description": "Numerical ID (1-8) of the stimulus shown on the right side of the screen."
+  },
+  "left_value": {
+    "Description": "True reward value (points) of the left stimulus if chosen. Values range from 1 to 5."
+  },
+  "right_value": {
+    "Description": "True reward value (points) of the right stimulus if chosen. Values range from 1 to 5."
+  },
+  "left_stim_name": {
+    "Description": "Name of the stimulus shown on the left. One of: face_female, face_male, figure_circle, figure_triangle, hand_back, hand_palm, house_1, house_2."
+  },
+  "right_stim_name": {
+    "Description": "Name of the stimulus shown on the right. One of: face_female, face_male, figure_circle, figure_triangle, hand_back, hand_palm, house_1, house_2."
+  },
+  "left_stim_cat": {
+    "Description": "Visual category of the left stimulus.",
+    "Levels": {
+      "face": "Face stimulus.",
+      "figure": "Abstract figure stimulus.",
+      "hand": "Hand stimulus.",
+      "house": "House stimulus."
+    }
+  },
+  "right_stim_cat": {
+    "Description": "Visual category of the right stimulus.",
+    "Levels": {
+      "face": "Face stimulus.",
+      "figure": "Abstract figure stimulus.",
+      "hand": "Hand stimulus.",
+      "house": "House stimulus."
+    }
+  },
+  "first_stim": {
+    "Description": "Numerical ID (1-8) of the stimulus presented first temporally."
+  },
+  "second_stim": {
+    "Description": "Numerical ID (1-8) of the stimulus presented second temporally."
+  },
+  "first_stim_name": {
+    "Description": "Name of the stimulus presented first temporally. One of: face_female, face_male, figure_circle, figure_triangle, hand_back, hand_palm, house_1, house_2."
+  },
+  "second_stim_name": {
+    "Description": "Name of the stimulus presented second temporally. One of: face_female, face_male, figure_circle, figure_triangle, hand_back, hand_palm, house_1, house_2."
+  },
+  "first_stim_cat": {
+    "Description": "Visual category of the first-presented stimulus.",
+    "Levels": {
+      "face": "Face stimulus.",
+      "figure": "Abstract figure stimulus.",
+      "hand": "Hand stimulus.",
+      "house": "House stimulus."
+    }
+  },
+  "second_stim_cat": {
+    "Description": "Visual category of the second-presented stimulus.",
+    "Levels": {
+      "face": "Face stimulus.",
+      "figure": "Abstract figure stimulus.",
+      "hand": "Hand stimulus.",
+      "house": "House stimulus."
+    }
+  },
+  "first_stim_value": {
+    "Description": "True reward value (points) of the first-presented stimulus. Values range from 1 to 5."
+  },
+  "second_stim_value": {
+    "Description": "True reward value (points) of the second-presented stimulus. Values range from 1 to 5."
+  },
+  "first_stim_frequ": {
+    "Description": "Choice-frequency manipulation applied to the first-presented stimulus during learning. This does NOT refer to how often the stimulus appeared on screen. It encodes how the stimulus was paired during learning: high-frequency stimuli were more often paired with less valuable partners (and were therefore chosen more often), whereas low-frequency stimuli were more often paired with more valuable partners (and were therefore chosen less often).",
+    "Levels": {
+      "-1": "Low-frequency stimulus: more often paired with more valuable stimuli during learning, hence chosen less frequently.",
+      "0": "Edge-case stimulus, not assigned to the high- or low-frequency condition.",
+      "1": "High-frequency stimulus: more often paired with less valuable stimuli during learning, hence chosen more frequently."
+    }
+  },
+  "second_stim_frequ": {
+    "Description": "Choice-frequency manipulation applied to the second-presented stimulus during learning. This does NOT refer to how often the stimulus appeared on screen. It encodes how the stimulus was paired during learning: high-frequency stimuli were more often paired with less valuable partners (and were therefore chosen more often), whereas low-frequency stimuli were more often paired with more valuable partners (and were therefore chosen less often).",
+    "Levels": {
+      "-1": "Low-frequency stimulus: more often paired with more valuable stimuli during learning, hence chosen less frequently.",
+      "0": "Edge-case stimulus, not assigned to the high- or low-frequency condition.",
+      "1": "High-frequency stimulus: more often paired with less valuable stimuli during learning, hence chosen more frequently."
+    }
+  },
+  "action": {
+    "Description": "Choice made by the participant. n/a on missed trials.",
+    "Levels": {
+      "1": "Left stimulus chosen.",
+      "2": "Right stimulus chosen."
+    }
+  },
+  "rt": {
+    "Description": "Reaction time in seconds from second stimulus onset to button press. n/a on missed trials.",
+    "Units": "s"
+  },
+  "reward": {
+    "Description": "Points received on the trial, equal to the true value of the chosen stimulus. n/a on missed trials.",
+    "Units": "points"
+  },
+  "correct": {
+    "Description": "Whether the participant chose the higher-value stimulus (1 = correct, 0 = incorrect). n/a on missed trials or when both stimuli have equal value."
+  },
+  "stim_chosen": {
+    "Description": "Numerical ID (1-8) of the chosen stimulus. n/a on missed trials."
+  },
+  "stim_unchosen": {
+    "Description": "Numerical ID (1-8) of the unchosen stimulus. n/a on missed trials."
+  },
+  "reward_chosen": {
+    "Description": "True reward value (points) of the chosen stimulus. n/a on missed trials.",
+    "Units": "points"
+  },
+  "reward_unchosen": {
+    "Description": "True reward value (points) of the unchosen stimulus. n/a on missed trials.",
+    "Units": "points"
+  },
+  "diff_val": {
+    "Description": "Value difference between left and right stimuli (left_value minus right_value).",
+    "Units": "points"
+  }
+}
