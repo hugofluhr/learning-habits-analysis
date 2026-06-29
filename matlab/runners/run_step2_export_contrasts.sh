@@ -38,6 +38,27 @@ for i in "${!GLM_ROOTS[@]}"; do
         exit "$matlab_exit"
     fi
 
+    # Create the symlinks in the shell from the manifests written by the export.
+    # MATLAB's system() is unreliable in this environment (returns 127, no shell),
+    # so 'copy', false leaves the link targets recorded in the manifests but the
+    # links uncreated. ln -s works fine here, so we make them ourselves.
+    n_made=0
+    # all-runs manifest: dst=col4, src=col5
+    if [ -f "$export_root/allruns/contrasts_manifest.tsv" ]; then
+        while IFS=$'\t' read -r _tok _idx _name dst src; do
+            [ -z "$dst" ] && continue
+            [ -e "$dst" ] || { ln -s "$src" "$dst" && n_made=$((n_made+1)); }
+        done < <(tail -n +2 "$export_root/allruns/contrasts_manifest.tsv")
+    fi
+    # per-session manifest: dst=col5, src=col6
+    if [ -f "$export_root/contrasts_manifest_sessions.tsv" ]; then
+        while IFS=$'\t' read -r _tok _sess _idx _name dst src; do
+            [ -z "$dst" ] && continue
+            [ -e "$dst" ] || { ln -s "$src" "$dst" && n_made=$((n_made+1)); }
+        done < <(tail -n +2 "$export_root/contrasts_manifest_sessions.tsv")
+    fi
+    echo "  Symlinks created from manifests: $n_made"
+
     echo ""
 done
 

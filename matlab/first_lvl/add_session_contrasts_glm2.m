@@ -16,11 +16,13 @@ end
 
 addpath(spmpath);
 
-connames = {
-    'first_stim', 'second_stim', ...
-    'second_stimxQval_chosen', 'second_stimxHval_chosen', ...
-    'response', 'purple_frame'
-};
+if ~exist('connames', 'var') || isempty(connames)
+    connames = {
+        'first_stim', 'second_stim', ...
+        'second_stimxQval_chosen', 'second_stimxHval_chosen', ...
+        'response', 'purple_frame'
+    };
+end
 
 % One label per SPM.Sess index (must match session order in the GLM)
 session_labels = {'Session 1', 'Session 2', 'Session 3'};  % 1=learning1 2=learning2 3=test
