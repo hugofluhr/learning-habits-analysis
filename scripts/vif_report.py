@@ -156,6 +156,10 @@ def main():
                    help='number of sessions (default: auto-detect from Sn(N))')
     p.add_argument('--thresholds', type=int, nargs='+', default=[10, 5],
                    help='VIF thresholds for exclusion counts (default: 10 5)')
+    p.add_argument('--exclusion-regressor', default='Hval',
+                   help="substring selecting regressors that drive exclusion "
+                        "counts (default: 'Hval', matching the notebook; use "
+                        "'x' for all parametric modulators)")
     p.add_argument('--skip-export', action='store_true',
                    help='do not run the MATLAB export even if CSVs are missing')
     p.add_argument('--overwrite-export', action='store_true',
@@ -192,7 +196,8 @@ def main():
     # 3. tables
     summary = summary_table(vifs)
     pm_max = pm_vif_max_per_session(vifs)
-    excl = exclusion_counts(vifs, thresholds=tuple(args.thresholds))
+    excl = exclusion_counts(vifs, thresholds=tuple(args.thresholds),
+                            regressor_filter=args.exclusion_regressor)
 
     vifs.round(3).to_csv(os.path.join(tables_dir, 'vifs_per_subject_session.csv'))
     summary.to_csv(os.path.join(tables_dir, 'summary_describe.csv'))
@@ -223,7 +228,8 @@ def main():
     tables = [
         ('VIF summary (describe)', summary),
         ('PM VIF max per session', pm_max),
-        (f'Subject exclusion counts (VIF thresholds {args.thresholds})', excl),
+        (f"Subject exclusion counts — '{args.exclusion_regressor}' regressors "
+         f"(VIF thresholds {args.thresholds})", excl),
     ]
     figures = [
         ('VIF by session — all task regressors', all_path),

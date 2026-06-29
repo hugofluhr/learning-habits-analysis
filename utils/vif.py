@@ -125,13 +125,17 @@ def pm_vif_max_per_session(vifs):
     return vifs[pm_cols].groupby('session').max().round(1)
 
 
-def exclusion_counts(vifs, thresholds=(10, 5), regressor_filter='x'):
+def exclusion_counts(vifs, thresholds=(10, 5), regressor_filter='Hval'):
     """Subject exclusion counts at VIF thresholds for the selected regressors.
 
     A subject is flagged for a session if *any* selected regressor exceeds the
     threshold that session; flagged overall if it exceeds in *any* session
     (max across sessions). Returns a DataFrame indexed by threshold with one
     column per session plus ``any_session``, ``n_total`` and ``pct_excluded``.
+
+    ``regressor_filter`` selects which regressors drive exclusion (substring
+    match on column names). Defaults to ``'Hval'`` to match the notebook's
+    Hval-collinearity exclusion analysis; returns None when no column matches.
     """
     sel_cols = [c for c in vifs.columns if regressor_filter in c]
     if not sel_cols:
