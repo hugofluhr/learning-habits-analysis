@@ -1,14 +1,13 @@
 #!/bin/bash
 # Submit GLMsingle beta-version QC decoding as a SLURM array job — one job per
-# subject. Runs the same standardized whole-brain decoder on each GLMsingle model
-# type (A/B/C/D) for both targets (category probe + reward), writing one tidy CSV
-# per subject. Use it to check whether the denoising/ridge steps improve
-# decodability on this dataset.
+# subject. Runs the same standardized whole-brain category decoder on each
+# GLMsingle model type (A/B/C/D), writing one tidy CSV per subject. Category
+# decoding is a pipeline-validation probe; use it to check whether the
+# denoising/ridge steps improve decodability on this dataset.
 #
 # Usage (from repo root):
 #   bash multivariate/submit_beta_qc_decoding.sh            # all subjects in PARTICIPANTS_TSV
 #   bash multivariate/submit_beta_qc_decoding.sh 01 05 12   # specific subjects
-#   BBT=/path/to/bbt.csv TARGETS=reward bash multivariate/submit_beta_qc_decoding.sh
 #
 # Higher --mem than the other decoders: each of TYPE{A,B,C,D}.npy is a full-brain
 # betas array loaded one at a time.
@@ -25,10 +24,6 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 LOG_DIR="${OUTPUT_DIR}/logs"
 
 PARTICIPANTS_TSV="/home/hfluhr/data/learninghabits/participants_mvpa.tsv"
-
-BBT="${BBT:-/home/hfluhr/data/learninghabits/bbt.csv}"
-TARGET_COL="${TARGET_COL:-first_stim_value}"
-TARGETS="${TARGETS:-category,reward}"
 
 # ---------------------------------------------------------------------------
 # Build subject list
@@ -52,12 +47,7 @@ if [ "$N" -eq 0 ]; then
     exit 1
 fi
 
-if [[ "$TARGETS" == *reward* ]] && [ ! -f "$BBT" ]; then
-    echo "ERROR: BBT target table not found: ${BBT} (set BBT=/path/to/bbt.csv)" >&2
-    exit 1
-fi
-
-echo "Submitting ${N} subjects (array 1-${N}), targets='${TARGETS}', bbt='${BBT}':"
+echo "Submitting ${N} subjects (array 1-${N}):"
 cat "$SUBJECTS_FILE"
 echo
 
@@ -91,8 +81,5 @@ echo "=== sub-\${SUBJECT}  (task \${SLURM_ARRAY_TASK_ID}/\${SLURM_ARRAY_TASK_COU
     --subject "\$SUBJECT" \\
     --bids-dir "${BIDS_DIR}" \\
     --glmsingle-dir "${GLMSINGLE_DIR}" \\
-    --bbt "${BBT}" \\
-    --target-col "${TARGET_COL}" \\
-    --targets "${TARGETS}" \\
     --output-dir "${OUTPUT_DIR}"
 EOF
