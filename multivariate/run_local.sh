@@ -9,6 +9,8 @@
 #   NPROC=8 THREADS=3 bash multivariate/run_local.sh glmsingle   # override defaults
 #
 # Pipelines:  glmsingle | searchlight | decoding | frem
+#             | beta_qc   (compare GLMsingle model types A/B/C/D by category
+#               decoding; memory-bound — loads each full-brain betas array)
 #
 # Why the per-pipeline defaults differ (this is the whole point of the file):
 #   glmsingle    -> MEMORY-bound. Loads 3 BOLD runs as float32 + GLMdenoise/ridge
@@ -41,6 +43,7 @@ GLMSINGLE_DIR="${GLMSINGLE_DIR:-${BASE_DIR}/bids_dataset/derivatives/glmsingle}"
 SEARCHLIGHT_DIR="${SEARCHLIGHT_DIR:-${BASE_DIR}/bids_dataset/derivatives/searchlight}"
 DECODING_DIR="${DECODING_DIR:-${BASE_DIR}/bids_dataset/derivatives/decoding}"
 FREM_DIR="${FREM_DIR:-${BASE_DIR}/bids_dataset/derivatives/frem}"
+GLMSINGLE_QC_DIR="${GLMSINGLE_QC_DIR:-${BASE_DIR}/bids_dataset/derivatives/glmsingle_qc}"
 VIS_MASK="${VIS_MASK:-${DECODING_DIR}/visual_cortex_mask.nii.gz}"
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
@@ -71,8 +74,12 @@ case "$PIPELINE" in
         OUTPUT_DIR="$FREM_DIR"
         DEF_NPROC=28 ; DEF_THREADS=1
         ;;
+    beta_qc)
+        OUTPUT_DIR="$GLMSINGLE_QC_DIR"
+        DEF_NPROC=8 ; DEF_THREADS=2     # MEMORY-bound: loads each full-brain betas array
+        ;;
     *)
-        echo "ERROR: unknown pipeline '$PIPELINE' (expected glmsingle|searchlight|decoding|frem)" >&2
+        echo "ERROR: unknown pipeline '$PIPELINE' (expected glmsingle|searchlight|decoding|frem|beta_qc)" >&2
         exit 1
         ;;
 esac
@@ -104,7 +111,7 @@ N=$(grep -c . "$SUBJECTS_FILE" || true)
 case "$PIPELINE" in
     glmsingle)
         [ -d "$BIDS_DIR" ] || { echo "ERROR: fMRIPrep dir not found: $BIDS_DIR" >&2; exit 1; } ;;
-    searchlight|decoding|frem)
+    searchlight|decoding|frem|beta_qc)
         [ -d "$GLMSINGLE_DIR" ] || { echo "ERROR: GLMsingle betas dir not found: $GLMSINGLE_DIR (run 'glmsingle' first)" >&2; exit 1; } ;;
 esac
 if [ "$PIPELINE" = "decoding" ] && [ ! -f "$VIS_MASK" ]; then
@@ -161,10 +168,14 @@ run_one() {
                 --subject "$s" --bids-dir "$BIDS_DIR" \
                 --glmsingle-dir "$GLMSINGLE_DIR" --output-dir "$FREM_DIR" \
                 --n-jobs 1 ;;
+        beta_qc)
+            "$PY" -u "${REPO}/multivariate/run_beta_qc_decoding.py" \
+                --subject "$s" --bids-dir "$BIDS_DIR" \
+                --glmsingle-dir "$GLMSINGLE_DIR" --output-dir "$GLMSINGLE_QC_DIR" ;;
     esac
 }
 export -f run_one
-export PIPELINE REPO PY BASE_DIR BIDS_DIR GLMSINGLE_DIR SEARCHLIGHT_DIR DECODING_DIR FREM_DIR VIS_MASK
+export PIPELINE REPO PY BASE_DIR BIDS_DIR GLMSINGLE_DIR SEARCHLIGHT_DIR DECODING_DIR FREM_DIR GLMSINGLE_QC_DIR VIS_MASK
 
 # xargs -P runs NPROC subjects at a time and picks up the next as each finishes
 # (natural load-balancing across the 59-subject list). Exit non-zero if any fail.
