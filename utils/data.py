@@ -66,6 +66,66 @@ def load_participant_list(base_dir, file_name='participants_sne2024.tsv'):
         ids = [line.strip() for line in file.readlines()]
     return ids
 
+
+def load_target_from_bbt(subject, bbt_path, trial_info, target_col='first_stim_value'):
+    """Return a per-trial target vector aligned 1:1 to GLMsingle CUES betas.
+
+    The GLMsingle single-trial betas (``sub-<id>_glmSingle_betas_CUES.nii.gz``) are
+    locked to first-stimulus onset and emitted in chronological order (run
+    ``learning1`` -> ``learning2`` -> ``test``, each sorted by ``t_first_stim`` â€” see
+    ``multivariate/run_glmsingle.py:extract_betas``). This helper reconstructs that
+    exact ordering from the Big Behavior Table (the same table used to fit the SPM
+    first-levels) and returns the requested column so it can serve as a decoding
+    target (e.g. the objective reward level of the first stimulus).
+
+    Parameters
+    ----------
+    subject : str
+        Subject ID, with or without the ``sub-`` prefix (e.g. ``'01'`` or ``'sub-01'``).
+    bbt_path : str
+        Path to the BBT CSV (must contain ``sub_id``, ``block``, ``t_first_stim``,
+        ``first_stim_name`` and ``target_col``).
+    trial_info : pandas.DataFrame
+        The GLMsingle ``..._betas_CUES_info.csv`` (must contain ``stim_name``), used
+        as the alignment anchor â€” its row order is the beta volume order.
+    target_col : str, optional
+        BBT column to return (default ``'first_stim_value'``, the objective reward).
+
+    Returns
+    -------
+    numpy.ndarray
+        Float vector of length ``len(trial_info)``, aligned to the beta 4th dimension.
+
+    Raises
+    ------
+    ValueError
+        If the subject is absent from the BBT or the target column is missing.
+    AssertionError
+        If the reconstructed ``first_stim_name`` sequence does not match
+        ``trial_info['stim_name']`` (guards against silent beta/target misalignment).
+    """
+    sub_id = str(subject) if str(subject).startswith('sub-') else f'sub-{subject}'
+
+    bbt = pd.read_csv(bbt_path)
+    if target_col not in bbt.columns:
+        raise ValueError(f"Column '{target_col}' not found in BBT {bbt_path}")
+    sub_bbt = bbt[bbt['sub_id'] == sub_id]
+    if sub_bbt.empty:
+        raise ValueError(f"No rows for '{sub_id}' in BBT {bbt_path}")
+
+    vals, names = [], []
+    for run in ['learning1', 'learning2', 'test']:          # info-CSV / beta run order
+        block = sub_bbt[sub_bbt['block'] == run].sort_values('t_first_stim')
+        vals += block[target_col].tolist()
+        names += block['first_stim_name'].tolist()
+
+    # Alignment guard: BBT identity sequence must equal the betas' info-CSV sequence.
+    assert list(trial_info['stim_name']) == names, (
+        f"{sub_id}: BBT/info misaligned "
+        f"({len(names)} BBT rows vs {len(trial_info)} betas)"
+    )
+    return np.asarray(vals, dtype=float)
+
 class StimuliInfo:
     def __init__(self, assignment, values, frequencies, names):
         self.assignment = assignment
@@ -978,7 +1038,7 @@ class Subject:
             std_dvars_threshold=std_dvars_thresh
         )
 
-        # if mask is None, all frames should be included
+        #ï¿½if mask is None, all frames should be included
         if sample_mask is None:
             sample_mask = np.arange(confounds.shape[0])
 
@@ -1151,7 +1211,7 @@ def collapse_events(df):
         # 1) Combine first and second stim
         first_stim  = grp.query("trial_type.str.startswith('first_stim_presentation')").iloc[0]
         second_stim = grp.query("trial_type == 'second_stim_presentation'").iloc[0]
-        # get the suffix of the first_stim_presentation
+        #ï¿½get the suffix of the first_stim_presentation
         if first_stim['trial_type'] == 'first_stim_presentation':
             stim_suffix = False
         else:
