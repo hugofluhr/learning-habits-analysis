@@ -8,6 +8,10 @@ version, so you can see whether the successive denoising/ridge steps actually
 improve decodability on *this* dataset (the validation GLMsingle's paper runs on
 its benchmark data — Prince et al. 2022).
 
+Type A (ONOFF) is written but *skipped* in the comparison: it pools every event
+into a single on/off beta per voxel (no per-trial dimension), so there is nothing
+to decode. The real comparison is B -> C -> D.
+
 Target = stimulus category (LinearSVC, accuracy, chance 0.25). Category decoding is
 purely a pipeline-validation probe — a high-SNR signal that is sensitive enough to
 rank the beta versions. It is NOT a result of interest; the analyses of interest
@@ -68,11 +72,20 @@ N_CUE_CONDITIONS = 8  # len(run_glmsingle.STIM_NAMES)
 
 def _load_cue_betas(subject_dir, beta_type, cue_mask, ref_img):
     """Load one model type's betas, keep the cue volumes, wrap as a NIfTI image
-    on the reference grid. Returns None if that type wasn't written."""
+    on the reference grid. Returns None if that type wasn't written, or if it
+    isn't single-trial output (type A/ONOFF collapses every event into one
+    pooled on-off beta per voxel — there's no per-trial signal to decode)."""
     npy = subject_dir / BETA_FILES[beta_type]
     if not npy.exists():
         return None
     betasmd = np.load(npy, allow_pickle=True).item()['betasmd']
+    if betasmd.shape[-1] != cue_mask.shape[0]:
+        logging.warning(
+            f"type-{beta_type}: betasmd has {betasmd.shape[-1]} volume(s), expected "
+            f"{cue_mask.shape[0]} (one per trial) — not single-trial output, skipping "
+            "from decoding (ONOFF pools all trials into one beta by design)"
+        )
+        return None
     return new_img_like(ref_img, betasmd[..., cue_mask])
 
 

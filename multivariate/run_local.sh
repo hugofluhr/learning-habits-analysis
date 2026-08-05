@@ -9,8 +9,8 @@
 #   NPROC=8 THREADS=3 bash multivariate/run_local.sh glmsingle   # override defaults
 #
 # Pipelines:  glmsingle | searchlight | decoding | frem
-#             | beta_qc   (compare GLMsingle model types A/B/C/D by category
-#               decoding; memory-bound — loads each full-brain betas array)
+#             | beta_qc   (compare GLMsingle model types B/C/D by category
+#               decoding; A is skipped — see run_beta_qc_decoding.py)
 #
 # Why the per-pipeline defaults differ (this is the whole point of the file):
 #   glmsingle    -> MEMORY-bound. Loads 3 BOLD runs as float32 + GLMdenoise/ridge
@@ -19,6 +19,9 @@
 #   searchlight  -> CPU-bound, light RAM (~2 GB). Whole-brain SVC x5 fits.
 #                   -> many subjects at once, single-threaded (--n-jobs 1).
 #   decoding     -> light + fast. -> many subjects at once, single-threaded.
+#   beta_qc      -> light + fast (measured: 35s wall, 866 MB peak RSS for
+#                   B+C+D, ~1 CPU core — LinearSVC/liblinear doesn't thread).
+#                   -> many subjects at once, single-threaded.
 #
 # The Python runners (run_*.py) are single-subject and skip work that's already
 # done, so this driver is safe to re-run / resume after an interruption.
@@ -76,7 +79,7 @@ case "$PIPELINE" in
         ;;
     beta_qc)
         OUTPUT_DIR="$GLMSINGLE_QC_DIR"
-        DEF_NPROC=8 ; DEF_THREADS=2     # MEMORY-bound: loads each full-brain betas array
+        DEF_NPROC=28 ; DEF_THREADS=1     # light + fast, ~900 MB/subject (measured)
         ;;
     *)
         echo "ERROR: unknown pipeline '$PIPELINE' (expected glmsingle|searchlight|decoding|frem|beta_qc)" >&2

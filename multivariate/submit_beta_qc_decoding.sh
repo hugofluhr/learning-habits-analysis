@@ -1,16 +1,26 @@
 #!/bin/bash
-# Submit GLMsingle beta-version QC decoding as a SLURM array job — one job per
-# subject. Runs the same standardized whole-brain category decoder on each
-# GLMsingle model type (A/B/C/D), writing one tidy CSV per subject. Category
-# decoding is a pipeline-validation probe; use it to check whether the
-# denoising/ridge steps improve decodability on this dataset.
+# Submit GLMsingle beta-version QC decoding as a SINGLE SLURM job that runs
+# all subjects internally via `xargs -P` (not a 59-way array job — see below).
+# Runs the same standardized whole-brain category decoder on each GLMsingle
+# model type (B/C/D; A is skipped, see run_beta_qc_decoding.py), writing one
+# tidy CSV per subject. Category decoding is a pipeline-validation probe; use
+# it to check whether the denoising/ridge steps improve decodability here.
 #
 # Usage (from repo root):
 #   bash multivariate/submit_beta_qc_decoding.sh            # all subjects in PARTICIPANTS_TSV
 #   bash multivariate/submit_beta_qc_decoding.sh 01 05 12   # specific subjects
+#   NPROC=4 bash multivariate/submit_beta_qc_decoding.sh    # override concurrency
 #
-# Higher --mem than the other decoders: each of TYPE{A,B,C,D}.npy is a full-brain
-# betas array loaded one at a time.
+# Why one job instead of an array: measured on a compute node via `srun` +
+# /usr/bin/time -v (one subject, B+C+D) — 35s wall time, 866 MB peak RSS,
+# ~1 CPU core (LinearSVC/liblinear doesn't thread). This is not memory-bound
+# (unlike GLMsingle itself) and far too short-lived to be worth a separate
+# array-task scheduling/queueing overhead per subject. A single job with
+# NPROC-way internal parallelism (same pattern as run_local.sh's beta_qc
+# pipeline, just dispatched through Slurm instead of over SSH) finishes all
+# subjects in a few minutes instead of 59 separate job slots.
+# run_beta_qc_decoding.py skips subjects already done, so this is resumable
+# if the job is killed partway through.
 
 set -euo pipefail
 
@@ -24,6 +34,11 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 LOG_DIR="${OUTPUT_DIR}/logs"
 
 PARTICIPANTS_TSV="/home/hfluhr/data/learninghabits/participants_mvpa.tsv"
+
+# Concurrent subjects within the single job allocation. Cluster's `standard`
+# partition nodes have >=8 cores; 8 is a safe default that schedules easily
+# and keeps every worker single-threaded (no BLAS thread contention).
+NPROC="${NPROC:-8}"
 
 # ---------------------------------------------------------------------------
 # Build subject list
@@ -47,39 +62,45 @@ if [ "$N" -eq 0 ]; then
     exit 1
 fi
 
-echo "Submitting ${N} subjects (array 1-${N}):"
+echo "Submitting 1 job for ${N} subjects (NPROC=${NPROC} concurrent):"
 cat "$SUBJECTS_FILE"
 echo
 
 # ---------------------------------------------------------------------------
-# SLURM submission
+# SLURM submission — one job, NPROC-way internal parallelism via xargs
 # ---------------------------------------------------------------------------
 sbatch <<EOF
 #!/bin/bash -l
 #SBATCH --job-name=beta_qc
-#SBATCH --output=${LOG_DIR}/beta_qc_%A_%a.out
-#SBATCH --error=${LOG_DIR}/beta_qc_%A_%a.err
+#SBATCH --output=${LOG_DIR}/beta_qc_%j.out
+#SBATCH --error=${LOG_DIR}/beta_qc_%j.err
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=32G
-#SBATCH --time=1:00:00
+#SBATCH --cpus-per-task=${NPROC}
+#SBATCH --mem=16G
+#SBATCH --time=30:00
 #SBATCH --partition=standard
-#SBATCH --array=1-${N}
 
 set -eo pipefail
 
-export OMP_NUM_THREADS=\$SLURM_CPUS_PER_TASK
-export MKL_NUM_THREADS=\$SLURM_CPUS_PER_TASK
-export OPENBLAS_NUM_THREADS=\$SLURM_CPUS_PER_TASK
-export NUMEXPR_NUM_THREADS=\$SLURM_CPUS_PER_TASK
+# Pin every worker to 1 thread — with NPROC subjects running concurrently,
+# letting each spawn its own BLAS threads would oversubscribe the cpus.
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1
 export PYTHONUNBUFFERED=1
 
-SUBJECT=\$(sed -n "\${SLURM_ARRAY_TASK_ID}p" "${SUBJECTS_FILE}")
-echo "=== sub-\${SUBJECT}  (task \${SLURM_ARRAY_TASK_ID}/\${SLURM_ARRAY_TASK_COUNT}) ==="
+run_one() {
+    local s="\$1"
+    /home/hfluhr/data/conda/envs/learning-habits/bin/python -u "${REPO}/multivariate/run_beta_qc_decoding.py" \\
+        --subject "\$s" \\
+        --bids-dir "${BIDS_DIR}" \\
+        --glmsingle-dir "${GLMSINGLE_DIR}" \\
+        --output-dir "${OUTPUT_DIR}"
+}
+export -f run_one
 
-/home/hfluhr/data/conda/envs/learning-habits/bin/python -u "${REPO}/multivariate/run_beta_qc_decoding.py" \\
-    --subject "\$SUBJECT" \\
-    --bids-dir "${BIDS_DIR}" \\
-    --glmsingle-dir "${GLMSINGLE_DIR}" \\
-    --output-dir "${OUTPUT_DIR}"
+xargs -a "${SUBJECTS_FILE}" -P ${NPROC} -I{} bash -c 'run_one "\$@"' _ {}
+
+echo "All beta_qc subjects finished. Per-subject logs under: ${OUTPUT_DIR}/sub-*/"
 EOF
