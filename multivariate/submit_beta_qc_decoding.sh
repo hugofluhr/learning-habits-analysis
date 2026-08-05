@@ -1,15 +1,20 @@
 #!/bin/bash
 # Submit GLMsingle beta-version QC decoding as a SINGLE SLURM job that runs
 # all subjects internally via `xargs -P` (not a 59-way array job — see below).
-# Runs the same standardized whole-brain category decoder on each GLMsingle
-# model type (B/C/D; A is skipped, see run_beta_qc_decoding.py), writing one
-# tidy CSV per subject. Category decoding is a pipeline-validation probe; use
-# it to check whether the denoising/ridge steps improve decodability here.
+# Runs the same standardized category decoder — whole-brain AND visual-cortex
+# ROI, same pattern as submit_decoding.sh — on each GLMsingle model type (B/C/D;
+# A is skipped, see run_beta_qc_decoding.py), writing one tidy CSV per subject.
+# Category decoding is a pipeline-validation probe; use it to check whether the
+# denoising/ridge steps improve decodability here. The visual-cortex ROI is the
+# more diagnostic of the two: whole-brain dilutes the category signal with tens
+# of thousands of non-visual voxels, which can swamp subtler beta-version
+# differences given only 328 trials.
 #
 # Usage (from repo root):
 #   bash multivariate/submit_beta_qc_decoding.sh            # all subjects in PARTICIPANTS_TSV
 #   bash multivariate/submit_beta_qc_decoding.sh 01 05 12   # specific subjects
 #   NPROC=4 bash multivariate/submit_beta_qc_decoding.sh    # override concurrency
+#   OVERWRITE=1 bash multivariate/submit_beta_qc_decoding.sh # force rerun of existing subjects
 #
 # Why one job instead of an array: measured on a compute node via `srun` +
 # /usr/bin/time -v (one subject, B+C+D) — 35s wall time, 866 MB peak RSS,
@@ -30,6 +35,7 @@ set -euo pipefail
 BIDS_DIR="/home/hfluhr/shares-hare/ds-learning-habits/derivatives/fmriprep-24.0.1-noSDC"
 GLMSINGLE_DIR="/home/hfluhr/shares-hare/ds-learning-habits/derivatives/glmsingle"
 OUTPUT_DIR="/home/hfluhr/shares-hare/ds-learning-habits/derivatives/glmsingle_qc"
+VIS_MASK="/home/hfluhr/shares-hare/ds-learning-habits/derivatives/decoding/visual_cortex_mask.nii.gz"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 LOG_DIR="${OUTPUT_DIR}/logs"
 
@@ -39,6 +45,12 @@ PARTICIPANTS_TSV="/home/hfluhr/data/learninghabits/participants_mvpa.tsv"
 # partition nodes have >=8 cores; 8 is a safe default that schedules easily
 # and keeps every worker single-threaded (no BLAS thread contention).
 NPROC="${NPROC:-8}"
+
+# Set OVERWRITE=1 to force a rerun of subjects that already have a QC CSV
+# (e.g. after a change to run_beta_qc_decoding.py's output schema).
+OVERWRITE="${OVERWRITE:-0}"
+OVERWRITE_FLAG=""
+[ "$OVERWRITE" = "1" ] && OVERWRITE_FLAG="--overwrite"
 
 # ---------------------------------------------------------------------------
 # Build subject list
@@ -59,6 +71,12 @@ fi
 N=$(wc -l < "$SUBJECTS_FILE")
 if [ "$N" -eq 0 ]; then
     echo "ERROR: subject list is empty" >&2
+    exit 1
+fi
+
+if [ ! -f "$VIS_MASK" ]; then
+    echo "ERROR: visual cortex mask not found: $VIS_MASK" >&2
+    echo "       Build it: python multivariate/build_visual_cortex_mask.py --output-dir <decoding-dir>" >&2
     exit 1
 fi
 
@@ -96,7 +114,9 @@ run_one() {
         --subject "\$s" \\
         --bids-dir "${BIDS_DIR}" \\
         --glmsingle-dir "${GLMSINGLE_DIR}" \\
-        --output-dir "${OUTPUT_DIR}"
+        --output-dir "${OUTPUT_DIR}" \\
+        --visual-cortex-mask "${VIS_MASK}" \\
+        ${OVERWRITE_FLAG}
 }
 export -f run_one
 

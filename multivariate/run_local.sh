@@ -10,7 +10,8 @@
 #
 # Pipelines:  glmsingle | searchlight | decoding | frem
 #             | beta_qc   (compare GLMsingle model types B/C/D by category
-#               decoding; A is skipped — see run_beta_qc_decoding.py)
+#               decoding, whole-brain AND visual-cortex ROI; A is skipped —
+#               see run_beta_qc_decoding.py)
 #
 # Why the per-pipeline defaults differ (this is the whole point of the file):
 #   glmsingle    -> MEMORY-bound. Loads 3 BOLD runs as float32 + GLMdenoise/ridge
@@ -117,7 +118,7 @@ case "$PIPELINE" in
     searchlight|decoding|frem|beta_qc)
         [ -d "$GLMSINGLE_DIR" ] || { echo "ERROR: GLMsingle betas dir not found: $GLMSINGLE_DIR (run 'glmsingle' first)" >&2; exit 1; } ;;
 esac
-if [ "$PIPELINE" = "decoding" ] && [ ! -f "$VIS_MASK" ]; then
+if { [ "$PIPELINE" = "decoding" ] || [ "$PIPELINE" = "beta_qc" ]; } && [ ! -f "$VIS_MASK" ]; then
     echo "ERROR: visual cortex mask not found: $VIS_MASK" >&2
     echo "       Build it: $PY multivariate/build_visual_cortex_mask.py --output-dir $DECODING_DIR" >&2
     exit 1
@@ -174,7 +175,8 @@ run_one() {
         beta_qc)
             "$PY" -u "${REPO}/multivariate/run_beta_qc_decoding.py" \
                 --subject "$s" --bids-dir "$BIDS_DIR" \
-                --glmsingle-dir "$GLMSINGLE_DIR" --output-dir "$GLMSINGLE_QC_DIR" ;;
+                --glmsingle-dir "$GLMSINGLE_DIR" --output-dir "$GLMSINGLE_QC_DIR" \
+                --visual-cortex-mask "$VIS_MASK" ;;
     esac
 }
 export -f run_one

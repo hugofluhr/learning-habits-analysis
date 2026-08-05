@@ -2,15 +2,22 @@
 """
 GLMsingle beta-version QC via decoding — one subject.
 
-Runs the *same* standardized whole-brain decoder on each GLMsingle model type
-(A: ONOFF, B: FITHRF, C: +GLMDENOISE, D: +ridge) and reports one scalar per
-version, so you can see whether the successive denoising/ridge steps actually
-improve decodability on *this* dataset (the validation GLMsingle's paper runs on
-its benchmark data — Prince et al. 2022).
+Runs the *same* standardized decoder — on both a whole-brain mask and a
+visual-cortex ROI, same pattern as run_decoding.py — on each GLMsingle model
+type (A: ONOFF, B: FITHRF, C: +GLMDENOISE, D: +ridge) and reports one scalar
+per version x mask, so you can see whether the successive denoising/ridge
+steps actually improve decodability on *this* dataset (the validation
+GLMsingle's paper runs on its benchmark data — Prince et al. 2022).
 
 Type A (ONOFF) is written but *skipped* in the comparison: it pools every event
 into a single on/off beta per voxel (no per-trial dimension), so there is nothing
 to decode. The real comparison is B -> C -> D.
+
+The visual-cortex ROI restricts the ~65k-voxel whole-brain feature set down to
+the region where the category signal actually lives — with only 328 trials,
+whole-brain noise voxels can dilute a decoder's sensitivity to the (usually
+subtler) differences between beta versions, so the ROI run is the more
+diagnostic of the two.
 
 Target = stimulus category (LinearSVC, accuracy, chance 0.25). Category decoding is
 purely a pipeline-validation probe — a high-SNR signal that is sensitive enough to
@@ -36,12 +43,13 @@ Usage
 python multivariate/run_beta_qc_decoding.py --subject 01 \\
     --bids-dir .../derivatives/fmriprep-24.0.1-noSDC \\
     --glmsingle-dir .../derivatives/glmsingle \\
-    --output-dir .../derivatives/glmsingle_qc
+    --output-dir .../derivatives/glmsingle_qc \\
+    --visual-cortex-mask .../derivatives/decoding/visual_cortex_mask.nii.gz
 
 Outputs (per subject)
 ---------------------
 <output-dir>/sub-<id>/
-    sub-<id>_beta_qc_decoding.csv   — tidy: subject, beta_type, target, metric, value, baseline
+    sub-<id>_beta_qc_decoding.csv   — tidy: subject, beta_type, mask, target, metric, value, baseline
     beta_qc_sub-<id>.log
 """
 
@@ -53,7 +61,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import nibabel as nib
-from nilearn.image import new_img_like
+from nilearn.image import new_img_like, math_img, resample_to_img
 from nilearn.maskers import NiftiMasker
 from sklearn.model_selection import LeaveOneGroupOut, cross_val_predict
 from sklearn.svm import LinearSVC
@@ -89,7 +97,8 @@ def _load_cue_betas(subject_dir, beta_type, cue_mask, ref_img):
     return new_img_like(ref_img, betasmd[..., cue_mask])
 
 
-def run_subject(subject, bids_dir, glmsingle_dir, output_dir, overwrite=False):
+def run_subject(subject, bids_dir, glmsingle_dir, output_dir, visual_cortex_mask_path,
+                 overwrite=False):
 
     subject_output = output_dir / f"sub-{subject}"
     out_csv = subject_output / f"sub-{subject}_beta_qc_decoding.csv"
@@ -129,9 +138,18 @@ def run_subject(subject, bids_dir, glmsingle_dir, output_dir, overwrite=False):
     brain_mask_img = nib.load(mask_candidates[0])
     logging.info(f"sub-{subject}: brain mask {mask_candidates[0].name}")
 
-    logo   = LeaveOneGroupOut()
-    masker = NiftiMasker(mask_img=brain_mask_img, standardize=True)  # neutralize ridge scaling
-    masker.fit()
+    # --- Visual cortex mask: resample atlas mask to subject functional space,
+    # same construction as run_decoding.py ---
+    vis_mask_mni  = nib.load(str(visual_cortex_mask_path))
+    vis_mask_func = resample_to_img(vis_mask_mni, brain_mask_img, interpolation='nearest')
+    vis_mask_img  = math_img('(v > 0) & (b > 0)', v=vis_mask_func, b=brain_mask_img)
+
+    logo = LeaveOneGroupOut()
+    maskers = {}
+    for mask_name, mask_img in [('wholebrain', brain_mask_img), ('visualcortex', vis_mask_img)]:
+        m = NiftiMasker(mask_img=mask_img, standardize=True)  # neutralize ridge scaling
+        m.fit()
+        maskers[mask_name] = m
 
     rows = []
     for btype in BETA_FILES:
@@ -139,23 +157,25 @@ def run_subject(subject, bids_dir, glmsingle_dir, output_dir, overwrite=False):
         if betas_img is None:
             logging.warning(f"sub-{subject}: type-{btype} betas missing, skipping")
             continue
-        X = masker.transform(betas_img)
-        logging.info(f"sub-{subject}: type-{btype} -> X {X.shape}")
 
-        pred = cross_val_predict(LinearSVC(max_iter=10000, dual='auto'),
-                                 X, y, cv=logo, groups=groups)
-        acc = float((pred == y).mean())
-        rows.append({'subject': f'sub-{subject}', 'beta_type': btype,
-                     'target': 'category', 'metric': 'accuracy',
-                     'value': acc, 'baseline': 0.25})
-        logging.info(f"sub-{subject}: type-{btype} category accuracy = {acc:.3f}")
+        for mask_name, masker in maskers.items():
+            X = masker.transform(betas_img)
+            logging.info(f"sub-{subject}: type-{btype} {mask_name} -> X {X.shape}")
+
+            pred = cross_val_predict(LinearSVC(max_iter=10000, dual='auto'),
+                                     X, y, cv=logo, groups=groups)
+            acc = float((pred == y).mean())
+            rows.append({'subject': f'sub-{subject}', 'beta_type': btype, 'mask': mask_name,
+                         'target': 'category', 'metric': 'accuracy',
+                         'value': acc, 'baseline': 0.25})
+            logging.info(f"sub-{subject}: type-{btype} {mask_name} category accuracy = {acc:.3f}")
 
     pd.DataFrame(rows).to_csv(out_csv, index=False)
     logging.info(f"sub-{subject}: saved {out_csv.name}")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="GLMsingle beta-version QC via whole-brain category decoding, one subject.")
+    parser = argparse.ArgumentParser(description="GLMsingle beta-version QC via whole-brain + visual-cortex category decoding, one subject.")
     parser.add_argument("--subject", required=True, help="Subject ID without 'sub-' prefix, e.g. 01")
     parser.add_argument("--bids-dir",      default="/home/ubuntu/data/learning-habits/bids_dataset"
                                                     "/derivatives/fmriprep-24.0.1-noSDC")
@@ -163,6 +183,9 @@ def main():
                                                     "/derivatives/glmsingle")
     parser.add_argument("--output-dir",    default="/home/ubuntu/data/learning-habits/bids_dataset"
                                                     "/derivatives/glmsingle_qc")
+    parser.add_argument("--visual-cortex-mask", required=True,
+                        help="Path to pre-built visual cortex mask NIfTI "
+                             "(from build_visual_cortex_mask.py)")
     parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args()
 
@@ -180,11 +203,12 @@ def main():
     )
 
     run_subject(
-        subject       = args.subject,
-        bids_dir      = Path(args.bids_dir),
-        glmsingle_dir = Path(args.glmsingle_dir),
-        output_dir    = output_dir,
-        overwrite     = args.overwrite,
+        subject                 = args.subject,
+        bids_dir                = Path(args.bids_dir),
+        glmsingle_dir           = Path(args.glmsingle_dir),
+        output_dir              = output_dir,
+        visual_cortex_mask_path = Path(args.visual_cortex_mask),
+        overwrite               = args.overwrite,
     )
 
 
