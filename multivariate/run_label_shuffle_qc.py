@@ -21,6 +21,14 @@ This does not modify or re-run GLMsingle or run_decoding.py; it reads the
 same type-D betas + info CSV and reconstructs the same masks (brain mask
 glob + visual-cortex ROI resample), same pattern as run_beta_qc_decoding.py.
 
+One deliberate deviation from run_decoding.py: standardize=True (not False).
+Unstandardized whole-brain betas (~65k voxels) make LinearSVC/liblinear
+converge very slowly -- a one-off cost run_decoding.py absorbs for its single
+fit, but fatal here where each mask needs `n_permutations + 1` refits on the
+same X. True and shuffled permutations share the identical standardized X, so
+the true-vs-null comparison stays apples-to-apples; only the raw true-accuracy
+value may differ slightly from run_decoding.py's unstandardized number.
+
 Usage
 -----
 python multivariate/run_label_shuffle_qc.py --subject 01 \\
@@ -98,9 +106,16 @@ def run_subject(subject, bids_dir, glmsingle_dir, output_dir, visual_cortex_mask
     for mask_idx, (mask_name, mask_img) in enumerate(
         [('wholebrain', brain_mask_img), ('visualcortex', vis_mask_img)]
     ):
-        # Match run_decoding.py exactly: standardize=False (type-D betas only,
-        # no cross-version ridge-scaling comparison here).
-        masker = NiftiMasker(mask_img=mask_img, standardize=False).fit()
+        # standardize=True (unlike run_decoding.py's standardize=False): with
+        # unstandardized whole-brain betas (65k+ voxels), LinearSVC/liblinear
+        # converges very slowly (empirically: still not converged after 20+ min
+        # on a single fit, see git history for the smoke-test finding) -- fine
+        # for run_decoding.py's one-off fit, not for the 101 refits/mask this
+        # script needs. Both true and shuffled permutations use the identical
+        # standardized X, so the true-vs-null comparison stays apples-to-apples;
+        # only the raw true-accuracy value may differ slightly from
+        # run_decoding.py's unstandardized number.
+        masker = NiftiMasker(mask_img=mask_img, standardize=True).fit()
         X = masker.transform(betas_img)  # transform once, reused across all permutations
         logging.info(f"sub-{subject}: {mask_name} -> X {X.shape}")
 

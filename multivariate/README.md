@@ -110,8 +110,12 @@ the top to match the host.
   all trials before the same `LeaveOneGroupOut` CV. If real accuracy sits outside the
   shuffled-accuracy null distribution, that supports the category signal being genuine; if
   shuffled accuracy doesn't collapse to chance, that's a leakage red flag (e.g.
-  standardization fit before the CV split, autocorrelation between adjacent trials). Also
-  needs `--visual-cortex-mask`.
+  standardization fit before the CV split, autocorrelation between adjacent trials). Unlike
+  `run_decoding.py`, uses `standardize=True` on both masks — unstandardized whole-brain betas
+  make LinearSVC converge too slowly to refit `n_permutations + 1` times per mask (a one-off
+  fit in `run_decoding.py` is fine; 101 refits on the same features is not), so the raw true
+  accuracy may differ slightly from `run_decoding.py`'s number, though the true-vs-null
+  comparison itself stays apples-to-apples. Also needs `--visual-cortex-mask`.
 
 All decoders use `LeaveOneGroupOut` over the three runs (no temporal leakage).
 
