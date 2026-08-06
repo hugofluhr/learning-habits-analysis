@@ -30,20 +30,28 @@ Outputs (per subject)
     TYPEA_ONOFF.npy
     TYPEB_FITHRF.npy
     TYPEC_FITHRF_GLMDENOISE.npy
-    TYPED_FITHRF_GLMDENOISE_RR.npy      <- type-D: best model (HRF + denoise + ridge)
+    TYPED_FITHRF_GLMDENOISE_RR.npy         <- type-D: best model (HRF + denoise + ridge)
     DESIGNINFO.npy
     RUNWISEFIR.npy
     figures/
-    sub-<id>_glmSingle_betas_CUES.nii.gz   <- (x,y,z, n_trials) type-D betas
-    sub-<id>_glmSingle_betas_CUES_info.csv  <- trial→condition/run mapping
+    sub-<id>_glmSingle_betas_CUES.nii.gz       <- (x,y,z, n_trials) type-D betas
+    sub-<id>_glmSingle_betas_CUES_info.csv     <- trial→condition/run mapping
+    sub-<id>_glmSingle_betas_CUES_mean.nii.gz  <- per-voxel mean |beta| across trials
+    sub-<id>_glmSingle_betas_CUES_std.nii.gz   <- per-voxel STD across trials
+    sub-<id>_glmSingle_betas_CUES_snr.nii.gz   <- per-voxel mean/STD ("SNR")
+    sub-<id>_glmSingle_qc_R2.nii.gz            <- type-D R² (3D)
+    sub-<id>_glmSingle_qc_R2run.nii.gz         <- type-D per-run R² (4D, 3 vols: learning1/learning2/test)
+    sub-<id>_glmSingle_qc_HRFindex.nii.gz      <- chosen HRF library index (3D)
+    sub-<id>_glmSingle_qc_FRACvalue.nii.gz     <- ridge regularization fraction (3D)
+    sub-<id>_glmSingle_qc_noisepool.nii.gz     <- GLMdenoise noise-pool mask, int8 (3D)
+    sub-<id>_glmSingle_qc_R2_bytype.nii.gz     <- R² for types A,B,C,D stacked (4D, 4 vols)
     glmsingle_sub-<id>.log
 
 Design choices
 --------------
 - 8 first-stimulus identity conditions; within-trial events excluded (TR-collision
   at TR=2.33 s — see dev notebook Step 4).
-- extra_regressors not used: GLMsingle has a bug when runs have unequal volumes
-  (FIR diagnostic always picks run-0 regressors). GLMdenoise handles noise.
+- extra_regressors not used: GLMdenoise handles noise, including explicit confounds would prevent it from learning the noise pool. This argument would be used to model other task events to prevent them from contaminating the estimates.
 - sessionindicator = [1,1,1]: all runs pooled for GLMdenoise noise estimation.
 - stimdur: mean(t_action - t_first_stim) over response-only trials.
 """
@@ -100,10 +108,13 @@ def build_design_matrix(trials, n_volumes, run_name):
     return dm
 
 
-def extract_betas(subject_output, run_trials):
-    """Load type-D betas, build trial-info DataFrame."""
-    typed      = np.load(subject_output / "TYPED_FITHRF_GLMDENOISE_RR.npy",
-                         allow_pickle=True).item()
+def extract_betas(typed, subject_output, run_trials):
+    """Build trial-info DataFrame and select type-D cue betas.
+
+    `typed` is the already-loaded TYPED_FITHRF_GLMDENOISE_RR.npy dict —
+    loaded once by run_subject() and reused here and in save_qc_maps() to
+    avoid a second multi-hundred-MB unpickle.
+    """
     designinfo = np.load(subject_output / "DESIGNINFO.npy",
                          allow_pickle=True).item()
 
@@ -137,6 +148,54 @@ def extract_betas(subject_output, run_trials):
     trial_info = pd.DataFrame(rows)
     trial_info.index.name = 'trial_id'
     return betas_cues, trial_info
+
+
+# TYPEA/B/C source files + their R²-equivalent key, for the bonus by-type
+# R² export. TYPED is excluded — its R2 is already in `typed` (passed in
+# from run_subject()). Type A's key differs (`onoffR2`) because it's a
+# single pooled on/off regressor, not a per-trial model.
+BYTYPE_R2_SOURCES = [
+    ('TYPEA_ONOFF.npy',             'onoffR2'),
+    ('TYPEB_FITHRF.npy',            'R2'),
+    ('TYPEC_FITHRF_GLMDENOISE.npy', 'R2'),
+]
+
+
+def save_qc_maps(typed, subject_output, subject, ref_img, betas_cues):
+    """Persist QC-diagnostic NIfTI volumes alongside the type-D betas.
+
+    All maps are unmasked, full-FOV — same convention as betas_CUES.nii.gz.
+    Reuses `typed` (no TYPED reload); TYPEA/B/C are each read once, only
+    for the bonus by-type R² export.
+    """
+    def _save(arr, suffix, dtype=np.float32):
+        image.new_img_like(ref_img, np.asarray(arr).astype(dtype)).to_filename(
+            str(subject_output / f"sub-{subject}_glmSingle_qc_{suffix}.nii.gz")
+        )
+
+    _save(typed['R2'],        'R2')
+    _save(typed['R2run'],     'R2run')          # (x,y,z,3): learning1,learning2,test
+    _save(typed['HRFindex'],  'HRFindex')
+    _save(typed['FRACvalue'], 'FRACvalue')
+    _save(typed['noisepool'], 'noisepool', dtype=np.int8)
+
+    # Per-voxel beta summary stats across trials (matches QC notebook Sec. 6)
+    beta_mean = np.abs(betas_cues).mean(axis=-1)
+    beta_std  = betas_cues.std(axis=-1)
+    with np.errstate(invalid='ignore', divide='ignore'):
+        beta_snr = np.where(beta_std > 0, beta_mean / beta_std, 0.0).astype(np.float32)
+    for arr, name in [(beta_mean, 'mean'), (beta_std, 'std'), (beta_snr, 'snr')]:
+        image.new_img_like(ref_img, arr.astype(np.float32)).to_filename(
+            str(subject_output / f"sub-{subject}_glmSingle_betas_CUES_{name}.nii.gz")
+        )
+
+    # Bonus: R² by model type (A, B, C, D order), 4D volume.
+    r2_by_type = [None, None, None, typed['R2']]
+    for i, (fname, key) in enumerate(BYTYPE_R2_SOURCES):
+        d = np.load(subject_output / fname, allow_pickle=True).item()
+        r2_by_type[i] = d[key]
+        del d
+    _save(np.stack(r2_by_type, axis=-1), 'R2_bytype')
 
 
 # ---------------------------------------------------------------------------
@@ -182,6 +241,12 @@ def run_subject(subject, base_dir, bids_dir, output_dir, overwrite=False):
     for run in RUNS:
         img = nib.load(sub.get_img_path(run))
         logging.info(f"  {run}: {img.shape}")
+        img_tr = img.header.get_zooms()[-1]
+        assert abs(img_tr - TR) < 1e-3, (
+            f"sub-{subject} {run}: NIfTI header TR ({img_tr}) does not match "
+            f"hardcoded TR ({TR}) — data may use a different acquisition "
+            f"protocol than assumed."
+        )
         fmri_data.append(img.get_fdata(dtype=np.float32))
         design_matrices.append(
             build_design_matrix(run_trials[run], img.shape[-1], run)
@@ -203,8 +268,10 @@ def run_subject(subject, base_dir, bids_dir, output_dir, overwrite=False):
     )
     logging.info("Fitting complete.")
 
-    # --- Extract and save type-D betas ---
-    betas_cues, trial_info = extract_betas(subject_output, run_trials)
+    # --- Extract and save type-D betas + QC diagnostic maps ---
+    typed = np.load(subject_output / "TYPED_FITHRF_GLMDENOISE_RR.npy",
+                     allow_pickle=True).item()
+    betas_cues, trial_info = extract_betas(typed, subject_output, run_trials)
 
     ref_img = nib.load(sub.get_img_path('learning1'))
     image.new_img_like(ref_img, betas_cues).to_filename(
@@ -213,6 +280,9 @@ def run_subject(subject, base_dir, bids_dir, output_dir, overwrite=False):
     trial_info.to_csv(
         str(subject_output / f"sub-{subject}_glmSingle_betas_CUES_info.csv")
     )
+
+    save_qc_maps(typed, subject_output, subject, ref_img, betas_cues)
+    del typed  # release before looping to the next subject in batch mode
 
     logging.info(f"sub-{subject}: done — betas shape {betas_cues.shape}, "
                  f"{len(trial_info)} trials")

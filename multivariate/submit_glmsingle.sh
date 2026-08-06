@@ -16,7 +16,7 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 BASE_DIR="/home/hfluhr/data/learninghabits"
 BIDS_DIR="/home/hfluhr/shares-hare/ds-learning-habits/derivatives/fmriprep-24.0.1-noSDC"
-OUTPUT_DIR="/home/hfluhr/shares-hare/ds-learning-habits/derivatives/glmsingle"
+OUTPUT_DIR="${OUTPUT_DIR:-/home/hfluhr/shares-hare/ds-learning-habits/derivatives/glmsingle}"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 LOG_DIR="${OUTPUT_DIR}/logs"
 
@@ -62,7 +62,7 @@ sbatch <<EOF
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
-#SBATCH --time=0:45:00
+#SBATCH --time=1:00:00
 #SBATCH --array=1-${N}
 
 set -eo pipefail
