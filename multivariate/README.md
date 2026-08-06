@@ -49,16 +49,18 @@ bash multivariate/submit_glmsingle.sh                 # 1. estimate betas (run f
 bash multivariate/submit_searchlight.sh               # 2. category searchlight
 bash multivariate/submit_decoding.sh                  #    category WB + visual-ROI decoding
 bash multivariate/submit_beta_qc_decoding.sh          # 3. beta-version QC (category probe)
+bash multivariate/submit_label_shuffle_qc.sh          # 4. label-shuffle robustness check
 
 bash multivariate/submit_searchlight.sh 01 05 12      # specific subjects
 ```
 
 `submit_glmsingle.sh`/`submit_searchlight.sh`/`submit_decoding.sh` are SLURM **array** jobs
-(one task per subject). `submit_beta_qc_decoding.sh` is a **single** job that loops all
-subjects internally via `xargs -P` — measured per-subject cost is light (~35–45s, <1GB), so
-an array job's per-task scheduling overhead isn't worth it; see the script's header comment
-for the measurement. `OVERWRITE=1 bash multivariate/submit_beta_qc_decoding.sh` forces a
-rerun of subjects that already have output (e.g. after a script/schema change).
+(one task per subject). `submit_beta_qc_decoding.sh` and `submit_label_shuffle_qc.sh` are
+**single** jobs that loop all subjects internally via `xargs -P` — measured per-subject cost
+is light, so an array job's per-task scheduling overhead isn't worth it; see each script's
+header comment for the measurement. `OVERWRITE=1 bash multivariate/submit_beta_qc_decoding.sh`
+forces a rerun of subjects that already have output (e.g. after a script/schema change); same
+for `submit_label_shuffle_qc.sh`.
 
 ### Locally / on the VM (xargs -P driver) — fallback when no scheduler
 
@@ -82,6 +84,7 @@ the top to match the host.
 | Category WB + visual ROI | `run_decoding.py` | `submit_decoding.sh` | `decoding` | `..._decoding_accuracy.csv`, confusions |
 | Category FREM | `run_frem.py` | *(run_local only)* | `frem` | `..._frem_coef_<cat>.nii.gz`, AUC |
 | **Beta-version QC** | `run_beta_qc_decoding.py` | `submit_beta_qc_decoding.sh` (single job) | `beta_qc` | `..._beta_qc_decoding.csv` |
+| **Label-shuffle QC** | `run_label_shuffle_qc.py` | `submit_label_shuffle_qc.sh` (single job) | *(cluster only)* | `..._label_shuffle_qc.csv` |
 
 ### Prerequisites / knobs
 
@@ -101,6 +104,14 @@ the top to match the host.
   can swamp subtler beta-version differences given only 328 trials. Reads `TYPE{B,C,D}.npy`
   directly and does not touch the production GLMsingle pipeline; `standardize=True`
   neutralizes type-D ridge shrinkage. B→D is usually but not guaranteed monotonic.
+- **Label-shuffle QC** is a permutation-test negative control on the *production* decoding
+  (type-D betas, same masks/CV as `run_decoding.py`): decodes `stim_cat` once with the true
+  labels, then `--n-permutations` times (default 100) with labels shuffled globally across
+  all trials before the same `LeaveOneGroupOut` CV. If real accuracy sits outside the
+  shuffled-accuracy null distribution, that supports the category signal being genuine; if
+  shuffled accuracy doesn't collapse to chance, that's a leakage red flag (e.g.
+  standardization fit before the CV split, autocorrelation between adjacent trials). Also
+  needs `--visual-cortex-mask`.
 
 All decoders use `LeaveOneGroupOut` over the three runs (no temporal leakage).
 
@@ -113,6 +124,7 @@ All decoders use `LeaveOneGroupOut` over the three runs (no temporal leakage).
 | `decoding_results.ipynb` | Category WB/ROI accuracy + confusions across subjects |
 | `frem_results.ipynb` | Category FREM weight maps + per-class AUC |
 | `betas_qc_decoding.ipynb` | Beta-version QC: B→D category accuracy per subject + group, wholebrain vs visual-cortex |
+| `label_shuffle_qc.ipynb` | Label-shuffle QC: true vs shuffled-label null distribution, empirical p-values per subject |
 | `glmsingle_qc.ipynb` | GLMsingle fit QC (R², HRF, reliability) |
 | `inspect_gm_masks.ipynb` | Inspect grey-matter / brain masks |
 | RSA: `RSA_sandbox.ipynb`, `RSA_second_lvl.ipynb`, `dev_nilearn_firstlvl_rsa.ipynb` | Representational similarity analyses |
