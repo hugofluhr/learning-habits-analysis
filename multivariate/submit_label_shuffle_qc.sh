@@ -1,7 +1,7 @@
 #!/bin/bash
-# Submit the label-shuffle decoding robustness check as a SINGLE SLURM job that
-# runs all subjects internally via `xargs -P` (same pattern as
-# submit_beta_qc_decoding.sh, not a 59-way array job).
+# Submit the label-shuffle decoding robustness check as a SLURM array job —
+# one task per subject (like submit_decoding.sh), throttled with `%THROTTLE`
+# so it doesn't hog the standard partition.
 #
 # Negative-control / permutation-test sanity check: decode stimulus category
 # from type-D betas with the true labels, then N times more with `stim_cat`
@@ -11,16 +11,20 @@
 # Usage (from repo root):
 #   bash multivariate/submit_label_shuffle_qc.sh              # all subjects in PARTICIPANTS_TSV
 #   bash multivariate/submit_label_shuffle_qc.sh 01 05 12      # specific subjects
-#   NPROC=4 bash multivariate/submit_label_shuffle_qc.sh       # override concurrency
+#   THROTTLE=10 bash multivariate/submit_label_shuffle_qc.sh   # override max concurrent tasks
 #   N_PERMUTATIONS=50 bash multivariate/submit_label_shuffle_qc.sh
 #   OVERWRITE=1 bash multivariate/submit_label_shuffle_qc.sh   # force rerun of existing subjects
 #
-# Cost: run_beta_qc_decoding.py measured ~6s/fit (3 beta types x 2 masks in
-# 35s). This script does 2 masks x (N_PERMUTATIONS+1) fits per subject with X
-# transformed once per mask and reused — at N_PERMUTATIONS=100 that's roughly
-# 2 x 101 x 6s ~= 20 min/subject. Same "single job, NPROC-way internal
-# parallelism" reasoning as submit_beta_qc_decoding.sh: too short-lived and
-# light (no memory pressure) to be worth per-task array scheduling overhead.
+# Cost, measured on the cluster (sub-01, standardize=True, 100 permutations,
+# both masks): 13m47s wall, single-threaded (LinearSVC/liblinear doesn't
+# thread), well under 1GB RSS (see run_beta_qc_decoding.py's measurement for
+# the same decoder). Originally this was a single job looping subjects via
+# `xargs -P` (same shape as submit_beta_qc_decoding.sh) — wrong choice here:
+# that pattern only pays off when per-subject cost is light enough that
+# array-task scheduling overhead matters (beta_qc: ~35-45s/subject); at
+# ~14min/subject the array job's genuine per-subject concurrency dominates.
+# `%THROTTLE` (default 20) caps concurrent tasks so this doesn't monopolize
+# shared partition capacity from other users' jobs.
 # run_label_shuffle_qc.py skips subjects already done, so this is resumable.
 
 set -euo pipefail
@@ -37,8 +41,9 @@ LOG_DIR="${OUTPUT_DIR}/logs"
 
 PARTICIPANTS_TSV="/home/hfluhr/data/learninghabits/participants_mvpa.tsv"
 
-# Concurrent subjects within the single job allocation.
-NPROC="${NPROC:-8}"
+# Max concurrent array tasks — a courtesy cap, not a hard cluster limit (no
+# per-user MaxJobs/MaxSubmit QOS limit is set for hfluhr as of writing).
+THROTTLE="${THROTTLE:-20}"
 
 # Label-shuffle iterations per subject/mask (see cost note above).
 N_PERMUTATIONS="${N_PERMUTATIONS:-100}"
@@ -76,48 +81,42 @@ if [ ! -f "$VIS_MASK" ]; then
     exit 1
 fi
 
-echo "Submitting 1 job for ${N} subjects (NPROC=${NPROC} concurrent, N_PERMUTATIONS=${N_PERMUTATIONS}):"
+echo "Submitting ${N} subjects (array 1-${N}%${THROTTLE}, N_PERMUTATIONS=${N_PERMUTATIONS}):"
 cat "$SUBJECTS_FILE"
 echo
 
 # ---------------------------------------------------------------------------
-# SLURM submission — one job, NPROC-way internal parallelism via xargs
+# SLURM submission — one array task per subject
 # ---------------------------------------------------------------------------
 sbatch <<EOF
 #!/bin/bash -l
 #SBATCH --job-name=label_shuffle_qc
-#SBATCH --output=${LOG_DIR}/label_shuffle_qc_%j.out
-#SBATCH --error=${LOG_DIR}/label_shuffle_qc_%j.err
+#SBATCH --output=${LOG_DIR}/label_shuffle_qc_%A_%a.out
+#SBATCH --error=${LOG_DIR}/label_shuffle_qc_%A_%a.err
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=${NPROC}
-#SBATCH --mem=16G
-#SBATCH --time=04:00:00
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=4G
+#SBATCH --time=30:00
 #SBATCH --partition=standard
+#SBATCH --array=1-${N}%${THROTTLE}
 
 set -eo pipefail
 
-# Pin every worker to 1 thread — with NPROC subjects running concurrently,
-# letting each spawn its own BLAS threads would oversubscribe the cpus.
 export OMP_NUM_THREADS=1
 export MKL_NUM_THREADS=1
 export OPENBLAS_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 export PYTHONUNBUFFERED=1
 
-run_one() {
-    local s="\$1"
-    /home/hfluhr/data/conda/envs/learning-habits/bin/python -u "${REPO}/multivariate/run_label_shuffle_qc.py" \\
-        --subject "\$s" \\
-        --bids-dir "${BIDS_DIR}" \\
-        --glmsingle-dir "${GLMSINGLE_DIR}" \\
-        --output-dir "${OUTPUT_DIR}" \\
-        --visual-cortex-mask "${VIS_MASK}" \\
-        --n-permutations "${N_PERMUTATIONS}" \\
-        ${OVERWRITE_FLAG}
-}
-export -f run_one
+SUBJECT=\$(sed -n "\${SLURM_ARRAY_TASK_ID}p" "${SUBJECTS_FILE}")
+echo "=== sub-\${SUBJECT}  (task \${SLURM_ARRAY_TASK_ID}/\${SLURM_ARRAY_TASK_COUNT}) ==="
 
-xargs -a "${SUBJECTS_FILE}" -P ${NPROC} -I{} bash -c 'run_one "\$@"' _ {}
-
-echo "All label_shuffle_qc subjects finished. Per-subject logs under: ${OUTPUT_DIR}/sub-*/"
+/home/hfluhr/data/conda/envs/learning-habits/bin/python -u "${REPO}/multivariate/run_label_shuffle_qc.py" \\
+    --subject "\$SUBJECT" \\
+    --bids-dir "${BIDS_DIR}" \\
+    --glmsingle-dir "${GLMSINGLE_DIR}" \\
+    --output-dir "${OUTPUT_DIR}" \\
+    --visual-cortex-mask "${VIS_MASK}" \\
+    --n-permutations "${N_PERMUTATIONS}" \\
+    ${OVERWRITE_FLAG}
 EOF

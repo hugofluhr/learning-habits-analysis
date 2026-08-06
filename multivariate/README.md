@@ -54,11 +54,15 @@ bash multivariate/submit_label_shuffle_qc.sh          # 4. label-shuffle robustn
 bash multivariate/submit_searchlight.sh 01 05 12      # specific subjects
 ```
 
-`submit_glmsingle.sh`/`submit_searchlight.sh`/`submit_decoding.sh` are SLURM **array** jobs
-(one task per subject). `submit_beta_qc_decoding.sh` and `submit_label_shuffle_qc.sh` are
-**single** jobs that loop all subjects internally via `xargs -P` — measured per-subject cost
-is light, so an array job's per-task scheduling overhead isn't worth it; see each script's
-header comment for the measurement. `OVERWRITE=1 bash multivariate/submit_beta_qc_decoding.sh`
+`submit_glmsingle.sh`/`submit_searchlight.sh`/`submit_decoding.sh`/`submit_label_shuffle_qc.sh`
+are SLURM **array** jobs (one task per subject; `submit_label_shuffle_qc.sh` throttles
+concurrency with `%THROTTLE`, default 20, as a courtesy to other partition users).
+`submit_beta_qc_decoding.sh` is a **single** job that loops all subjects internally via
+`xargs -P` — measured per-subject cost is light (~35-45s), so an array job's per-task
+scheduling overhead isn't worth it there; see the script's header comment for the
+measurement and reasoning (label-shuffle QC used to follow this pattern too, until its
+much heavier per-subject cost — ~14min — made genuine array concurrency the better trade,
+see `submit_label_shuffle_qc.sh`'s header). `OVERWRITE=1 bash multivariate/submit_beta_qc_decoding.sh`
 forces a rerun of subjects that already have output (e.g. after a script/schema change); same
 for `submit_label_shuffle_qc.sh`.
 
@@ -84,7 +88,7 @@ the top to match the host.
 | Category WB + visual ROI | `run_decoding.py` | `submit_decoding.sh` | `decoding` | `..._decoding_accuracy.csv`, confusions |
 | Category FREM | `run_frem.py` | *(run_local only)* | `frem` | `..._frem_coef_<cat>.nii.gz`, AUC |
 | **Beta-version QC** | `run_beta_qc_decoding.py` | `submit_beta_qc_decoding.sh` (single job) | `beta_qc` | `..._beta_qc_decoding.csv` |
-| **Label-shuffle QC** | `run_label_shuffle_qc.py` | `submit_label_shuffle_qc.sh` (single job) | *(cluster only)* | `..._label_shuffle_qc.csv` |
+| **Label-shuffle QC** | `run_label_shuffle_qc.py` | `submit_label_shuffle_qc.sh` (array job) | *(cluster only)* | `..._label_shuffle_qc.csv` |
 
 ### Prerequisites / knobs
 
