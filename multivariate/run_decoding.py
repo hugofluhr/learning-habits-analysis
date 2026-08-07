@@ -86,7 +86,12 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir,
     cats    = sorted(set(y))
 
     for mask_name, mask_img in [('wholebrain', brain_mask_img), ('visualcortex', vis_mask)]:
-        masker = NiftiMasker(mask_img=mask_img, standardize=False).fit()
+        # standardize=True: whole-brain features are ~65k voxels of widely
+        # varying signal scale, which biases LinearSVC's L2 penalty toward
+        # high-magnitude voxels and slows liblinear convergence. Matches
+        # run_beta_qc_decoding.py / run_cv_comparison_decoding.py /
+        # run_label_shuffle_qc.py, which decode the same betas.
+        masker = NiftiMasker(mask_img=mask_img, standardize=True).fit()
         X      = masker.transform(betas_img)
         logging.info(f"  {mask_name}: {X.shape[1]:,} voxels")
 

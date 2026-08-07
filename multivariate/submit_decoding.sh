@@ -1,9 +1,22 @@
 #!/bin/bash
-# Submit stimulus category decoding as a SLURM array job — one job per subject.
+# Submit stimulus category decoding as a SINGLE SLURM job that runs all
+# subjects internally via `xargs -P` (not a per-subject array job — see below).
 #
 # Usage (from repo root):
 #   bash multivariate/submit_decoding.sh            # all subjects in PARTICIPANTS_TSV
 #   bash multivariate/submit_decoding.sh 01 05 12   # specific subjects
+#   NPROC=4 bash multivariate/submit_decoding.sh    # override concurrency
+#   OVERWRITE=1 bash multivariate/submit_decoding.sh # force rerun of existing subjects
+#
+# Why one job instead of an array: measured on a compute node (3-subject
+# smoke test, job 4388817) — ~20-26s wall time, ~1.2GB peak RSS per subject,
+# single core (LinearSVC/liblinear doesn't thread). Same reasoning as
+# submit_beta_qc_decoding.sh: this is far too light and short-lived to be
+# worth a separate array-task scheduling/queueing overhead per subject. A
+# single job with NPROC-way internal parallelism finishes all subjects in a
+# couple of minutes instead of 59 separate job slots.
+# run_decoding.py skips subjects already done, so this is resumable if the
+# job is killed partway through.
 #
 # Prerequisites: visual_cortex_mask.nii.gz must exist in OUTPUT_DIR.
 # Build it locally with:
@@ -24,6 +37,17 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 LOG_DIR="${OUTPUT_DIR}/logs"
 
 PARTICIPANTS_TSV="${BASE_DIR}/participants_mvpa.tsv"
+
+# Concurrent subjects within the single job allocation. Cluster's `standard`
+# partition nodes have >=8 cores; 8 is a safe default that schedules easily
+# and keeps every worker single-threaded (no BLAS thread contention).
+NPROC="${NPROC:-8}"
+
+# Set OVERWRITE=1 to force a rerun of subjects that already have a decoding
+# CSV (e.g. after a change to run_decoding.py's output schema).
+OVERWRITE="${OVERWRITE:-0}"
+OVERWRITE_FLAG=""
+[ "$OVERWRITE" = "1" ] && OVERWRITE_FLAG="--overwrite"
 
 # ---------------------------------------------------------------------------
 # Build subject list
@@ -54,41 +78,48 @@ if [ ! -f "$VIS_MASK" ]; then
     exit 1
 fi
 
-echo "Submitting ${N} subjects (array 1-${N}):"
+echo "Submitting 1 job for ${N} subjects (NPROC=${NPROC} concurrent):"
 cat "$SUBJECTS_FILE"
 echo
 
 # ---------------------------------------------------------------------------
-# SLURM submission
+# SLURM submission — one job, NPROC-way internal parallelism via xargs
 # ---------------------------------------------------------------------------
 sbatch <<EOF
 #!/bin/bash -l
 #SBATCH --job-name=decoding
-#SBATCH --output=${LOG_DIR}/decoding_%A_%a.out
-#SBATCH --error=${LOG_DIR}/decoding_%A_%a.err
+#SBATCH --output=${LOG_DIR}/decoding_%j.out
+#SBATCH --error=${LOG_DIR}/decoding_%j.err
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=16G
-#SBATCH --time=1:00:00
+#SBATCH --cpus-per-task=${NPROC}
+#SBATCH --mem=8G
+#SBATCH --time=10:00
 #SBATCH --partition=standard
-#SBATCH --array=1-${N}
 
 set -eo pipefail
 
-export OMP_NUM_THREADS=\$SLURM_CPUS_PER_TASK
-export MKL_NUM_THREADS=\$SLURM_CPUS_PER_TASK
-export OPENBLAS_NUM_THREADS=\$SLURM_CPUS_PER_TASK
-export NUMEXPR_NUM_THREADS=\$SLURM_CPUS_PER_TASK
+# Pin every worker to 1 thread — with NPROC subjects running concurrently,
+# letting each spawn its own BLAS threads would oversubscribe the cpus.
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1
 export PYTHONUNBUFFERED=1
 
-SUBJECT=\$(sed -n "\${SLURM_ARRAY_TASK_ID}p" "${SUBJECTS_FILE}")
-echo "=== sub-\${SUBJECT}  (task \${SLURM_ARRAY_TASK_ID}/\${SLURM_ARRAY_TASK_COUNT}) ==="
+run_one() {
+    local s="\$1"
+    /home/hfluhr/data/conda/envs/learning-habits/bin/python -u "${REPO}/multivariate/run_decoding.py" \\
+        --subject "\$s" \\
+        --base-dir "${BASE_DIR}" \\
+        --bids-dir "${BIDS_DIR}" \\
+        --glmsingle-dir "${GLMSINGLE_DIR}" \\
+        --output-dir "${OUTPUT_DIR}" \\
+        --visual-cortex-mask "${VIS_MASK}" \\
+        ${OVERWRITE_FLAG}
+}
+export -f run_one
 
-/home/hfluhr/data/conda/envs/learning-habits/bin/python -u "${REPO}/multivariate/run_decoding.py" \\
-    --subject "\$SUBJECT" \\
-    --base-dir "${BASE_DIR}" \\
-    --bids-dir "${BIDS_DIR}" \\
-    --glmsingle-dir "${GLMSINGLE_DIR}" \\
-    --output-dir "${OUTPUT_DIR}" \\
-    --visual-cortex-mask "${VIS_MASK}"
+xargs -a "${SUBJECTS_FILE}" -P ${NPROC} -I{} bash -c 'run_one "\$@"' _ {}
+
+echo "All decoding subjects finished. Per-subject logs under: ${OUTPUT_DIR}/sub-*/"
 EOF
