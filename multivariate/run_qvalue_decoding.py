@@ -27,6 +27,25 @@ RidgeCV adapts per mask automatically. LeaveOneGroupOut CV over runs, standardiz
 features (matches run_decoding.py's rationale: widely varying voxel signal scale
 otherwise biases the penalty toward high-magnitude voxels).
 
+Run-level correction (both leakage-safe — neither uses y from a run to transform that
+same run's own X, nor lets the model see a held-out run's true mean at fit time):
+  - **Features** are additionally demeaned per run (each voxel's own per-run mean
+    subtracted, on top of the existing global standardize=True) — removes session-level
+    drift/baseline shift as a nuisance confound before fitting. Uses only `run` group
+    membership, never y, so it's safe to apply before the CV split.
+  - **Scoring**: reward level is ~flat across runs by design (levels {1,2,2,3,3,4,4,5}
+    average to exactly 3.0 per run), so with only 3 LeaveOneGroupOut folds a heavily-
+    regularized model's predictions get anchored near the *training*-fold mean, which is
+    mechanically anti-correlated with the *held-out* run's mean (removing an
+    above-average run from a fixed-ish total necessarily raises the remaining mean) —
+    a CV arithmetic artifact, not signal. It's most visible for small, low-SNR ROIs
+    (vmPFC/striatum) where there's little real within-run signal to outweigh it.
+    r/r2 are therefore computed on predictions and targets demeaned by their own run's
+    mean *after* cross_val_predict (a post-hoc scoring transform — doesn't feed anything
+    back into fitting), isolating the within-run relationship this analysis actually
+    cares about. Raw (non-demeaned) r/r2 are kept alongside as r_raw/r2_raw for
+    transparency.
+
 Usage
 -----
 python multivariate/run_qvalue_decoding.py --subject 01 \\
@@ -42,8 +61,9 @@ python multivariate/run_qvalue_decoding.py --subject 01 \\
 Outputs (per subject)
 ---------------------
 <output-dir>/sub-<id>/
-    sub-<id>_qvalue_decoding_<tag>.csv               — mask, n_voxels, r, r2, n_trials
-    sub-<id>_qvalue_decoding_predictions_<tag>.csv    — mask, run, y_true, y_pred (long)
+    sub-<id>_qvalue_decoding_<tag>.csv               — mask, n_voxels, r, r2, r_raw, r2_raw,
+                                                        n_trials (r/r2 = run-demeaned; see above)
+    sub-<id>_qvalue_decoding_predictions_<tag>.csv    — mask, run, y_true, y_pred (long, raw)
     qvalue_decoding_sub-<id>.log
 """
 
@@ -124,6 +144,16 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path
         masker = NiftiMasker(mask_img=mask_img, standardize=True).fit()
         X      = masker.transform(betas_img)
         n_voxels = X.shape[1]
+
+        # Run-demean features on top of the global standardize=True: subtracts each
+        # voxel's own per-run mean, removing session-level drift as a nuisance
+        # confound. Uses only `run` membership (never y) so it's leakage-safe to do
+        # once before the CV split.
+        X = X.copy()
+        for r_id in np.unique(groups):
+            m = groups == r_id
+            X[m] -= X[m].mean(axis=0, keepdims=True)
+
         logging.info(f"  {mask_name}: {n_voxels:,} voxels")
 
         # RidgeCV: a single fixed alpha doesn't suit both a ~65k-voxel wholebrain mask
@@ -132,12 +162,28 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path
         estimator = RidgeCV(alphas=ALPHAS)
         y_pred = cross_val_predict(estimator, X, y, cv=logo, groups=groups)
 
-        r  = float(np.corrcoef(y, y_pred)[0, 1]) if np.std(y_pred) > 0 else 0.0
-        r2 = float(r2_score(y, y_pred))
-        logging.info(f"  {mask_name}: r = {r:.3f}, r2 = {r2:.3f}  (null r = 0)")
+        r_raw  = float(np.corrcoef(y, y_pred)[0, 1]) if np.std(y_pred) > 0 else 0.0
+        r2_raw = float(r2_score(y, y_pred))
+
+        # Run-demeaned scoring (post-hoc, doesn't touch fitting): reward level is
+        # ~flat across runs by design, so with only 3 LeaveOneGroupOut folds a
+        # heavily-regularized model's between-run prediction spread is dominated by a
+        # CV arithmetic artifact (see module docstring), not signal — most visible for
+        # small ROIs with little real within-run signal to outweigh it. Demeaning both
+        # y and y_pred by their own run's mean isolates the within-run relationship.
+        y_s      = pd.Series(y)
+        y_pred_s = pd.Series(y_pred)
+        run_s    = pd.Series(groups)
+        y_dm      = (y_s - y_s.groupby(run_s).transform('mean')).values
+        y_pred_dm = (y_pred_s - y_pred_s.groupby(run_s).transform('mean')).values
+
+        r  = float(np.corrcoef(y_dm, y_pred_dm)[0, 1]) if np.std(y_pred_dm) > 0 else 0.0
+        r2 = float(r2_score(y_dm, y_pred_dm))
+        logging.info(f"  {mask_name}: r = {r:.3f}, r2 = {r2:.3f}  "
+                     f"(raw: r = {r_raw:.3f}, r2 = {r2_raw:.3f})  (null r = 0)")
 
         results.append({'mask': mask_name, 'n_voxels': n_voxels, 'r': r, 'r2': r2,
-                         'n_trials': len(y)})
+                         'r_raw': r_raw, 'r2_raw': r2_raw, 'n_trials': len(y)})
         for run_id, yt, yp in zip(groups, y, y_pred):
             pred_rows.append({'mask': mask_name, 'run': run_id,
                                'y_true': float(yt), 'y_pred': float(yp)})
