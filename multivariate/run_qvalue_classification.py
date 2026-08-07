@@ -33,6 +33,20 @@ standardize=True) — removes session-level drift as a nuisance confound, leakag
 since it only uses `run` membership, never the label. Carried over from
 run_qvalue_decoding.py, where it measurably helped wholebrain/visual-cortex signal.
 
+**Category confound.** Checked empirically across all 58 successfully-run subjects:
+stimulus category is essentially deterministic of the low/high split for every single
+subject (chi-square p in the 1e-15 to 1e-22 range) — most categories are *entirely* low
+or *entirely* high for a given subject (not a tendency, a near-total split), because
+reward level is tied to a fixed slot and, within a subject, whole categories tend to
+land on one side of that slot's value tier. Since category decodes very well from
+visual cortex/whole-brain (see `decoding_results.ipynb`), a classifier could hit high
+"reward" accuracy purely by re-detecting category, with zero real value-coding signal.
+Every mask/subject therefore also gets a **(run x category)-demeaned** feature variant
+(subtract each run/category cell's own mean, on top of the run-only demeaning) —
+strips any category-driven mean-pattern signal, leaving only within-category variance
+for the classifier. Both `accuracy_run_demeaned` (the original, confound-able version)
+and `accuracy_run_cat_demeaned` (the control) are reported side by side.
+
 Usage
 -----
 python multivariate/run_qvalue_classification.py --subject 01 \\
@@ -48,10 +62,10 @@ python multivariate/run_qvalue_classification.py --subject 01 \\
 Outputs (per subject)
 ---------------------
 <output-dir>/sub-<id>/
-    sub-<id>_qvalue_classification_<tag>.csv                       — mask, n_voxels,
-                                                                      accuracy, n_trials,
-                                                                      n_low, n_high
-    sub-<id>_qvalue_classification_confusion_<mask>_<tag>.npy       — 2x2, labels=[low,high]
+    sub-<id>_qvalue_classification_<tag>.csv                                  — mask,
+        n_voxels, accuracy_run_demeaned, accuracy_run_cat_demeaned, n_trials, n_low, n_high
+    sub-<id>_qvalue_classification_confusion_<mask>_<variant>_<tag>.npy       — 2x2,
+        labels=[low,high]; <variant> is run_demeaned or run_cat_demeaned
     qvalue_classification_sub-<id>.log
 """
 
@@ -103,6 +117,8 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path
     # --- Continuous target from the BBT, then split into low/high, dropping the middle ---
     y_cont      = load_target_from_bbt(subject, bbt_path, trial_info, target_col=target_col)
     groups_full = trial_info['run'].values
+    cat_full    = trial_info['stim_cat'].values
+    cell_full   = np.array([f"{r}__{c}" for r, c in zip(groups_full, cat_full)])
 
     keep = (y_cont <= low_max) | (y_cont >= high_min)
     y      = np.where(y_cont[keep] <= low_max, 'low', 'high')
@@ -138,26 +154,35 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path
         masker = NiftiMasker(mask_img=mask_img, standardize=True).fit()
         X_full   = masker.transform(betas_img)
         n_voxels = X_full.shape[1]
-
-        # Run-demean features (all trials in the run, before the low/high filter) on
-        # top of the global standardize=True — see module docstring.
-        X_full = X_full.copy()
-        for r_id in np.unique(groups_full):
-            m = groups_full == r_id
-            X_full[m] -= X_full[m].mean(axis=0, keepdims=True)
-
-        X = X_full[keep]
         logging.info(f"  {mask_name}: {n_voxels:,} voxels")
 
-        y_pred = cross_val_predict(LinearSVC(max_iter=10000, dual='auto'), X, y,
-                                    cv=logo, groups=groups)
-        acc = float((y_pred == y).mean())
-        logging.info(f"  {mask_name}: accuracy = {acc:.3f}  (chance = 0.5)")
+        # Two feature variants, both computed from ALL trials (before the low/high
+        # filter) on top of the global standardize=True — see module docstring.
+        X_run = X_full.copy()
+        for r_id in np.unique(groups_full):
+            m = groups_full == r_id
+            X_run[m] -= X_run[m].mean(axis=0, keepdims=True)
 
-        results.append({'mask': mask_name, 'n_voxels': n_voxels, 'accuracy': acc,
-                         'n_trials': len(y), 'n_low': n_low, 'n_high': n_high})
-        cm = confusion_matrix(y, y_pred, labels=LABELS)
-        np.save(subject_output / f"sub-{subject}_qvalue_classification_confusion_{mask_name}_{tag}.npy", cm)
+        X_cat = X_full.copy()
+        for cell in np.unique(cell_full):
+            m = cell_full == cell
+            X_cat[m] -= X_cat[m].mean(axis=0, keepdims=True)
+
+        result = {'mask': mask_name, 'n_voxels': n_voxels, 'n_trials': len(y),
+                  'n_low': n_low, 'n_high': n_high}
+
+        for variant, X_variant in [('run_demeaned', X_run), ('run_cat_demeaned', X_cat)]:
+            X = X_variant[keep]
+            y_pred = cross_val_predict(LinearSVC(max_iter=10000, dual='auto'), X, y,
+                                        cv=logo, groups=groups)
+            acc = float((y_pred == y).mean())
+            result[f'accuracy_{variant}'] = acc
+            cm = confusion_matrix(y, y_pred, labels=LABELS)
+            np.save(subject_output / f"sub-{subject}_qvalue_classification_confusion_{mask_name}_{variant}_{tag}.npy", cm)
+
+        logging.info(f"  {mask_name}: accuracy(run-demeaned) = {result['accuracy_run_demeaned']:.3f}  "
+                     f"accuracy(run+cat-demeaned) = {result['accuracy_run_cat_demeaned']:.3f}  (chance = 0.5)")
+        results.append(result)
 
     pd.DataFrame(results).to_csv(done_flag, index=False)
     logging.info(f"sub-{subject}: done")
