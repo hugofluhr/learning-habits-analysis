@@ -33,19 +33,28 @@ standardize=True) — removes session-level drift as a nuisance confound, leakag
 since it only uses `run` membership, never the label. Carried over from
 run_qvalue_decoding.py, where it measurably helped wholebrain/visual-cortex signal.
 
-**Category confound.** Checked empirically across all 58 successfully-run subjects:
-stimulus category is essentially deterministic of the low/high split for every single
-subject (chi-square p in the 1e-15 to 1e-22 range) — most categories are *entirely* low
-or *entirely* high for a given subject (not a tendency, a near-total split), because
-reward level is tied to a fixed slot and, within a subject, whole categories tend to
-land on one side of that slot's value tier. Since category decodes very well from
-visual cortex/whole-brain (see `decoding_results.ipynb`), a classifier could hit high
-"reward" accuracy purely by re-detecting category, with zero real value-coding signal.
-Every mask/subject therefore also gets a **(run x category)-demeaned** feature variant
-(subtract each run/category cell's own mean, on top of the run-only demeaning) —
-strips any category-driven mean-pattern signal, leaving only within-category variance
-for the classifier. Both `accuracy_run_demeaned` (the original, confound-able version)
-and `accuracy_run_cat_demeaned` (the control) are reported side by side.
+**Category/identity confound.** Checked empirically across all 58 successfully-run
+subjects: stimulus category is essentially deterministic of the low/high split for
+every single subject (chi-square p in the 1e-15 to 1e-22 range) — most categories are
+*entirely* low or *entirely* high for a given subject (not a tendency, a near-total
+split), because reward level is tied to a fixed slot and, within a subject, whole
+categories tend to land on one side of that slot's value tier. Since category decodes
+very well from visual cortex/whole-brain (see `decoding_results.ipynb`), a classifier
+could hit high "reward" accuracy purely by re-detecting category (4-way, `stim_cat`) or
+even the individual stimulus identity (8-way, `stim_name` — e.g. `face_male`,
+`house_2`), with zero real value-coding signal.
+
+`--group-demean-by {category,identity,both}` (default `both`) controls which
+**(run x group)-demeaned** feature variant(s) are additionally computed on top of the
+run-only demeaning — subtract each run/group cell's own per-voxel mean (leakage-safe:
+uses only known group membership, never the label), stripping any group-driven
+mean-pattern signal so only within-group variance is left for the classifier. Identity
+cells are finer (8 identities x 3 runs = 24 cells, ~14 trials/cell on average, vs. 4
+categories x 3 runs = 12 cells, ~27 trials/cell) so the identity-demeaned mean estimate
+is noisier — expect somewhat more variance in `accuracy_run_identity_demeaned` for that
+reason alone, independent of any real effect. `accuracy_run_demeaned` (the original,
+confound-able baseline), `accuracy_run_category_demeaned`, and
+`accuracy_run_identity_demeaned` are reported side by side (whichever were requested).
 
 Usage
 -----
@@ -63,9 +72,12 @@ Outputs (per subject)
 ---------------------
 <output-dir>/sub-<id>/
     sub-<id>_qvalue_classification_<tag>.csv                                  — mask,
-        n_voxels, accuracy_run_demeaned, accuracy_run_cat_demeaned, n_trials, n_low, n_high
+        n_voxels, accuracy_run_demeaned, accuracy_run_category_demeaned,
+        accuracy_run_identity_demeaned, n_trials, n_low, n_high (last two columns present
+        only if requested via --group-demean-by)
     sub-<id>_qvalue_classification_confusion_<mask>_<variant>_<tag>.npy       — 2x2,
-        labels=[low,high]; <variant> is run_demeaned or run_cat_demeaned
+        labels=[low,high]; <variant> is run_demeaned, run_category_demeaned, or
+        run_identity_demeaned
     qvalue_classification_sub-<id>.log
 """
 
@@ -91,10 +103,12 @@ LABELS = ['low', 'high']
 
 def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path,
                 target_col='first_stim_value', low_max=2.0, high_min=4.0,
-                roi_masks=None, overwrite=False):
+                roi_masks=None, group_demean_by='both', overwrite=False):
 
     roi_masks = roi_masks or []
     tag = 'reward' if target_col == 'first_stim_value' else target_col
+    extra_groups = {'category': 'category', 'identity': 'identity', 'both': ('category', 'identity')}[group_demean_by]
+    extra_groups = extra_groups if isinstance(extra_groups, tuple) else (extra_groups,)
 
     subject_output = output_dir / f"sub-{subject}"
     done_flag = subject_output / f"sub-{subject}_qvalue_classification_{tag}.csv"
@@ -117,8 +131,15 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path
     # --- Continuous target from the BBT, then split into low/high, dropping the middle ---
     y_cont      = load_target_from_bbt(subject, bbt_path, trial_info, target_col=target_col)
     groups_full = trial_info['run'].values
-    cat_full    = trial_info['stim_cat'].values
-    cell_full   = np.array([f"{r}__{c}" for r, c in zip(groups_full, cat_full)])
+
+    # (run x group)-cell keys for each requested extra demeaning variant. 'category' is
+    # stim_cat (4-way); 'identity' is stim_name, the individual exemplar (8-way, e.g.
+    # 'face_male', 'house_2') — finer-grained, fewer trials/cell, see module docstring.
+    group_cols  = {'category': trial_info['stim_cat'].values, 'identity': trial_info['stim_name'].values}
+    cell_by_group = {
+        g: np.array([f"{r}__{v}" for r, v in zip(groups_full, group_cols[g])])
+        for g in extra_groups
+    }
 
     keep = (y_cont <= low_max) | (y_cont >= high_min)
     y      = np.where(y_cont[keep] <= low_max, 'low', 'high')
@@ -156,22 +177,26 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path
         n_voxels = X_full.shape[1]
         logging.info(f"  {mask_name}: {n_voxels:,} voxels")
 
-        # Two feature variants, both computed from ALL trials (before the low/high
-        # filter) on top of the global standardize=True — see module docstring.
+        # Feature variants, all computed from ALL trials (before the low/high filter)
+        # on top of the global standardize=True — see module docstring. Baseline
+        # (run-only) plus one per requested extra grouping (category and/or identity).
         X_run = X_full.copy()
         for r_id in np.unique(groups_full):
             m = groups_full == r_id
             X_run[m] -= X_run[m].mean(axis=0, keepdims=True)
 
-        X_cat = X_full.copy()
-        for cell in np.unique(cell_full):
-            m = cell_full == cell
-            X_cat[m] -= X_cat[m].mean(axis=0, keepdims=True)
+        variants = [('run_demeaned', X_run)]
+        for g in extra_groups:
+            X_g = X_full.copy()
+            for cell in np.unique(cell_by_group[g]):
+                m = cell_by_group[g] == cell
+                X_g[m] -= X_g[m].mean(axis=0, keepdims=True)
+            variants.append((f'run_{g}_demeaned', X_g))
 
         result = {'mask': mask_name, 'n_voxels': n_voxels, 'n_trials': len(y),
                   'n_low': n_low, 'n_high': n_high}
 
-        for variant, X_variant in [('run_demeaned', X_run), ('run_cat_demeaned', X_cat)]:
+        for variant, X_variant in variants:
             X = X_variant[keep]
             y_pred = cross_val_predict(LinearSVC(max_iter=10000, dual='auto'), X, y,
                                         cv=logo, groups=groups)
@@ -180,8 +205,8 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path
             cm = confusion_matrix(y, y_pred, labels=LABELS)
             np.save(subject_output / f"sub-{subject}_qvalue_classification_confusion_{mask_name}_{variant}_{tag}.npy", cm)
 
-        logging.info(f"  {mask_name}: accuracy(run-demeaned) = {result['accuracy_run_demeaned']:.3f}  "
-                     f"accuracy(run+cat-demeaned) = {result['accuracy_run_cat_demeaned']:.3f}  (chance = 0.5)")
+        summary_str = "  ".join(f"{v}={result[f'accuracy_{v}']:.3f}" for v, _ in variants)
+        logging.info(f"  {mask_name}: {summary_str}  (chance = 0.5)")
         results.append(result)
 
     pd.DataFrame(results).to_csv(done_flag, index=False)
@@ -215,6 +240,9 @@ def main():
                         default=[],
                         help="ROI mask to classify, given as NAME PATH; repeatable. "
                              "Whole-brain is always included automatically.")
+    parser.add_argument("--group-demean-by", choices=["category", "identity", "both"], default="both",
+                        help="Which extra (run x group)-demeaned confound-control variant(s) "
+                             "to compute on top of the run-only baseline (default: both)")
     parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args()
 
@@ -242,6 +270,7 @@ def main():
         low_max       = args.low_max,
         high_min      = args.high_min,
         roi_masks     = args.roi_mask,
+        group_demean_by = args.group_demean_by,
         overwrite     = args.overwrite,
     )
 
