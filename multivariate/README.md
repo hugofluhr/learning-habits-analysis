@@ -27,7 +27,9 @@ Label comes straight from the betas' info CSV.
 
 > Reward/value decoding (objective reward level of the cue, sourced from the BBT) is
 > under development on the `qvalue-decoding` branch — not yet merged, so not documented
-> here. See that branch's `run_qvalue_searchlight.py` / `run_qvalue_frem.py` once merged.
+> here. See that branch's `run_qvalue_decoding.py` (whole-brain + ROI, the regression
+> counterpart of `run_decoding.py`) / `run_qvalue_searchlight.py` / `run_qvalue_frem.py`
+> once merged.
 
 ## Environment
 
@@ -89,6 +91,7 @@ the top to match the host.
 | Category FREM | `run_frem.py` | *(run_local only)* | `frem` | `..._frem_coef_<cat>.nii.gz`, AUC |
 | **Beta-version QC** | `run_beta_qc_decoding.py` | `submit_beta_qc_decoding.sh` (single job) | `beta_qc` | `..._beta_qc_decoding.csv` |
 | **Label-shuffle QC** | `run_label_shuffle_qc.py` | `submit_label_shuffle_qc.sh` (array job) | *(cluster only)* | `..._label_shuffle_qc.csv` |
+| **Reward WB + ROI decoding** | `run_qvalue_decoding.py` | `submit_qvalue_decoding.sh` (single job) | *(cluster only)* | `..._qvalue_decoding_<tag>.csv`, predictions |
 
 ### Prerequisites / knobs
 
@@ -120,6 +123,14 @@ the top to match the host.
   fit in `run_decoding.py` is fine; 101 refits on the same features is not), so the raw true
   accuracy may differ slightly from `run_decoding.py`'s number, though the true-vs-null
   comparison itself stays apples-to-apples. Also needs `--visual-cortex-mask`.
+- **Reward WB + ROI decoding** takes ROI masks as a repeatable `--roi-mask NAME PATH`
+  flag (whole-brain is automatic, from the subject's own functional mask) rather than
+  one named flag per mask — new ROIs need no code change, just another `--roi-mask` in
+  the submit script. Masks live in a shared directory:
+  `.../masks/MNI152NLin2009cAsym/` (same path on both the cluster and the VM), currently
+  holding the Bartra 2013 meta-analytic `vmpfc`/`striatum` masks plus several others
+  (fusiform, putamen, motor, parietal, premotor, HMAT, AAL, habit) not yet wired in. The
+  visual-cortex ROI is the same pre-built mask `run_decoding.py` uses.
 
 All decoders use `LeaveOneGroupOut` over the three runs (no temporal leakage).
 
