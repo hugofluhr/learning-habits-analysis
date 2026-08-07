@@ -27,9 +27,13 @@ Label comes straight from the betas' info CSV.
 
 > Reward/value decoding (objective reward level of the cue, sourced from the BBT) is
 > under development on the `qvalue-decoding` branch — not yet merged, so not documented
-> here. See that branch's `run_qvalue_decoding.py` (whole-brain + ROI, the regression
-> counterpart of `run_decoding.py`) / `run_qvalue_searchlight.py` / `run_qvalue_frem.py`
-> once merged.
+> here. See that branch's `run_qvalue_decoding.py` (whole-brain + ROI regression,
+> the counterpart of `run_decoding.py`) / `run_qvalue_classification.py` (whole-brain +
+> ROI high/low classification) / `run_qvalue_searchlight_classification.py` (searchlight
+> counterpart of the classifier — whole-brain/visual-cortex decode reward genuinely at
+> whole-ROI resolution, vmPFC/striatum are flat at chance there, this localizes the
+> question) / `run_qvalue_searchlight.py` (an earlier regression-searchlight draft, never
+> run) / `run_qvalue_frem.py` once merged.
 
 ## Environment
 
@@ -92,6 +96,8 @@ the top to match the host.
 | **Beta-version QC** | `run_beta_qc_decoding.py` | `submit_beta_qc_decoding.sh` (single job) | `beta_qc` | `..._beta_qc_decoding.csv` |
 | **Label-shuffle QC** | `run_label_shuffle_qc.py` | `submit_label_shuffle_qc.sh` (array job) | *(cluster only)* | `..._label_shuffle_qc.csv` |
 | **Reward WB + ROI decoding** | `run_qvalue_decoding.py` | `submit_qvalue_decoding.sh` (single job) | *(cluster only)* | `..._qvalue_decoding_<tag>.csv`, predictions |
+| **Reward WB + ROI classification** | `run_qvalue_classification.py` | `submit_qvalue_classification.sh` (single job) | *(cluster only)* | `..._qvalue_classification_<tag>.csv`, confusions |
+| **Reward classification searchlight** | `run_qvalue_searchlight_classification.py` | `submit_qvalue_searchlight_classification.sh` (array job) | *(cluster only)* | `..._searchlight_<tag>_classification.nii.gz` |
 
 ### Prerequisites / knobs
 
@@ -131,6 +137,19 @@ the top to match the host.
   holding the Bartra 2013 meta-analytic `vmpfc`/`striatum` masks plus several others
   (fusiform, putamen, motor, parietal, premotor, HMAT, AAL, habit) not yet wired in. The
   visual-cortex ROI is the same pre-built mask `run_decoding.py` uses.
+- **Reward classification searchlight** localizes `run_qvalue_classification.py`'s binary
+  high/low split (chance 0.5, `--low-max`/`--high-min`, default 2/4) instead of regressing
+  the continuous reward level, since classification is the better-behaved of the two
+  whole-ROI reward analyses (no between-run CV-arithmetic artifact, see
+  `run_qvalue_decoding.py`'s docstring). Computes a single feature variant — voxels
+  demeaned per (run x category) cell, the whole-ROI script's validated primary/confound-
+  controlled variant — rather than the two variants reported at whole-ROI resolution,
+  since they were shown to tell nearly the same story there and category-demeaning is
+  needed for validity regardless (category is a near-deterministic confound of low/high
+  reward, chi-square p in 1e-15-1e-22). No `standardize=True`, unlike the whole-ROI
+  decoders: each 6mm sphere holds only ~30-90 spatially adjacent voxels, far less
+  cross-voxel scale heterogeneity than the ~65k-voxel whole-brain mask that motivates
+  standardizing there — the same conclusion reached for the category searchlight.
 
 All decoders use `LeaveOneGroupOut` over the three runs (no temporal leakage).
 
