@@ -1,13 +1,12 @@
 #!/bin/bash
 # Submit reward-value (Q-value) whole-brain + ROI decoding as a SINGLE SLURM job that
 # runs all subjects internally via `xargs -P` (not a per-subject array job — see
-# submit_decoding.sh, whose reasoning this mirrors: category decoding is light + fast,
-# ~20-26s wall / ~1.2GB peak RSS per subject, single core, measured on a compute node).
-# RidgeCV's internal alpha selection uses sklearn's efficient built-in generalized-CV
-# shortcut rather than brute-force refitting per alpha, so this should stay in the same
-# performance class — resources below are bumped modestly over submit_decoding.sh's as a
-# safety margin until a real smoke-test measurement is in hand; update this comment with
-# real numbers once you have them.
+# submit_decoding.sh, whose pattern this mirrors). Measured via a sub-01 srun smoke test
+# (job 4390771, 4 cores, all 4 masks incl. wholebrain's 65,617 voxels): ~5s wall, well
+# under a single CPU core (RidgeCV's internal alpha selection uses sklearn's efficient
+# built-in generalized-CV shortcut, not brute-force refitting per alpha) — same
+# performance class as submit_decoding.sh's category decoder. --mem/--time below still
+# carry a safety margin over that single-subject measurement for the full-cohort run.
 #
 # Usage (from repo root):
 #   bash multivariate/submit_qvalue_decoding.sh            # all subjects in PARTICIPANTS_TSV
