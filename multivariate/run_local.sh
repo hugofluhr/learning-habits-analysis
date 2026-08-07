@@ -12,6 +12,8 @@
 #             | beta_qc   (compare GLMsingle model types B/C/D by category
 #               decoding, whole-brain AND visual-cortex ROI; A is skipped —
 #               see run_beta_qc_decoding.py)
+#             | qvalue_searchlight | qvalue_frem   (reward-value regression;
+#               target sourced from the BBT — same table used for the SPM GLMs)
 #
 # Why the per-pipeline defaults differ (this is the whole point of the file):
 #   glmsingle    -> MEMORY-bound. Loads 3 BOLD runs as float32 + GLMdenoise/ridge
@@ -49,6 +51,10 @@ DECODING_DIR="${DECODING_DIR:-${BASE_DIR}/bids_dataset/derivatives/decoding}"
 FREM_DIR="${FREM_DIR:-${BASE_DIR}/bids_dataset/derivatives/frem}"
 GLMSINGLE_QC_DIR="${GLMSINGLE_QC_DIR:-${BASE_DIR}/bids_dataset/derivatives/glmsingle_qc}"
 VIS_MASK="${VIS_MASK:-${DECODING_DIR}/visual_cortex_mask.nii.gz}"
+# BBT target table for the reward-value regressions — default matches the table
+# the SPM first-levels use (cf. glm2_chosen.m: <base_dir>/bbt.csv).
+BBT="${BBT:-${BASE_DIR}/bbt.csv}"
+QVALUE_TARGET_COL="${QVALUE_TARGET_COL:-first_stim_value}"
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 PY="${PY:-python}"   # override with the env's python, e.g. PY=~/miniforge3/envs/neuroim/bin/python
@@ -82,8 +88,16 @@ case "$PIPELINE" in
         OUTPUT_DIR="$GLMSINGLE_QC_DIR"
         DEF_NPROC=28 ; DEF_THREADS=1     # light + fast, ~900 MB/subject (measured)
         ;;
+    qvalue_searchlight)
+        OUTPUT_DIR="$SEARCHLIGHT_DIR"   # alongside category maps (distinct filenames)
+        DEF_NPROC=28 ; DEF_THREADS=1
+        ;;
+    qvalue_frem)
+        OUTPUT_DIR="$FREM_DIR"          # alongside category maps (distinct filenames)
+        DEF_NPROC=28 ; DEF_THREADS=1
+        ;;
     *)
-        echo "ERROR: unknown pipeline '$PIPELINE' (expected glmsingle|searchlight|decoding|frem|beta_qc)" >&2
+        echo "ERROR: unknown pipeline '$PIPELINE' (expected glmsingle|searchlight|decoding|frem|beta_qc|qvalue_searchlight|qvalue_frem)" >&2
         exit 1
         ;;
 esac
@@ -115,8 +129,12 @@ N=$(grep -c . "$SUBJECTS_FILE" || true)
 case "$PIPELINE" in
     glmsingle)
         [ -d "$BIDS_DIR" ] || { echo "ERROR: fMRIPrep dir not found: $BIDS_DIR" >&2; exit 1; } ;;
-    searchlight|decoding|frem|beta_qc)
+    searchlight|decoding|frem|beta_qc|qvalue_searchlight|qvalue_frem)
         [ -d "$GLMSINGLE_DIR" ] || { echo "ERROR: GLMsingle betas dir not found: $GLMSINGLE_DIR (run 'glmsingle' first)" >&2; exit 1; } ;;
+esac
+case "$PIPELINE" in
+    qvalue_searchlight|qvalue_frem)
+        [ -f "$BBT" ] || { echo "ERROR: BBT target table not found: $BBT (set BBT=/path/to/bbt.csv)" >&2; exit 1; } ;;
 esac
 if { [ "$PIPELINE" = "decoding" ] || [ "$PIPELINE" = "beta_qc" ]; } && [ ! -f "$VIS_MASK" ]; then
     echo "ERROR: visual cortex mask not found: $VIS_MASK" >&2
@@ -177,10 +195,22 @@ run_one() {
                 --subject "$s" --bids-dir "$BIDS_DIR" \
                 --glmsingle-dir "$GLMSINGLE_DIR" --output-dir "$GLMSINGLE_QC_DIR" \
                 --visual-cortex-mask "$VIS_MASK" ;;
+        qvalue_searchlight)
+            "$PY" -u "${REPO}/multivariate/run_qvalue_searchlight.py" \
+                --subject "$s" --bids-dir "$BIDS_DIR" \
+                --glmsingle-dir "$GLMSINGLE_DIR" --output-dir "$SEARCHLIGHT_DIR" \
+                --bbt "$BBT" --target-col "$QVALUE_TARGET_COL" \
+                --n-jobs 1 ;;
+        qvalue_frem)
+            "$PY" -u "${REPO}/multivariate/run_qvalue_frem.py" \
+                --subject "$s" --bids-dir "$BIDS_DIR" \
+                --glmsingle-dir "$GLMSINGLE_DIR" --output-dir "$FREM_DIR" \
+                --bbt "$BBT" --target-col "$QVALUE_TARGET_COL" \
+                --n-jobs 1 ;;
     esac
 }
 export -f run_one
-export PIPELINE REPO PY BASE_DIR BIDS_DIR GLMSINGLE_DIR SEARCHLIGHT_DIR DECODING_DIR FREM_DIR GLMSINGLE_QC_DIR VIS_MASK
+export PIPELINE REPO PY BASE_DIR BIDS_DIR GLMSINGLE_DIR SEARCHLIGHT_DIR DECODING_DIR FREM_DIR GLMSINGLE_QC_DIR VIS_MASK BBT QVALUE_TARGET_COL
 
 # xargs -P runs NPROC subjects at a time and picks up the next as each finishes
 # (natural load-balancing across the 59-subject list). Exit non-zero if any fail.
