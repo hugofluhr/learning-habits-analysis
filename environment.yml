@@ -11,6 +11,10 @@ dependencies:
   - nibabel=5.2
   - nilearn=0.10
   - scikit-learn=1.4
+  - seaborn
+  - statsmodels
+  - tqdm
+  - ipykernel
   - pip
   - pip:
-    - git+https://github.com/cvnlab/GLMsingle.git
+    - git+https://github.com/cvnlab/GLMsingle.git@1ab54a65

@@ -22,20 +22,11 @@ module load miniforge3
 source "\$(conda info --base)/etc/profile.d/conda.sh"
 export CONDA_PKGS_DIRS="\$HOME/data/conda/pkgs"
 
-# Strip pip dependencies so conda doesn't invoke pip itself
-# Removes "  - pip:" header and any indented pip packages below it
-awk '!/^  - pip:/ && !/glmsingle/' "${REPO}/environment.yml" > /tmp/env_nopip.yml
-
 if [ -d "${ENV_PATH}" ]; then
-    conda env update -p "${ENV_PATH}" -f /tmp/env_nopip.yml --prune
+    conda env update -p "${ENV_PATH}" -f "${REPO}/environment.yml" --prune
 else
-    conda env create -p "${ENV_PATH}" -f /tmp/env_nopip.yml
+    conda env create -p "${ENV_PATH}" -f "${REPO}/environment.yml"
 fi
-
-# Install pip packages separately with explicit SSL cert
-"${ENV_PATH}/bin/pip" install \
-    --cert /etc/ssl/certs/ca-certificates.crt \
-    glmsingle==1.2
 
 echo "Done. Env at: ${ENV_PATH}"
 EOF
