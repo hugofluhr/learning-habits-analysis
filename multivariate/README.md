@@ -4,9 +4,16 @@ Single-trial fMRI decoding for the reward-learning habits study. One GLMsingle s
 estimates per-trial beta maps; every downstream analysis (whole-brain/ROI decoding,
 searchlight, FREM, RSA) consumes the same betas.
 
-All beta maps are locked to **first-stimulus (cue) onset** — one volume per presentation,
-8 stimulus identities, emitted in chronological order (`learning1` → `learning2` → `test`,
-each sorted by `t_first_stim`). Sessions: `learning1`, `learning2`, `test`.
+The **primary** beta maps are locked to **first-stimulus (cue) onset** — one volume per
+presentation, 8 stimulus identities, emitted in chronological order (`learning1` →
+`learning2` → `test`, each sorted by `t_first_stim`). Sessions: `learning1`, `learning2`,
+`test`. Every downstream analysis listed below consumes these.
+
+A second set locked to **reward-feedback onset** lives in `derivatives/glmsingle_feedback/`
+(`run_glmsingle_feedback.py`): learning runs only, 8 stimulus-pair conditions, responded
+trials only. Treat it as exploratory — feedback onset is just 1.95 s after cue onset at
+TR = 2.334 s, so those betas are a cue+feedback composite rather than a feedback-specific
+signal. `compare_cue_vs_feedback_betas.py` quantifies exactly how redundant they are.
 
 ## Pipeline overview
 
@@ -89,7 +96,8 @@ the top to match the host.
 
 | Stage | Runner | Cluster submit | `run_local` | Output |
 |-------|--------|----------------|-------------|--------|
-| Single-trial betas | `run_glmsingle.py` | `submit_glmsingle.sh` | `glmsingle` | `derivatives/glmsingle/` |
+| Single-trial betas (cue) | `run_glmsingle.py` | `submit_glmsingle.sh` | `glmsingle` | `derivatives/glmsingle/` |
+| Single-trial betas (feedback) | `run_glmsingle_feedback.py` | `submit_glmsingle_feedback.sh` (array job) | *(cluster only)* | `derivatives/glmsingle_feedback/` |
 | Category searchlight | `run_searchlight.py` | `submit_searchlight.sh` | `searchlight` | `..._searchlight_stim_cat*.nii.gz` |
 | Category WB + visual ROI | `run_decoding.py` | `submit_decoding.sh` | `decoding` | `..._decoding_accuracy.csv`, confusions |
 | Category FREM | `run_frem.py` | *(run_local only)* | `frem` | `..._frem_coef_<cat>.nii.gz`, AUC |
@@ -98,6 +106,7 @@ the top to match the host.
 | **Reward WB + ROI decoding** | `run_qvalue_decoding.py` | `submit_qvalue_decoding.sh` (single job) | *(cluster only)* | `..._qvalue_decoding_<tag>.csv`, predictions |
 | **Reward WB + ROI classification** | `run_qvalue_classification.py` | `submit_qvalue_classification.sh` (single job) | *(cluster only)* | `..._qvalue_classification_<tag>.csv`, confusions |
 | **Reward classification searchlight** | `run_qvalue_searchlight_classification.py` | `submit_qvalue_searchlight_classification.sh` (array job) | *(cluster only)* | `..._searchlight_<tag>_classification.nii.gz` |
+| **Cue vs feedback redundancy** | `compare_cue_vs_feedback_betas.py` | `submit_compare_cue_vs_feedback.sh` (array job) | *(cluster only)* | `..._cue_vs_feedback.csv`, voxelwise r map |
 
 ### Prerequisites / knobs
 
