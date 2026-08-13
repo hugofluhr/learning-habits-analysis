@@ -74,7 +74,9 @@ Outputs (per subject)
     sub-<id>_glmSingle_qc_FRACvalue.nii.gz         <- ridge regularization fraction (3D)
     sub-<id>_glmSingle_qc_noisepool.nii.gz         <- GLMdenoise noise-pool mask, int8 (3D)
     sub-<id>_glmSingle_qc_R2_bytype.nii.gz         <- R2 for types A,B,C,D stacked (4D, 4 vols)
-    glmsingle_feedback_sub-<id>.log
+<output-dir>/logs/
+    glmsingle_feedback_sub-<id>.log     <- NOT under sub-<id>/: GLMsingle rmtree's that
+                                           dir at the start of fit(), see main()
 
 The info CSV carries every deterministic per-trial quantity (pair, chosen/unchosen
 stimulus and reward, RT, accuracy) so downstream analyses need no BBT join for them.
@@ -436,14 +438,19 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Resolve subject list and log destination
+    # Logs live in <output-dir>/logs/, NOT in the per-subject dir: GLM_single.fit()
+    # starts with `shutil.rmtree(outputdir)` on <output-dir>/sub-<id>, which unlinks
+    # any file opened there beforehand. The FileHandler keeps writing to the unlinked
+    # inode, so nothing errors — the log just silently doesn't exist afterwards.
+    log_dir = output_dir / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+
     if args.subject:
         subjects = [args.subject]
-        log_dir  = output_dir / f"sub-{args.subject}"
-        log_dir.mkdir(parents=True, exist_ok=True)
         log_file = log_dir / f"glmsingle_feedback_sub-{args.subject}.log"
     else:
         subjects = load_participant_list(str(base_dir), file_name=args.participants_file)
-        log_file = output_dir / "glmsingle_feedback_batch.log"
+        log_file = log_dir / "glmsingle_feedback_batch.log"
 
     logging.basicConfig(
         level=logging.INFO,
