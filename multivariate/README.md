@@ -173,6 +173,7 @@ All decoders use `LeaveOneGroupOut` over the three runs (no temporal leakage).
 | `betas_qc_decoding.ipynb` | Beta-version QC: B→D category accuracy per subject + group, wholebrain vs visual-cortex |
 | `label_shuffle_qc.ipynb` | Label-shuffle QC: true vs shuffled-label null distribution, empirical p-values per subject |
 | `glmsingle_qc.ipynb` | GLMsingle fit QC (R², HRF, reliability) |
+| `glmsingle_cue_vs_feedback_comparison.ipynb` | Cue- vs feedback-locked beta redundancy (types B/D, vs shuffled + adjacent baselines) |
 | `inspect_gm_masks.ipynb` | Inspect grey-matter / brain masks |
 | RSA: `RSA_sandbox.ipynb`, `RSA_second_lvl.ipynb`, `dev_nilearn_firstlvl_rsa.ipynb` | Representational similarity analyses |
 | Dev/sandbox: `dev_glmsingle_stim_cat.ipynb`, `dev_mvpa.ipynb`, `single_trial_GLM_sandbox.ipynb` | Prototyping (source of the `run_*.py` scripts) |
