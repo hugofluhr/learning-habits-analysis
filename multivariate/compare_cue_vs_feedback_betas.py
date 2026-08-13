@@ -35,10 +35,21 @@ python multivariate/compare_cue_vs_feedback_betas.py --subject 01 \\
     --output-dir /home/hfluhr/shares-hare/ds-learning-habits/derivatives/cue_vs_feedback \\
     --roi-mask visualcortex /home/hfluhr/shares-hare/ds-learning-habits/derivatives/decoding/visual_cortex_mask.nii.gz
 
+Which model type to compare (--beta-type)
+-----------------------------------------
+Defaults to D, the production betas every downstream analysis uses — but a type-D-only
+comparison is confounded for this question. D's GLMdenoise PC count and fracridge
+fraction are cross-validated over *condition repeats*, and the two models define
+conditions differently (8 stimulus identities for cue, 8 stimulus pairs for feedback),
+so any decorrelation mixes different event timing with different hyperparameter
+selection. Type B (FITHRF only, no denoise, no ridge) isolates the timing effect.
+Run `--beta-type B D` to separate them. Type A is unavailable: ONOFF pools every event
+into a single beta, leaving nothing per-trial to correlate.
+
 Outputs (per subject)
 ---------------------
-<output-dir>/sub-<id>/sub-<id>_cue_vs_feedback.csv          — one row per mask
-<output-dir>/sub-<id>/sub-<id>_cue_vs_feedback_r.nii.gz     — voxelwise matched r (--save-maps)
+<output-dir>/sub-<id>/sub-<id>_cue_vs_feedback.csv          — one row per (beta_type, mask)
+<output-dir>/sub-<id>/sub-<id>_cue_vs_feedback_r_type<T>.nii.gz — voxelwise matched r (--save-maps)
 <output-dir>/logs/cue_vs_feedback_sub-<id>.log
 
 --output-dir deliberately defaults outside the GLMsingle output trees: GLM_single.fit()
@@ -77,6 +88,39 @@ from utils.data import Subject
 # Cue betas span all three runs in this order; feedback betas only the learning ones.
 CUE_RUNS      = ['learning1', 'learning2', 'test']
 EXPECTED_CUE_COUNTS = {'learning1': 96, 'learning2': 96, 'test': 136}
+
+# Raw GLMsingle model outputs, for --beta-type. Type A is excluded: ONOFF pools every
+# event into one beta per voxel, so there are no per-trial volumes to correlate.
+BETA_FILES = {
+    'B': 'TYPEB_FITHRF.npy',
+    'C': 'TYPEC_FITHRF_GLMDENOISE.npy',
+    'D': 'TYPED_FITHRF_GLMDENOISE_RR.npy',
+}
+
+
+def load_betas(subject_dir, subject, tag, beta_type, n_expected):
+    """Load one model type's single-trial betas as (x, y, z, n_trials).
+
+    Type D comes from the NIfTI the runners already export; B and C are only written
+    as raw .npy, so they are unpickled here.
+    """
+    if beta_type == 'D':
+        path = subject_dir / f"sub-{subject}_glmSingle_betas_{tag}.nii.gz"
+        if not path.exists():
+            raise FileNotFoundError(f"sub-{subject}: missing input {path}")
+        arr = nib.load(path).get_fdata(dtype=np.float32)
+    else:
+        path = subject_dir / BETA_FILES[beta_type]
+        if not path.exists():
+            raise FileNotFoundError(f"sub-{subject}: missing input {path}")
+        arr = np.load(path, allow_pickle=True).item()['betasmd'].astype(np.float32)
+
+    if arr.shape[-1] != n_expected:
+        raise ValueError(
+            f"sub-{subject}: type-{beta_type} {tag} betas have {arr.shape[-1]} volumes, "
+            f"expected {n_expected} (one per trial)"
+        )
+    return arr
 
 
 # ---------------------------------------------------------------------------
@@ -241,7 +285,8 @@ def compare_in_mask(cue_arr, fb_arr, mask_arr, runs, rng, n_shuffles):
 # ---------------------------------------------------------------------------
 
 def run_subject(subject, base_dir, bids_dir, cue_dir, feedback_dir, output_dir,
-                roi_masks=None, n_shuffles=10, seed=0, save_maps=False, overwrite=False):
+                roi_masks=None, beta_types=('D',), n_shuffles=10, seed=0,
+                save_maps=False, overwrite=False):
     roi_masks = roi_masks or []
     subject_output = output_dir / f"sub-{subject}"
     done_flag = subject_output / f"sub-{subject}_cue_vs_feedback.csv"
@@ -252,11 +297,11 @@ def run_subject(subject, base_dir, bids_dir, cue_dir, feedback_dir, output_dir,
 
     subject_output.mkdir(parents=True, exist_ok=True)
 
-    cue_betas_path = cue_dir / f"sub-{subject}" / f"sub-{subject}_glmSingle_betas_CUES.nii.gz"
-    cue_info_path  = cue_dir / f"sub-{subject}" / f"sub-{subject}_glmSingle_betas_CUES_info.csv"
-    fb_betas_path  = feedback_dir / f"sub-{subject}" / f"sub-{subject}_glmSingle_betas_FEEDBACK.nii.gz"
-    fb_info_path   = feedback_dir / f"sub-{subject}" / f"sub-{subject}_glmSingle_betas_FEEDBACK_info.csv"
-    for p in (cue_betas_path, cue_info_path, fb_betas_path, fb_info_path):
+    cue_sub_dir = cue_dir / f"sub-{subject}"
+    fb_sub_dir  = feedback_dir / f"sub-{subject}"
+    cue_info_path = cue_sub_dir / f"sub-{subject}_glmSingle_betas_CUES_info.csv"
+    fb_info_path  = fb_sub_dir / f"sub-{subject}_glmSingle_betas_FEEDBACK_info.csv"
+    for p in (cue_info_path, fb_info_path):
         if not p.exists():
             raise FileNotFoundError(f"sub-{subject}: missing input {p}")
 
@@ -267,21 +312,6 @@ def run_subject(subject, base_dir, bids_dir, cue_dir, feedback_dir, output_dir,
                   include_imaging=True, bids_dir=str(bids_dir))
 
     cue_idx = match_trials(cue_info, fb_info, sub, subject)
-
-    cue_img = nib.load(cue_betas_path)
-    fb_img  = nib.load(fb_betas_path)
-    logging.info(f"sub-{subject}: cue {cue_img.shape}, feedback {fb_img.shape}")
-
-    if fb_img.shape[3] != len(fb_info):
-        raise ValueError(f"sub-{subject}: feedback betas have {fb_img.shape[3]} volumes "
-                         f"but info CSV has {len(fb_info)} rows")
-    if cue_img.shape[3] != len(cue_info):
-        raise ValueError(f"sub-{subject}: cue betas have {cue_img.shape[3]} volumes "
-                         f"but info CSV has {len(cue_info)} rows")
-
-    # Select matched cue volumes up front so both arrays are trial-aligned from here on.
-    cue_arr = cue_img.get_fdata(dtype=np.float32)[..., cue_idx]
-    fb_arr  = fb_img.get_fdata(dtype=np.float32)
     runs    = fb_info['run'].to_numpy()
 
     brain_mask_img = nib.load(sub.get_brain_mask('learning1'))
@@ -289,46 +319,59 @@ def run_subject(subject, base_dir, bids_dir, cue_dir, feedback_dir, output_dir,
     for name, path in roi_masks:
         roi_func = resample_to_img(nib.load(str(path)), brain_mask_img, interpolation='nearest')
         masks.append((name, math_img('(v > 0) & (b > 0)', v=roi_func, b=brain_mask_img)))
+    mask_arrays = [(name, img.get_fdata() > 0) for name, img in masks]
 
-    rng = np.random.default_rng(seed)
     rows = []
-    for mask_name, mask_img in masks:
-        mask_arr = mask_img.get_fdata() > 0
-        res = compare_in_mask(cue_arr, fb_arr, mask_arr, runs, rng, n_shuffles)
-        vox_map = res.pop('_vox_matched_map', None)
-        finite  = res.pop('_finite', None)
+    for beta_type in beta_types:
+        # Select matched cue volumes up front so both arrays are trial-aligned from here on.
+        cue_arr = load_betas(cue_sub_dir, subject, 'CUES', beta_type, len(cue_info))[..., cue_idx]
+        fb_arr  = load_betas(fb_sub_dir, subject, 'FEEDBACK', beta_type, len(fb_info))
+        logging.info(f"sub-{subject}: type-{beta_type} — cue {cue_arr.shape}, feedback {fb_arr.shape}")
 
-        if res.get('n_voxels', 0) == 0:
-            logging.warning(f"  {mask_name}: no finite voxels, skipping")
-            continue
+        # Reseed per type so the shuffled baseline is identical across types and the
+        # B-vs-D difference can't be an artefact of different random pairings.
+        rng = np.random.default_rng(seed)
 
-        logging.info(
-            f"  {mask_name}: {res['n_voxels']:,} vox | "
-            f"voxelwise r matched {res['vox_r_matched_median']:.3f} "
-            f"(shuffled {res['vox_r_shuffled_median']:.3f}, "
-            f"adjacent {res['vox_r_adjacent_median']:.3f}) | "
-            f"trialwise r matched {res['trial_r_matched_mean']:.3f} "
-            f"(shuffled {res['trial_r_shuffled_mean']:.3f}, "
-            f"adjacent {res['trial_r_adjacent_mean']:.3f})"
-        )
-        # Direction sanity check — if matched isn't above the shuffled floor, suspect
-        # the alignment before believing the science.
-        if res['vox_r_matched_median'] <= res['vox_r_shuffled_median']:
-            logging.warning(f"  {mask_name}: matched r <= shuffled r — check alignment")
+        for mask_name, mask_arr in mask_arrays:
+            res = compare_in_mask(cue_arr, fb_arr, mask_arr, runs, rng, n_shuffles)
+            vox_map = res.pop('_vox_matched_map', None)
+            finite  = res.pop('_finite', None)
 
-        rows.append({'subject': subject, 'mask': mask_name, **res})
+            if res.get('n_voxels', 0) == 0:
+                logging.warning(f"  type-{beta_type} {mask_name}: no finite voxels, skipping")
+                continue
 
-        if save_maps and mask_name == 'wholebrain':
-            full = np.full(mask_arr.shape, np.nan, dtype=np.float32)
-            vox_positions = np.where(mask_arr)
-            keep = tuple(v[finite] for v in vox_positions)
-            full[keep] = vox_map.astype(np.float32)
-            nib.Nifti1Image(full, brain_mask_img.affine, brain_mask_img.header).to_filename(
-                str(subject_output / f"sub-{subject}_cue_vs_feedback_r.nii.gz")
+            logging.info(
+                f"  type-{beta_type} {mask_name}: {res['n_voxels']:,} vox | "
+                f"voxelwise r matched {res['vox_r_matched_median']:.3f} "
+                f"(shuffled {res['vox_r_shuffled_median']:.3f}, "
+                f"adjacent {res['vox_r_adjacent_median']:.3f}) | "
+                f"trialwise r matched {res['trial_r_matched_mean']:.3f} "
+                f"(shuffled {res['trial_r_shuffled_mean']:.3f}, "
+                f"adjacent {res['trial_r_adjacent_mean']:.3f})"
             )
+            # Direction sanity check — if matched isn't above the shuffled floor,
+            # suspect the alignment before believing the science.
+            if res['vox_r_matched_median'] <= res['vox_r_shuffled_median']:
+                logging.warning(f"  type-{beta_type} {mask_name}: matched r <= shuffled r "
+                                f"— check alignment")
+
+            rows.append({'subject': subject, 'beta_type': beta_type,
+                         'mask': mask_name, **res})
+
+            if save_maps and mask_name == 'wholebrain':
+                full = np.full(mask_arr.shape, np.nan, dtype=np.float32)
+                keep = tuple(v[finite] for v in np.where(mask_arr))
+                full[keep] = vox_map.astype(np.float32)
+                nib.Nifti1Image(full, brain_mask_img.affine, brain_mask_img.header).to_filename(
+                    str(subject_output /
+                        f"sub-{subject}_cue_vs_feedback_r_type{beta_type}.nii.gz")
+                )
+
+        del cue_arr, fb_arr   # each pair is ~350 MB; don't hold two types at once
 
     pd.DataFrame(rows).to_csv(done_flag, index=False)
-    logging.info(f"sub-{subject}: done — {len(rows)} mask(s) written to {done_flag.name}")
+    logging.info(f"sub-{subject}: done — {len(rows)} row(s) written to {done_flag.name}")
 
 
 # ---------------------------------------------------------------------------
@@ -358,6 +401,16 @@ def main():
                         default=[],
                         help="ROI mask given as NAME PATH; repeatable. Whole-brain is "
                              "always included automatically.")
+    parser.add_argument("--beta-type", nargs='+', choices=['B', 'C', 'D'], default=['D'],
+                        help="GLMsingle model type(s) to compare; repeatable, e.g. "
+                             "--beta-type B D (default: D). Type A is excluded — ONOFF "
+                             "pools all events into one beta, leaving nothing per-trial. "
+                             "Comparing B alongside D matters here: D's GLMdenoise/ridge "
+                             "hyperparameters are cross-validated over condition repeats, "
+                             "and the two models define conditions differently (8 stimulus "
+                             "identities vs 8 stimulus pairs), so a type-D-only comparison "
+                             "conflates different event timing with different hyperparameter "
+                             "selection. Type B (FITHRF only) isolates the timing effect.")
     parser.add_argument("--n-shuffles", type=int, default=10,
                         help="Shuffled-pairing repetitions for the baseline (default: 10)")
     parser.add_argument("--seed", type=int, default=0, help="RNG seed for the shuffles")
@@ -389,6 +442,7 @@ def main():
         feedback_dir = Path(args.feedback_dir),
         output_dir   = output_dir,
         roi_masks    = args.roi_mask,
+        beta_types   = args.beta_type,
         n_shuffles   = args.n_shuffles,
         seed         = args.seed,
         save_maps    = args.save_maps,

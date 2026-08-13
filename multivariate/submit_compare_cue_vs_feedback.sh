@@ -28,6 +28,12 @@ LOG_DIR="${OUTPUT_DIR}/logs"
 
 PARTICIPANTS_TSV="${BASE_DIR}/participants_mvpa.tsv"
 
+# B alongside D by default: D's GLMdenoise/ridge hyperparameters are tuned over
+# condition repeats and the two models define conditions differently (stimulus
+# identities vs stimulus pairs), so D alone conflates event timing with hyperparameter
+# selection. B (FITHRF only) isolates the timing effect. Override with BETA_TYPES=D.
+BETA_TYPES="${BETA_TYPES:-B D}"
+
 EXTRA_ARGS=""
 [ "${OVERWRITE:-0}" = "1" ] && EXTRA_ARGS="--overwrite"
 
@@ -77,8 +83,8 @@ sbatch <<EOF
 #SBATCH --error=${LOG_DIR}/cue_vs_feedback_%A_%a.err
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=2
-#SBATCH --mem=16G
-#SBATCH --time=0:20:00
+#SBATCH --mem=24G
+#SBATCH --time=0:30:00
 #SBATCH --array=1-${N}
 
 set -eo pipefail
@@ -102,5 +108,6 @@ echo "=== sub-\${SUBJECT}  (task \${SLURM_ARRAY_TASK_ID}/\${SLURM_ARRAY_TASK_COU
     --feedback-dir "${FEEDBACK_DIR}" \\
     --output-dir "${OUTPUT_DIR}" \\
     --roi-mask visualcortex "${VIS_MASK}" \\
+    --beta-type ${BETA_TYPES} \\
     --save-maps ${EXTRA_ARGS}
 EOF
