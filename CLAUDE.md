@@ -2,6 +2,29 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Session checkpoints
+
+This repo keeps `session-notes/` — a git-tracked, per-session log where
+findings are backed by rerunnable code, not just prose (see the `checkpoint`
+skill). Numbers and claims computed in scratch code and only ever stated in
+prose are exactly what gets lost between sessions; don't let that happen here.
+
+Self-trigger the `checkpoint` skill (don't wait to be asked) in either of these
+two situations:
+
+1. **Right after stating a numeric/statistical conclusion or decision as
+   settled** — e.g. writing/updating a findings-summary section, or answering
+   "what did we conclude" — if it isn't yet backed by a saved notebook
+   cell/script.
+2. **Right before a topic or focus shift** in a long session (moving from one
+   analysis thread to a different one), if the thread being left behind
+   produced findings that aren't checkpointed yet.
+
+Use `session-notes/2026-08-13_feedback-glmsingle-and-cue-redundancy.md` as the
+template for section structure — not for length. Keep new findings to 2-4
+lines each pointing at the notebook that backs them; push full derivations
+into the notebook's markdown cells instead of restating them in the note.
+
 ## Jupyter notebooks
 
 Always use `NotebookEdit` to create or edit `.ipynb` files — never `Write`.
