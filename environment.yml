@@ -18,3 +18,4 @@ dependencies:
   - pip
   - pip:
     - git+https://github.com/cvnlab/GLMsingle.git@1ab54a65
+    - rsatoolbox==0.2.0
