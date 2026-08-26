@@ -123,12 +123,12 @@ def run_subject(subject, bids_dir, glmsingle_dir, output_dir,
 def main():
     parser = argparse.ArgumentParser(description="Run stimulus category FREM decoding for one subject.")
     parser.add_argument("--subject", required=True, help="Subject ID without 'sub-' prefix, e.g. 01")
-    parser.add_argument("--bids-dir",      default="/home/ubuntu/data/learning-habits/bids_dataset"
-                                                    "/derivatives/fmriprep-24.0.1-noSDC")
-    parser.add_argument("--glmsingle-dir", default="/home/ubuntu/data/learning-habits/bids_dataset"
-                                                    "/derivatives/glmsingle")
-    parser.add_argument("--output-dir",    default="/home/ubuntu/data/learning-habits/bids_dataset"
-                                                    "/derivatives/frem")
+    parser.add_argument("--bids-dir", required=True,
+                        help="fMRIPrep derivatives directory")
+    parser.add_argument("--glmsingle-dir", required=True,
+                        help="GLMsingle betas directory")
+    parser.add_argument("--output-dir", required=True,
+                        help="Output root directory")
     parser.add_argument("--n-jobs",  type=int,   default=1,
                         help="Parallel jobs for FREM (default: 1)")
     parser.add_argument("--overwrite", action="store_true")

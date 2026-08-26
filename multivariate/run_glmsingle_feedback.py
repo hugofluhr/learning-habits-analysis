@@ -39,14 +39,14 @@ Usage
 # Single subject (local default paths)
 python multivariate/run_glmsingle_feedback.py --subject 01
 
-# All subjects from participants_mvpa.tsv (sequential)
-python multivariate/run_glmsingle_feedback.py
-
-# Cluster (override paths, single subject — called from submit_glmsingle_feedback.sh)
+# Cluster, single subject (this is what submit_glmsingle_feedback.sh runs)
 python multivariate/run_glmsingle_feedback.py --subject 01 \
-    --base-dir /mnt/data/learning-habits \
-    --bids-dir /mnt/data/learning-habits/bids_dataset/derivatives/fmriprep-24.0.1-noSDC \
-    --output-dir /mnt/data/learning-habits/bids_dataset/derivatives/glmsingle_feedback
+    --base-dir /home/hfluhr/data/learninghabits \
+    --bids-dir /home/hfluhr/shares-hare/ds-learning-habits/derivatives/fmriprep-24.0.1-noSDC \
+    --output-dir /home/hfluhr/shares-hare/ds-learning-habits/derivatives/glmsingle_feedback
+
+# All subjects from participants_mvpa.tsv (sequential) — drop --subject
+python multivariate/run_glmsingle_feedback.py --base-dir ... --bids-dir ... --output-dir ...
 
 Subject list
 ------------
@@ -419,15 +419,13 @@ def main():
                         help="TSV filename (relative to --base-dir) listing subject IDs "
                              "(default: participants_mvpa.tsv)")
     parser.add_argument("--base-dir",
-                        default="/home/ubuntu/data/learning-habits",
+                        required=True,
                         help="Root data dir containing spm_format/")
     parser.add_argument("--bids-dir",
-                        default="/home/ubuntu/data/learning-habits/bids_dataset"
-                                "/derivatives/fmriprep-24.0.1-noSDC",
+                        required=True,
                         help="fMRIPrep derivatives directory")
     parser.add_argument("--output-dir",
-                        default="/home/ubuntu/data/learning-habits/bids_dataset"
-                                "/derivatives/glmsingle_feedback",
+                        required=True,
                         help="Output root directory")
     parser.add_argument("--overwrite", action="store_true",
                         help="Rerun even if outputs already exist")
