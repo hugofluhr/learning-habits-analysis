@@ -17,6 +17,9 @@ Notes that live nowhere else:
 
 Usage
 -----
+# Precondition check only — needs just --bbt, no NIfTI/cluster access:
+python multivariate/run_rsa_roi.py --subject 01 --bbt /path/to/bbt.csv --dry-run
+
 python multivariate/run_rsa_roi.py --subject 01 \\
     --base-dir /home/hfluhr/data/learninghabits \\
     --bids-dir  .../derivatives/fmriprep-24.0.1-noSDC \\
@@ -191,6 +194,51 @@ def value_contrast(rdm, keep, cat, value):
     if not a.any() or not b.any():
         return float('nan'), int(a.sum()), int(b.sum())
     return float(y[b].mean() - y[a].mean()), int(a.sum()), int(b.sum())
+
+
+# ---------------------------------------------------------------------------
+# Dry-run precondition check
+# ---------------------------------------------------------------------------
+def check_bbt_only(subject, bbt_path):
+    """Whether the BBT has a well-formed 8-stimulus record for `subject`, with no
+    NIfTI/info-CSV access at all.
+
+    This is a *necessary but not sufficient* precondition: it catches a subject
+    entirely missing from the BBT (the sub-46 failure mode below) or one whose
+    stimuli aren't uniquely valued, using only the ~200 KB bbt.csv read — no
+    cluster access needed. It does NOT check that the BBT's identity sequence
+    matches the beta volume order; that's `load_target_from_bbt`'s job at runtime,
+    and it needs the info CSV that only exists once GLMsingle has produced betas.
+    Passing this check does not guarantee `run_subject` will succeed; failing it
+    guarantees `run_subject` will crash on this subject.
+
+    Returns (ok: bool, message: str).
+    """
+    sub_id = f"sub-{subject}"
+    bbt = pd.read_csv(bbt_path, usecols=['sub_id', 'block', 'first_stim_name',
+                                         'first_stim_cat', 'first_stim_value',
+                                         'first_stim_frequ', 'first_stim_value_rl'])
+    sub_bbt = bbt[bbt['sub_id'] == sub_id]
+    if sub_bbt.empty:
+        return False, f"{sub_id}: absent from BBT ({bbt_path})"
+
+    for run in RUNS:
+        if not (sub_bbt['block'] == run).any():
+            return False, f"{sub_id}: no rows for run '{run}'"
+
+    grp = sub_bbt.groupby('first_stim_name')
+    n_stim = grp.ngroups
+    if n_stim != 8:
+        return False, f"{sub_id}: {n_stim} distinct stimuli, expected 8"
+
+    bad = grp.agg(n_cat=('first_stim_cat', 'nunique'),
+                  n_val=('first_stim_value', 'nunique'),
+                  n_frq=('first_stim_frequ', 'nunique'))
+    bad = bad[(bad > 1).any(axis=1)]
+    if len(bad):
+        return False, f"{sub_id}: non-unique value/frequency/category for {list(bad.index)}"
+
+    return True, f"{sub_id}: OK — 8 stimuli, all 3 runs present, values well-formed"
 
 
 # ---------------------------------------------------------------------------
@@ -408,17 +456,18 @@ def _validate_against_rsatoolbox(patterns, cond_idx, fold_idx, stim_names, rdm_o
 def main():
     parser = argparse.ArgumentParser(description="ROI crossnobis RSA for one subject.")
     parser.add_argument("--subject", required=True, help="ID without 'sub-' prefix, e.g. 01")
-    parser.add_argument("--base-dir", required=True,
-                        help="Root data directory")
-    parser.add_argument("--bids-dir", required=True,
-                        help="fMRIPrep derivatives directory")
-    parser.add_argument("--glmsingle-dir", required=True,
-                        help="GLMsingle betas directory")
+    parser.add_argument("--base-dir", help="Root data directory")
+    parser.add_argument("--bids-dir", help="fMRIPrep derivatives directory")
+    parser.add_argument("--glmsingle-dir", help="GLMsingle betas directory")
     parser.add_argument("--bbt", required=True,
                         help="Big Behavior Table CSV (first_stim_value, first_stim_frequ, "
                              "first_stim_value_rl)")
-    parser.add_argument("--output-dir", required=True,
-                        help="Output root directory")
+    parser.add_argument("--output-dir", help="Output root directory")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Check only that the BBT has a well-formed record for this "
+                             "subject (presence, 8 stimuli, all 3 runs, unique values) and "
+                             "exit. No NIfTI/mask access, no cluster paths needed — see "
+                             "check_bbt_only(). Exit code 1 on failure, for shell loops.")
     parser.add_argument("--roi-mask", action="append", nargs=2, metavar=("NAME", "PATH"),
                         default=[],
                         help="ROI mask as NAME PATH; repeatable. Whole-brain always included.")
@@ -433,6 +482,19 @@ def main():
                              "smallest ROI (needs rsatoolbox installed)")
     parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args()
+
+    if args.dry_run:
+        logging.basicConfig(level=logging.INFO, format="%(message)s")
+        ok, message = check_bbt_only(args.subject, args.bbt)
+        logging.info(("PASS  " if ok else "FAIL  ") + message)
+        sys.exit(0 if ok else 1)
+
+    missing = [f"--{name.replace('_', '-')}" for name in
+              ('base_dir', 'bids_dir', 'glmsingle_dir', 'output_dir')
+              if getattr(args, name) is None]
+    if missing:
+        parser.error(f"the following arguments are required (unless --dry-run): "
+                     f"{', '.join(missing)}")
 
     output_dir = Path(args.output_dir)
     subject_output = output_dir / f"sub-{args.subject}"
