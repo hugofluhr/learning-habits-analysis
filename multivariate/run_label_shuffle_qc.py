@@ -162,12 +162,12 @@ def main():
         description="Label-shuffle robustness check for category decoding, one subject."
     )
     parser.add_argument("--subject", required=True, help="Subject ID without 'sub-' prefix, e.g. 01")
-    parser.add_argument("--bids-dir",      default="/home/ubuntu/data/learning-habits/bids_dataset"
-                                                    "/derivatives/fmriprep-24.0.1-noSDC")
-    parser.add_argument("--glmsingle-dir", default="/home/ubuntu/data/learning-habits/bids_dataset"
-                                                    "/derivatives/glmsingle")
-    parser.add_argument("--output-dir",    default="/home/ubuntu/data/learning-habits/bids_dataset"
-                                                    "/derivatives/glmsingle_qc")
+    parser.add_argument("--bids-dir", required=True,
+                        help="fMRIPrep derivatives directory")
+    parser.add_argument("--glmsingle-dir", required=True,
+                        help="GLMsingle betas directory")
+    parser.add_argument("--output-dir", required=True,
+                        help="Output root directory")
     parser.add_argument("--visual-cortex-mask", required=True,
                         help="Path to pre-built visual cortex mask NIfTI "
                              "(from build_visual_cortex_mask.py)")

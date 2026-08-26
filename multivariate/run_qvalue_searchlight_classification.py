@@ -40,7 +40,7 @@ Usage
 python multivariate/run_qvalue_searchlight_classification.py --subject 01 \\
     --bids-dir /home/hfluhr/shares-hare/ds-learning-habits/derivatives/fmriprep-24.0.1-noSDC \\
     --glmsingle-dir /home/hfluhr/shares-hare/ds-learning-habits/derivatives/glmsingle \\
-    --bbt /mnt/data/learning-habits/bbt.csv \\
+    --bbt /home/hfluhr/data/learninghabits/bbt.csv \\
     --output-dir /home/hfluhr/shares-hare/ds-learning-habits/derivatives/searchlight \\
     --n-jobs 8
 
@@ -151,10 +151,10 @@ def run_subject(subject, bids_dir, glmsingle_dir, bbt_path, output_dir,
 def main():
     parser = argparse.ArgumentParser(description="Run reward high/low classification searchlight for one subject.")
     parser.add_argument("--subject", required=True, help="Subject ID without 'sub-' prefix, e.g. 01")
-    parser.add_argument("--bids-dir",      default="/home/ubuntu/data/learning-habits/bids_dataset"
-                                                    "/derivatives/fmriprep-24.0.1-noSDC")
-    parser.add_argument("--glmsingle-dir", default="/home/ubuntu/data/learning-habits/bids_dataset"
-                                                    "/derivatives/glmsingle")
+    parser.add_argument("--bids-dir", required=True,
+                        help="fMRIPrep derivatives directory")
+    parser.add_argument("--glmsingle-dir", required=True,
+                        help="GLMsingle betas directory")
     parser.add_argument("--bbt", required=True,
                         help="Path to the Big Behavior Table CSV holding the target column "
                              "(same table used to fit the SPM first-levels)")
@@ -164,8 +164,8 @@ def main():
                         help="Trials with target <= this value are labeled 'low' (default: 2.0)")
     parser.add_argument("--high-min", type=float, default=4.0,
                         help="Trials with target >= this value are labeled 'high' (default: 4.0)")
-    parser.add_argument("--output-dir",    default="/home/ubuntu/data/learning-habits/bids_dataset"
-                                                    "/derivatives/searchlight")
+    parser.add_argument("--output-dir", required=True,
+                        help="Output root directory")
     parser.add_argument("--radius",  type=float, default=6.,
                         help="Searchlight sphere radius in mm (default: 6)")
     parser.add_argument("--n-jobs",  type=int,   default=1,

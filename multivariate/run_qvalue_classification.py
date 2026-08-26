@@ -191,14 +191,12 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path
 def main():
     parser = argparse.ArgumentParser(description="Run reward high/low classification for one subject.")
     parser.add_argument("--subject", required=True, help="Subject ID without 'sub-' prefix, e.g. 01")
-    parser.add_argument("--base-dir",
-                        default="/home/ubuntu/data/learning-habits")
-    parser.add_argument("--bids-dir",
-                        default="/home/ubuntu/data/learning-habits/bids_dataset"
-                                "/derivatives/fmriprep-24.0.1-noSDC")
-    parser.add_argument("--glmsingle-dir",
-                        default="/home/ubuntu/data/learning-habits/bids_dataset"
-                                "/derivatives/glmsingle")
+    parser.add_argument("--base-dir", required=True,
+                        help="Root data directory")
+    parser.add_argument("--bids-dir", required=True,
+                        help="fMRIPrep derivatives directory")
+    parser.add_argument("--glmsingle-dir", required=True,
+                        help="GLMsingle betas directory")
     parser.add_argument("--bbt", required=True,
                         help="Path to the Big Behavior Table CSV holding the target column "
                              "(same table used to fit the SPM first-levels)")
@@ -208,9 +206,8 @@ def main():
                         help="Trials with target <= this are labeled 'low' (default: 2)")
     parser.add_argument("--high-min", type=float, default=4.0,
                         help="Trials with target >= this are labeled 'high' (default: 4)")
-    parser.add_argument("--output-dir",
-                        default="/home/ubuntu/data/learning-habits/bids_dataset"
-                                "/derivatives/decoding")
+    parser.add_argument("--output-dir", required=True,
+                        help="Output root directory")
     parser.add_argument("--roi-mask", action="append", nargs=2, metavar=("NAME", "PATH"),
                         default=[],
                         help="ROI mask to classify, given as NAME PATH; repeatable. "

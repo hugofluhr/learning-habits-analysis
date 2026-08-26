@@ -43,7 +43,51 @@ conda activate neuroim
 
 Neuroimaging (fMRI) analysis pipeline for a reward-learning habits study. The experiment has three sessions per subject: `learning1`, `learning2`, and `test`. Analysis uses both SPM12 (MATLAB) for GLM estimation and nilearn (Python) for design matrix inspection and secondary analyses.
 
+## Compute environments
+
+**All remote compute runs on the SLURM cluster (UZH sciencecluster). The analysis VM
+(`uzh.vm`) is off-limits — do not ssh to it, run jobs on it, or write paths for it.**
+See the `sciencecluster` skill for SLURM specifics.
+
+| Where | What it's for |
+|-------|---------------|
+| Cluster (`hfluhr@cluster.s3it.uzh.ch`) | Everything that touches the full dataset — GLMsingle, decoding, searchlight, RSA |
+| Local (this machine) | Editing code, notebooks, aggregating results, smoke tests against `dev_sample` |
+| ~~VM (`uzh.vm`)~~ | **Off-limits.** Legacy paths below (`/mnt/data/…`, `/home/ubuntu/…`) refer to it |
+
+Cluster access — two aliases, and they are not interchangeable:
+
+```bash
+ssh uzh.cluster.cmd "squeue -u hfluhr"   # inline commands, rsync, scp — always this one
+ssh uzh.cluster                          # interactive shell only (has RemoteCommand=zsh)
+```
+
+**Never run compute on the login node**, not even a quick smoke test — wrap it in
+`srun` or submit it with `sbatch`.
+
+Get code onto the cluster by pushing and pulling, never by copying into its working tree:
+
+```bash
+git add … && git commit -m "…" && git push                                  # local
+ssh uzh.cluster.cmd "cd ~/repos/learning-habits-analysis && git pull"       # cluster
+```
+
+Cluster paths (these are what the `multivariate/submit_*.sh` scripts inject):
+
+| Location | Path |
+|----------|------|
+| Repo | `/home/hfluhr/repos/learning-habits-analysis` |
+| Data root (`--base-dir`) | `/home/hfluhr/data/learninghabits` |
+| Derivatives | `/home/hfluhr/shares-hare/ds-learning-habits/derivatives/{fmriprep-24.0.1-noSDC,glmsingle,decoding,searchlight,frem,rsa}` |
+| Conda env | `/home/hfluhr/data/conda/envs/learning-habits` (build with `multivariate/build_env.sh`) |
+
+For local smoke tests use `/Users/hugofluhr/phd_local/data/LearningHabits/dev_sample/`
+(has `bbt.csv` and masks, but **no** GLMsingle betas).
+
 ## Running MATLAB scripts
+
+> These paths are on the decommissioned VM and have no cluster equivalent recorded yet —
+> ask before running the MATLAB/SPM pipeline.
 
 SPM12 is at `/home/ubuntu/repos/spm12`. Load it and run a script:
 
@@ -99,11 +143,15 @@ bash scripts/spm_export_first_lvl.sh
 
 ## Data paths
 
+For cluster paths — the ones you almost always want — see **Compute environments** above.
+The SPM/MATLAB paths below are **VM paths, and the VM is off-limits**; they are kept only
+as a record of where that pipeline last ran.
+
 | Location | Path |
 |----------|------|
-| Raw GLM outputs | `/mnt/data/learning-habits/spm_format/outputs/` |
-| Session contrast exports | `/mnt/data/learning-habits/spm_outputs/session_contrasts_exports/` |
-| Local data (alternative) | `/home/ubuntu/data/learning-habits/` |
+| Raw GLM outputs (VM) | `/mnt/data/learning-habits/spm_format/outputs/` |
+| Session contrast exports (VM) | `/mnt/data/learning-habits/spm_outputs/session_contrasts_exports/` |
+| Local data, VM-side alternative | `/home/ubuntu/data/learning-habits/` |
 
 GLM output directories are timestamped, e.g. `glm2_all_runs_scrubbed_2025-12-11-12-44`.
 

@@ -384,19 +384,16 @@ def main():
                     "betas, against shuffled-pair and adjacent-trial baselines."
     )
     parser.add_argument("--subject", required=True, help="Subject ID without 'sub-' prefix, e.g. 01")
-    parser.add_argument("--base-dir", default="/home/ubuntu/data/learning-habits")
-    parser.add_argument("--bids-dir",
-                        default="/home/ubuntu/data/learning-habits/bids_dataset"
-                                "/derivatives/fmriprep-24.0.1-noSDC")
-    parser.add_argument("--cue-dir",
-                        default="/home/ubuntu/data/learning-habits/bids_dataset"
-                                "/derivatives/glmsingle")
-    parser.add_argument("--feedback-dir",
-                        default="/home/ubuntu/data/learning-habits/bids_dataset"
-                                "/derivatives/glmsingle_feedback")
-    parser.add_argument("--output-dir",
-                        default="/home/ubuntu/data/learning-habits/bids_dataset"
-                                "/derivatives/cue_vs_feedback")
+    parser.add_argument("--base-dir", required=True,
+                        help="Root data directory")
+    parser.add_argument("--bids-dir", required=True,
+                        help="fMRIPrep derivatives directory")
+    parser.add_argument("--cue-dir", required=True,
+                        help="Cue-locked GLMsingle betas directory")
+    parser.add_argument("--feedback-dir", required=True,
+                        help="Feedback-locked GLMsingle betas directory")
+    parser.add_argument("--output-dir", required=True,
+                        help="Output root directory")
     parser.add_argument("--roi-mask", action="append", nargs=2, metavar=("NAME", "PATH"),
                         default=[],
                         help="ROI mask given as NAME PATH; repeatable. Whole-brain is "
