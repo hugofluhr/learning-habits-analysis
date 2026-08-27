@@ -345,7 +345,7 @@ def build_scopes(subject, cond_idx, run_labels, trial_order, within_run_split):
 # ---------------------------------------------------------------------------
 def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path,
                 roi_masks=None, within_run_split='interleaved', shuffle_seed=None,
-                validate_rsatoolbox=False, overwrite=False):
+                remove_mean=False, validate_rsatoolbox=False, overwrite=False):
 
     subject_output = output_dir / f"sub-{subject}"
     done_flag = subject_output / f"sub-{subject}_rsa_results.csv"
@@ -378,7 +378,7 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path
                                    .mean().reindex(range(n_cond)).values)
                for scope, (obs, _) in scopes.items()}
 
-    rows = []
+    rows, amp_rows = [], []
     for mask_name, vox in masks:
         X = X_wb[:, vox]
         sd = compute_noise_sd(X, cond_idx, run_labels)
@@ -388,6 +388,25 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path
                             "voxels with zero residual SD")
         Xw = X[:, good] / sd[good]
         n_voxels = int(good.sum())
+
+        # Per-(stimulus, run) mean amplitude of the whitened pattern — the direct probe
+        # for the adaptation/repetition-suppression alternative to a frequency-geometry
+        # effect (high-frequency stimuli responding globally weaker). Always computed
+        # from the NON-mean-removed patterns, before the optional removal below.
+        amp = Xw.mean(axis=1)   # (n_trials,) spatial mean per trial
+        for r in RUNS:
+            for c, name in enumerate(stim_names):
+                sel = (run_labels == r) & (cond_idx == c)
+                if sel.any():
+                    amp_rows.append({'mask': mask_name, 'stim_name': name, 'run': r,
+                                     'n_trials': int(sel.sum()),
+                                     'mean_amp': float(amp[sel].mean())})
+
+        if remove_mean:
+            # Subtract each trial pattern's spatial mean (rsatoolbox's remove_mean
+            # semantics): any purely global amplitude difference between conditions
+            # can no longer contribute to the crossnobis distances.
+            Xw = Xw - Xw.mean(axis=1, keepdims=True)
 
         for scope, (obs, folds) in scopes.items():
             rdm = _crossnobis_loo(Xw[obs], cond_idx[obs], folds[obs], n_cond)
@@ -417,6 +436,7 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path
                         'n_same_value_pairs': n_same, 'n_diff_value_pairs': n_diff,
                         'rdm_mean': float(cells.mean()), 'rdm_sd': float(cells.std()),
                         'within_run_split': within_run_split,
+                        'remove_mean': bool(remove_mean),
                         'shuffle_seed': -1 if shuffle_seed is None else shuffle_seed,
                     })
                     if subset == 'all' and model_name == 'objective':
@@ -432,6 +452,8 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path
              stim_frequency=props['frequency'], non_figure=non_figure,
              **model_rdms, **{f'rl_value_{k}': v for k, v in rl_rdms.items()})
 
+    pd.DataFrame(amp_rows).to_csv(
+        subject_output / f"sub-{subject}_rsa_amplitude.csv", index=False)
     pd.DataFrame(rows).to_csv(done_flag, index=False)
     logging.info(f"sub-{subject}: done — {len(rows)} rows -> {done_flag}")
 
@@ -477,6 +499,12 @@ def main():
     parser.add_argument("--shuffle-seed", type=int, default=None,
                         help="Negative control: permute stimulus labels within run. "
                              "Write to a separate --output-dir.")
+    parser.add_argument("--remove-mean", action="store_true",
+                        help="Subtract each trial pattern's spatial mean before crossnobis "
+                             "(amplitude-confound control: a global response-magnitude "
+                             "difference between conditions, e.g. repetition suppression "
+                             "for high-frequency stimuli, can then no longer drive the "
+                             "distances). Write to a separate --output-dir.")
     parser.add_argument("--validate-against-rsatoolbox", action="store_true",
                         help="Assert the local crossnobis matches rsatoolbox on the "
                              "smallest ROI (needs rsatoolbox installed)")
@@ -517,6 +545,7 @@ def main():
         roi_masks           = args.roi_mask,
         within_run_split    = args.within_run_split,
         shuffle_seed        = args.shuffle_seed,
+        remove_mean         = args.remove_mean,
         validate_rsatoolbox = args.validate_against_rsatoolbox,
         overwrite           = args.overwrite,
     )

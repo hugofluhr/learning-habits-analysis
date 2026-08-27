@@ -62,6 +62,19 @@ if [ -n "${SHUFFLE_SEED:-}" ]; then
     esac
 fi
 
+# REMOVE_MEAN=1: amplitude-confound control (see run_rsa_roi.py --remove-mean).
+# Same guardrail idea as the shuffle: never write a variant into the main rsa tree.
+REMOVE_MEAN_FLAG=""
+if [ "${REMOVE_MEAN:-0}" = "1" ]; then
+    REMOVE_MEAN_FLAG="--remove-mean"
+    case "$OUTPUT_DIR" in
+        *remove_mean*|*removemean*) ;;
+        *) echo "ERROR: REMOVE_MEAN=1 but OUTPUT_DIR ('${OUTPUT_DIR}') does not look" >&2
+           echo "       like a remove-mean tree. Refusing to overwrite real results." >&2
+           exit 1 ;;
+    esac
+fi
+
 # ---------------------------------------------------------------------------
 # Build subject list
 # ---------------------------------------------------------------------------
@@ -99,7 +112,7 @@ done
 echo "Submitting 1 job for ${N} subjects (NPROC=${NPROC} concurrent)"
 echo "  output    : ${OUTPUT_DIR}"
 echo "  bbt       : ${BBT}"
-echo "  split     : ${SPLIT}${SHUFFLE_FLAG:+   [SHUFFLE CONTROL: seed ${SHUFFLE_SEED}]}"
+echo "  split     : ${SPLIT}${SHUFFLE_FLAG:+   [SHUFFLE CONTROL: seed ${SHUFFLE_SEED}]}${REMOVE_MEAN_FLAG:+   [REMOVE-MEAN control]}"
 cat "$SUBJECTS_FILE"
 echo
 
@@ -139,7 +152,7 @@ run_one() {
         --roi-mask fusiform "${FUSIFORM_MASK}" \
         --roi-mask vmpfc "${VMPFC_MASK}" \
         --roi-mask striatum "${STRIATUM_MASK}" \
-        ${SHUFFLE_FLAG} ${OVERWRITE_FLAG}
+        ${SHUFFLE_FLAG} ${REMOVE_MEAN_FLAG} ${OVERWRITE_FLAG}
 }
 export -f run_one
 
