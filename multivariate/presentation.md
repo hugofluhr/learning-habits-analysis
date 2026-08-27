@@ -395,9 +395,9 @@ The timing caveat above turns out to be more than a caveat: a direct trial-by-tr
 
 ---
 
-## RSA results — frequency coding, not value coding
+## RSA results — pooled regression: frequency robust, value ≈ 0
 
-β, non-figure subset, pooled, n=58:
+β, non-figure subset, pooled, n=58, joint model (category + value + frequency):
 
 | model | wholebrain | visual cortex | fusiform |
 |---|---|---|---|
@@ -407,23 +407,45 @@ The timing caveat above turns out to be more than a caveat: a direct trial-by-tr
 <div class="caption">
 
 - Frequency (the habit manipulation) is robustly represented everywhere (all p<0.001) — the shuffled-label control collapses it to ~0
-- Value shows **no signal anywhere** except vmPFC (−0.080, p=0.030) — small, negative, and indistinguishable from the shuffled control's own ~1-in-20 false-positive rate (fusiform β(value) hits p=0.026 there too)
-- **This RSA pass shows exposure/habit coding, not reward-value coding**
+- Value in this joint regression is ≈0 everywhere except vmPFC (−0.080, p=0.030) — small, negative, and indistinguishable from the shuffled control's own ~1-in-20 false-positive rate
+- **This β(value)≈0 is *not* the end of the value story — see the next slide.** A same-day follow-up shows it's two real, opposite-signed effects cancelling in the pool, not an absence of value coding
 
 </div>
 
-<!-- SOURCE: session-notes/2026-08-27_rsa-first-real-results.md findings 2-3 (rsa_roi_results.ipynb §3/§6). -->
+<!-- SOURCE: session-notes/2026-08-27_rsa-first-real-results.md (rsa_roi_results.ipynb §3/§6), as of commit a9a42ec on branch rsa-roi. -->
+
+---
+
+## ⚠️ Preliminary, unvalidated — value × choice-frequency interaction
+
+Split the same non-figure pairs by whether they share a choice-frequency label instead of regressing frequency out — value slope (\|Δv\|=2 minus \|Δv\|=1), n=58:
+
+| | wholebrain | visual cortex | fusiform |
+|---|---|---|---|
+| same-frequency pairs | **+0.426**\*\*\* | **+0.651**\*\*\* | **+0.869**\*\*\* |
+| different-frequency pairs | **−0.239**\* | **−0.579**\*\*\* | **−0.488**\*\*\* |
+| interaction | +0.665\*\*\* | +1.230\*\*\* | +1.357\*\*\* |
+
+<div class="caption">
+
+- Value predicts distance with **opposite signs** depending on frequency-match — this is *why* the pooled regression's β(value)≈0: two real effects averaging out, not a null
+- Ruled out the simple explanation: dropping frequency from the regression entirely pushes β(value) **further negative** (visual cortex −0.149\*\*\*, fusiform −0.143\*\*\*), not toward the same-frequency slot's positive sign — not ordinary omitted-variable bias
+- **⚠️ Explicitly not yet validated**: computed once, not checked against the shuffled/blocked/remove-mean controls already on disk, no multiple-comparison correction. **Do not treat "no value coding" as settled, and do not cite these numbers outside the notebook until validated** — top open item, two slides on
+
+</div>
+
+<!-- SOURCE: multivariate/rsa_roi_results.ipynb §8a–§8c and Findings findings 1/7, commit a9a42ec on branch rsa-roi (not yet merged/pushed as of this deck update) — same-freq/diff-freq/interaction and omitted-variable-bias numbers transcribed verbatim from §8c cell output; ck-variant reconstruction r=-0.089 (~-0.09) from §8a cell output. -->
 
 ---
 
 ## RSA controls — frequency effect is real, not an amplitude artifact
 
 - The repetition-suppression alternative (high-frequency stimuli simply responding globally weaker, no shared geometry) is ruled out twice: under `--remove-mean` β(frequency) *grows* (visual cortex +0.351→+0.390, fusiform +0.378→+0.425, both p<0.001), and the direct amplitude~frequency correlation is negligible (visual cortex r=−0.066, p=0.004)
-- The raw same-value contrast (−0.202 to −0.637, p<0.011) is finding 3 leaking through the by-design \|Δfrequency\|=2 on same-value pairs — not a second value effect. The frequency-partialled regression is the number to trust
+- The raw same-value contrast (−0.202 to −0.637, p<0.011) sits downstream of the by-design \|Δfrequency\|=2 on same-value pairs — but given the interaction above, neither "trust the regression" nor "trust the raw contrast" is a settled statement anymore; both await the same validation pass
 - The full 8-stimulus set reproduces the predicted confound exactly (category/value/frequency all significant, near-identical magnitude) — confirms the non-figure subset was the right primary readout
-- A `test`-run sign flip in the learning-dynamics contrast failed the blocked-split robustness check and is discarded (low-SNR fragility, as `crossnobis_validation.ipynb` predicted)
+- A `test`-run sign flip in the learning-dynamics contrast failed the blocked-split robustness check and is discarded (low-SNR fragility, as `crossnobis_validation.ipynb` predicted) — not yet re-examined against the value×frequency interaction
 
-<!-- SOURCE: session-notes/2026-08-27_rsa-first-real-results.md findings 4-7 (rsa_roi_results.ipynb §4/§7). -->
+<!-- SOURCE: session-notes/2026-08-27_rsa-first-real-results.md findings 3/6/7/8, as of commit a9a42ec on branch rsa-roi (rsa_roi_results.ipynb §4/§5/§7). -->
 
 ---
 
@@ -431,10 +453,10 @@ The timing caveat above turns out to be more than a caveat: a direct trial-by-tr
 
 - **Category decoding is robust and validated** — survives label-shuffle, CV-scheme, and per-run checks
 - **Reward-level decoding in whole-brain/visual cortex is likely stimulus-identity decoding under a value label** — category-demeaning can't rule this out, and identity-demeaning is degenerate for this target (see confound slides)
-- **No reliable value coding in vmPFC/striatum** by any of three decoding methods, and now a **fourth, independent method — RSA — agrees**: frequency (habit), not value, is what's represented, robustly, across wholebrain/visual cortex/fusiform
-- **The reward-decoding null is reframed, not deepened**: a genuine, well-controlled effect exists in the same data — it's habit/exposure, not reward value
+- **No reliable value coding in vmPFC/striatum** by any of three decoding methods; RSA's choice-frequency effect (habit) is robust across wholebrain/visual cortex/fusiform
+- **⚠️ RSA's value-coding "null" does not stand as stated**: a preliminary, unvalidated same-day follow-up found value predicts distance with opposite signs in same- vs. different-frequency pairs — a real interaction, not yet checked against the shuffled/blocked/remove-mean controls already on disk. **Do not present "no value coding" as an RSA conclusion until that validation runs** (see RSA interaction slide)
 - Cue- and feedback-locked betas are **substantially redundant** (r²≈0.60 shared variance) — tempers the feedback-locked confound work's priority
-- Most likely reading overall: **a design confound makes the objective-reward target unanswerable in this dataset** — reported, not buried
+- Most likely reading overall for the *decoding* work specifically: **a design confound makes the objective-reward target unanswerable via decoding in this dataset** — reported, not buried; RSA may be reopening a route around that confound, pending validation
 
 <!-- SOURCE: synthesis of the sourced claims on every slide above, including the new RSA and cue/feedback-redundancy slides — no new numbers introduced here. -->
 
@@ -452,13 +474,14 @@ The timing caveat above turns out to be more than a caveat: a direct trial-by-tr
 
 ## Open items / next steps (2/2)
 
-- Trial-level repetition-suppression follow-up: the weak amplitude~frequency adaptation signature (visual cortex r=−0.066) motivates a per-trial pass (cumulative exposure, lag since last presentation) — per-condition amplitudes are already saved
-- FDR-correct across the RSA 5×4 ROI×model table before treating vmPFC's β(value) (p≈0.030) or striatum's β(frequency) (p≈0.02) as more than suggestive — both are singles among ~20 uncorrected comparisons
-- A dedicated commonality-analysis pass on the RSA regression would make "frequency, not value" airtight rather than inferred from two adjacent, r=−0.346-correlated coefficients
-- New `ck` (choice-kernel H-value) RSA model variant is coded and merged into the model-RDMs pipeline, not yet run/reported
-- Reward FREM, reward regression searchlight, and RSA searchlight are all drafted/discussed but not yet run
-- Possible comparison against Tor Wager's searchlight toolbox (low-priority curiosity item)
+- **Top priority: validate the value×choice-frequency interaction** — rerun the same- vs. different-frequency value-slope comparison against the shuffled/blocked/remove-mean control trees already on disk, FDR-corrected. If it survives, propagate the revision everywhere "no value coding" was stated (this deck included); if not, the pooled-regression null stands
+- FDR-correct across the RSA 5×4 ROI×model table before treating vmPFC's β(value) (p≈0.030) or striatum's β(frequency) (p≈0.02) as more than suggestive
+- Trial-level repetition-suppression follow-up (per-trial amplitude vs. cumulative exposure/lag) — per-condition amplitudes already saved
+- `ck` (H-value) RSA variant has been run — inconclusive due to a noisy \|ΔH\| proxy, not disconfirming; revisit with a better-fitting CK model
+- Reward FREM, reward regression searchlight, and RSA searchlight all drafted but not yet run; Tor Wager toolbox comparison (low-priority curiosity item)
 
 <!-- SOURCE: synthesis of the sourced claims on every slide above. "Reward FREM... drafted but not yet run/merged" confirmed via `ssh uzh.cluster.cmd` 2026-08-13: no "frem" directory exists under derivatives/ (16 derivatives dirs enumerated, frem not among them), consistent with run_qvalue_frem.py never having been executed. Open-threads additions from session-notes/2026-08-27_rsa-first-real-results.md "Open threads" 1-3 and the ck-variant/redundancy-multimodality points sourced on their respective slides above. -->
+
+---
 
 # Questions?
