@@ -5,7 +5,14 @@ ROI crossnobis RSA on GLMsingle cue betas — one subject.
 Conditions are the 8 stimulus identities. Distances are crossnobis (cross-validated
 Mahalanobis, univariate noise normalisation), computed pooled over the 3 runs and
 per-run for the learning-dynamics readout. Each RDM is regressed on category / value /
-frequency model RDMs, and a targeted same-value contrast is reported.
+choice-frequency model RDMs, and a targeted same-value contrast is reported.
+
+`first_stim_frequ` is CHOICE frequency, not presentation frequency: every stimulus is
+presented equally often (first-stim counts balanced across the +-1 labels, per-subject
+r=-0.05 ns — see `rsa_design_checks.ipynb`); what the +-1 label encodes is how often the
+subject *chose* the stimulus during learning, manipulated by selectively pairing it with
+higher- or lower-valued alternatives. The graded behavioural counterpart is the
+choice-kernel H-value (`first_stim_value_ck`), used by the `ck` model variant.
 
 Notes that live nowhere else:
   * No identity regressor is needed — every off-diagonal cell is a different-identity
@@ -257,7 +264,8 @@ def load_stimuli(subject, glmsingle_dir, bbt_path, shuffle_seed=None):
     logging.info(f"sub-{subject}: betas {betas_img.shape}, {len(trial_info)} trials")
 
     per_trial = {col: load_target_from_bbt(subject, bbt_path, trial_info, target_col=col)
-                 for col in ['first_stim_value', 'first_stim_frequ', 'first_stim_value_rl']}
+                 for col in ['first_stim_value', 'first_stim_frequ',
+                             'first_stim_value_rl', 'first_stim_value_ck']}
 
     stim_labels = trial_info['stim_name'].values
     run_labels = trial_info['run'].values
@@ -290,7 +298,8 @@ def load_stimuli(subject, glmsingle_dir, bbt_path, shuffle_seed=None):
         f"{n}({c},v={v:.0f},f={f:+.0f})" for n, c, v, f
         in zip(props['names'], props['cat'], props['value'], props['frequency'])))
 
-    return betas_img, trial_info, cond_idx, run_labels, props, per_trial['first_stim_value_rl']
+    return (betas_img, trial_info, cond_idx, run_labels, props,
+            per_trial['first_stim_value_rl'], per_trial['first_stim_value_ck'])
 
 
 def build_masks(subject, base_dir, bids_dir, betas_img, roi_masks):
@@ -354,7 +363,8 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path
         return
     subject_output.mkdir(parents=True, exist_ok=True)
 
-    betas_img, trial_info, cond_idx, run_labels, props, rl_per_trial = load_stimuli(
+    (betas_img, trial_info, cond_idx, run_labels, props,
+     rl_per_trial, ck_per_trial) = load_stimuli(
         subject, glmsingle_dir, bbt_path, shuffle_seed)
     stim_names, n_cond = props['names'], len(props['names'])
 
@@ -373,8 +383,11 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path
     trial_order = np.asarray(trial_info.index.values, dtype=float)   # chronological
     scopes = build_scopes(subject, cond_idx, run_labels, trial_order, within_run_split)
 
-    # Q evolves with learning, so the RL value RDM is scope-specific.
+    # Q and H evolve with learning, so their model RDMs are scope-specific.
     rl_rdms = {scope: abs_diff_rdm(pd.Series(rl_per_trial[obs]).groupby(cond_idx[obs])
+                                   .mean().reindex(range(n_cond)).values)
+               for scope, (obs, _) in scopes.items()}
+    ck_rdms = {scope: abs_diff_rdm(pd.Series(ck_per_trial[obs]).groupby(cond_idx[obs])
                                    .mean().reindex(range(n_cond)).values)
                for scope, (obs, _) in scopes.items()}
 
@@ -390,9 +403,11 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path
         n_voxels = int(good.sum())
 
         # Per-(stimulus, run) mean amplitude of the whitened pattern — the direct probe
-        # for the adaptation/repetition-suppression alternative to a frequency-geometry
-        # effect (high-frequency stimuli responding globally weaker). Always computed
-        # from the NON-mean-removed patterns, before the optional removal below.
+        # for a global-gain alternative to a choice-frequency-geometry effect (e.g.
+        # frequently-chosen stimuli responding uniformly stronger/weaker via attention
+        # or choice-related gain; presentation counts are equal, so classic repetition
+        # suppression is not a candidate). Always computed from the NON-mean-removed
+        # patterns, before the optional removal below.
         amp = Xw.mean(axis=1)   # (n_trials,) spatial mean per trial
         for r in RUNS:
             for c, name in enumerate(stim_names):
@@ -420,10 +435,17 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path
                 contrast, n_same, n_diff = value_contrast(rdm, keep, props['cat'],
                                                           props['value'])
                 cells = _triu(rdm[np.ix_(keep, keep)])
-                for model_name, value_rdm in [('objective', model_rdms['value']),
-                                              ('rl', rl_rdms[scope])]:
+                # 'objective'/'rl' swap the VALUE regressor (objective |dv| vs |dQ|);
+                # 'ck' instead swaps the FREQUENCY regressor: the graded per-subject
+                # choice-kernel |dH| replaces the categorical +-1 choice-frequency
+                # label, testing whether behaviourally expressed habit strength
+                # explains the geometry better than the design condition.
+                for model_name, value_rdm, freq_rdm in [
+                        ('objective', model_rdms['value'], model_rdms['frequency']),
+                        ('rl',        rl_rdms[scope],      model_rdms['frequency']),
+                        ('ck',        model_rdms['value'], ck_rdms[scope])]:
                     models = {'category': model_rdms['category'], 'value': value_rdm,
-                              'frequency': model_rdms['frequency']}
+                              'frequency': freq_rdm}
                     betas, corrs, n_pairs = fit_rdm_regression(rdm, models, keep)
                     rows.append({
                         'subject': f"sub-{subject}", 'mask': mask_name,
@@ -450,7 +472,8 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path
     np.savez(subject_output / f"sub-{subject}_rsa_model_rdms.npz",
              stim_names=stim_names, stim_cat=props['cat'], stim_value=props['value'],
              stim_frequency=props['frequency'], non_figure=non_figure,
-             **model_rdms, **{f'rl_value_{k}': v for k, v in rl_rdms.items()})
+             **model_rdms, **{f'rl_value_{k}': v for k, v in rl_rdms.items()},
+             **{f'ck_value_{k}': v for k, v in ck_rdms.items()})
 
     pd.DataFrame(amp_rows).to_csv(
         subject_output / f"sub-{subject}_rsa_amplitude.csv", index=False)
@@ -502,9 +525,9 @@ def main():
     parser.add_argument("--remove-mean", action="store_true",
                         help="Subtract each trial pattern's spatial mean before crossnobis "
                              "(amplitude-confound control: a global response-magnitude "
-                             "difference between conditions, e.g. repetition suppression "
-                             "for high-frequency stimuli, can then no longer drive the "
-                             "distances). Write to a separate --output-dir.")
+                             "difference between conditions, e.g. attention/choice-related "
+                             "gain for frequently-chosen stimuli, can then no longer drive "
+                             "the distances). Write to a separate --output-dir.")
     parser.add_argument("--validate-against-rsatoolbox", action="store_true",
                         help="Assert the local crossnobis matches rsatoolbox on the "
                              "smallest ROI (needs rsatoolbox installed)")
