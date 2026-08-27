@@ -15,7 +15,7 @@ style: |
 # Multivariate status update
 ## Learning Habits fMRI study
 
-GLMsingle single-trial betas → category decoding & searchlight → validations → reward-value decoding → reward/identity counfound + RSA ideas
+GLMsingle single-trial betas → category decoding & searchlight → validations → reward-value decoding → reward/identity counfound → cue/feedback redundancy → RSA: frequency vs. value
 
 August 2026
 
@@ -30,7 +30,8 @@ August 2026
 5. **Category searchlight** — spatial localization
 6. **Reward-value decoding** — regression + classification, confound control
 7. **Reward searchlight** — localization test in vmPFC/striatum
-8. **Confound problem** — identity vs. reward, feedback-locked GLM, RSA ideas
+8. **Confound problem** — identity vs. reward, feedback-locked GLM, cue/feedback redundancy
+9. **RSA** — frequency vs. value coding, controls, robustness
 
 ---
 
@@ -292,7 +293,7 @@ Tests whether vmPFC/striatum hide a spatially localized cluster that whole-ROI a
 - For the 2 non-straddling categories, every trial shares one label → the residual there carries no label-relevant signal at all either way
 - This exactly predicts what was observed: VC ≫ WB, vmPFC/striatum flat, effect "surviving" demeaning — **consistent with pure identity decoding**, and category-demeaning cannot distinguish that from real reward coding
 
-<!-- SOURCE: reasoning from session-notes/2026-08-11_glmsingle-conditions-and-reward-decoding.md §2-3, cross-checked against the bbt.csv straddling-category computation on the previous slide. Not an independently quoted statistic — this slide is an argument, not a new number. -->
+<!-- SOURCE: reasoning from session-notes/2026-08-11_glmsingle-conditions-and-reward-decoding.md §2-3, cross-checked against the bbt.csv straddling-category computation on the previous slide. Rescued into a reproducible notebook cell in multivariate/qvalue_classification_results.ipynb (commit df94f47, 2026-08-17) — no longer only prose reasoning, though still an argument rather than a new empirical number. -->
 
 ---
 
@@ -333,7 +334,29 @@ GLMsingle locked to reward feedback (learning runs only) **just completed** — 
 
 - Timing caveat: feedback lags cue by ~1 TR for 82% of trials (TR=2.33s, only 0.16s of RT jitter) — betas likely closely resemble the existing cue-locked ones regardless of target
 
-<!-- SOURCE (completion status): cluster derivatives/glmsingle_feedback/ — verified via `ssh uzh.cluster.cmd` 2026-08-13: 59/59 subjects have final *_glmSingle_betas_FEEDBACK.nii.gz, 0 matches for 'error|traceback|failed' across logs/*.err, most recent file timestamp 1786614740 = 2026-08-13 11:52:20 CEST (current time at check was 12:08:53 CEST same day). SOURCE (variance table): computed directly from bbt.csv restricted to phase=='training' 2026-08-13 — reward_chosen: 0.000 dissociable variance (grouped by sub_id,stim_chosen). reward_chosen-reward_unchosen: confined to exactly {+1: 10414, -1: 1267} trials = 89.2%/10.8% (matches "±1 only, 89/11" claim essentially exactly); dissociable-variance fraction computed here = 0.61, vs. 0.888 quoted — methodology difference not resolved (the ± 1/imbalance numbers, which ARE independently exact-matched, are the load-bearing claims; the 0.888 figure is carried over from session-notes/2026-08-11_...md §4b without independent re-derivation). RPE (reward_chosen - chosen_value_rl): fraction |RPE|<0.01 = 0.7945 (matches "79%" claim essentially exactly); dissociable-variance fraction computed here = 0.76 vs. 0.814 quoted, same caveat as above. SOURCE (timing caveat): session-notes/2026-08-11_...md §4a — not independently re-derived in this review. -->
+<!-- SOURCE (completion status): cluster derivatives/glmsingle_feedback/ — verified via `ssh uzh.cluster.cmd` 2026-08-13: 59/59 subjects have final *_glmSingle_betas_FEEDBACK.nii.gz, 0 matches for 'error|traceback|failed' across logs/*.err, most recent file timestamp 1786614740 = 2026-08-13 11:52:20 CEST (current time at check was 12:08:53 CEST same day). SOURCE (variance table): computed directly from bbt.csv restricted to phase=='training' 2026-08-13 — reward_chosen: 0.000 dissociable variance (grouped by sub_id,stim_chosen). reward_chosen-reward_unchosen: confined to exactly {+1: 10414, -1: 1267} trials = 89.2%/10.8% (matches "±1 only, 89/11" claim essentially exactly); dissociable-variance fraction computed here = 0.61, vs. 0.888 quoted — methodology difference not resolved (the ± 1/imbalance numbers, which ARE independently exact-matched, are the load-bearing claims; the 0.888 figure is carried over from session-notes/2026-08-11_...md §4b without independent re-derivation). RPE (reward_chosen - chosen_value_rl): fraction |RPE|<0.01 = 0.7945 (matches "79%" claim essentially exactly); dissociable-variance fraction computed here = 0.76 vs. 0.814 quoted, same caveat as above. SOURCE (timing caveat): the 82%/1-TR-lag claim was rescued and independently re-derived in `glmsingle_cue_vs_feedback_comparison.ipynb` §0 (commit 447b714, 2026-08-17): 11,683 responded learning trials, cue→feedback lag 1.95s ± 0.16s SD, TR=2.334s — matches this slide's figure. -->
+
+---
+
+## Feedback betas are largely redundant with cue betas
+
+The timing caveat above turns out to be more than a caveat: a direct trial-by-trial comparison of cue-locked vs. feedback-locked betas (n=59) shows most of the feedback signal is already present in the cue betas.
+
+| | matched voxelwise *r* | shuffled floor | adjacent-pair baseline |
+|---|---|---|---|
+| type B | **0.782** | −0.000 | 0.213 |
+| type D | **0.773** | −0.005 | 0.050 |
+
+<div class="caption">
+
+- Matched *r* sits far above both baselines and the shuffled floor is ~0 everywhere (largest \|shuffled\| = 0.033) — genuine trial-by-trial coupling, not shared spatial structure. *r*≈0.77 → **r²≈0.60 shared variance**, and that's a lower bound (two noisy estimates of the same quantity correlate at their reliability, not at 1)
+- Beta-type confound (8 identities vs. 8 pairs as conditions) is real in principle but negligible in practice: corr(B,D) across subjects = 0.991
+- **Distribution is multimodal and unexplained**: 38 subjects near 0.79, 18 near 0.42, 3 near zero (sub-05/28/70) — divergent GLMdenoise/ridge tuning is ruled out (same split appears in type B, which has neither)
+- **Consequence**: for roughly two-thirds of the sample, feedback betas largely re-express the cue response — combined with the identity confound above, a reward-at-feedback analysis is unlikely to reveal anything not already present in the cue betas
+
+</div>
+
+<!-- SOURCE: multivariate/glmsingle_cue_vs_feedback_comparison.ipynb §"Findings summary", executed n=59 (commits 229de69, 2ad1ba6, 397979f, 76adf01, e3b9b5a, 2026-08-13/17). All numbers (matched r=0.782/0.773, shuffled floor -0.000/-0.005, adjacent baseline 0.213/0.050, r^2~=0.60, corr(B,D)=0.991, multimodal counts 38/18/3, sub-05/28/70) transcribed verbatim from the notebook's findings-summary markdown cell. -->
 
 ---
 
@@ -351,49 +374,91 @@ GLMsingle locked to reward feedback (learning runs only) **just completed** — 
 
 ---
 
-## Potential direction: RSA instead of / alongside decoding
+## RSA — design constraints
 
-- Decoding only tests a binary/categorical prediction; **RSA can test graded structure** — does dissimilarity scale with reward *distance*, not just same-/different-identity?
-- Naive per-dimension RDM correlation recreates the same confound (reward-RDM ~ identity-RDM) — needs **variance-partitioned / multiple-regression RSA**: identity + category + graded-value RDMs entered together, asking whether value explains *unique* variance
-- Graded model RDM should use `value_diff` or `first_stim_value_rl` (real independent variance) — same fix as decoding, ported into RSA terms
-- Still can't rule out a stimulus-set-level accidental confound, since the identity→value mapping is fixed across all subjects, not randomized — RSA narrows the question, it doesn't eliminate the design limit
+- Image→value mapping is **counterbalanced**: 12 distinct assignments across 62 subjects, so a value effect can't just be fixed visual similarity between two particular images
+- But values **{1, 5} always land on the `figure` category, 62/62 subjects** — a hard design constraint. Extreme value is perfectly confounded with figure-vs-rest → every readout computed twice, on all 8 stimuli and on the **non-figure 6-stimulus subset** (primary)
+- Frequency is **choice frequency, not presentation frequency**: every stimulus is shown equally often (84/stimulus, zero variance) — the label instead encodes selective pairing with higher/lower-valued alternatives, confirmed directly (chosen count 38.3 vs. 44.0, r=+0.224, p=8e-8)
+- Fixed for every subject: corr(value, frequency) = −0.346, corr(category, value) = −0.179 — same-value pairs carry the *maximal* \|Δfrequency\|, so a frequency effect pushes the value contrast *negative* (conservative, not confounded in its favor)
 
-<!-- SOURCE: proposal/recommendation for future work, not an empirical claim from this dataset — no source needed for the numbers (there are none); reasoning follows directly from the confound established in the slides above. -->
+<!-- SOURCE: session-notes/2026-08-26_rsa-design-and-roi-pipeline.md findings 1-3 (rsa_design_checks.ipynb §2-5); choice-frequency correction and chosen-count stat from session-notes/2026-08-27_rsa-first-real-results.md (commit b15b1eb). -->
 
 ---
 
-## RSA — practical plan if pursued
+## RSA — pipeline validated, then run for real
 
-- Model RDMs: **category** (sanity check — should replicate the existing strong category decoding), **identity** (nuisance), **graded value** (`value_diff` / `first_stim_value_rl`), **frequency** (not yet checked for its own identity confound)
-- Cross-run beta reliability is low (mean r=0.31, `glmsingle_qc`) → use **cross-validated distances** (crossnobis / cross-validated Mahalanobis) over the existing LOGO run-folds, not plain correlation distance, to avoid noise-driven inflation
-- Commonality / variance-partitioning regression on dissimilarities + permutation test for each RDM's unique-variance term
-- Meaningfully more engineering than the current pipeline (cross-validated RDM estimator, multi-RDM regression, permutation testing) — a next-phase project, not a quick add-on
+- Local crossnobis implementation (`run_rsa_roi.py`): rsatoolbox's own crossnobis path materializes a dense n_voxels² identity matrix with no noise precision given — ~20GB at whole-brain scale, so the kernel is implemented directly
+- Validated bit-exact against rsatoolbox 0.2.0 (max\|dev\| = 1.1e-16) and unbiased under the null (mean −0.00001 over 400 sims) — licenses testing group coefficients against 0 directly
+- **Real run: n=58** (sub-46 excluded — confirmed still absent from the BBT via the new `--dry-run` precondition check), plus shuffled-label, `--remove-mean`, and blocked-split control runs, all on the cluster
 
-<!-- SOURCE: proposal, not an empirical claim. "mean r=0.31" reused from glmsingle_qc.ipynb (sourced on the GLMsingle QC slide above). -->
+<!-- SOURCE: session-notes/2026-08-26_rsa-design-and-roi-pipeline.md finding 4 (crossnobis_validation.ipynb); session-notes/2026-08-27_rsa-first-real-results.md finding 1 (03e2d6d dry-run sweep) and "Data produced" section (job IDs 5331366/5331395/5331516/5331517). -->
+
+---
+
+## RSA results — frequency coding, not value coding
+
+β, non-figure subset, pooled, n=58:
+
+| model | wholebrain | visual cortex | fusiform |
+|---|---|---|---|
+| **frequency** | **+0.220** (p<0.001) | **+0.351** (p<0.001) | **+0.378** (p<0.001) |
+| value | n.s. | n.s. | n.s. |
+
+<div class="caption">
+
+- Frequency (the habit manipulation) is robustly represented everywhere (all p<0.001) — the shuffled-label control collapses it to ~0
+- Value shows **no signal anywhere** except vmPFC (−0.080, p=0.030) — small, negative, and indistinguishable from the shuffled control's own ~1-in-20 false-positive rate (fusiform β(value) hits p=0.026 there too)
+- **This RSA pass shows exposure/habit coding, not reward-value coding**
+
+</div>
+
+<!-- SOURCE: session-notes/2026-08-27_rsa-first-real-results.md findings 2-3 (rsa_roi_results.ipynb §3/§6). -->
+
+---
+
+## RSA controls — frequency effect is real, not an amplitude artifact
+
+- The repetition-suppression alternative (high-frequency stimuli simply responding globally weaker, no shared geometry) is ruled out twice: under `--remove-mean` β(frequency) *grows* (visual cortex +0.351→+0.390, fusiform +0.378→+0.425, both p<0.001), and the direct amplitude~frequency correlation is negligible (visual cortex r=−0.066, p=0.004)
+- The raw same-value contrast (−0.202 to −0.637, p<0.011) is finding 3 leaking through the by-design \|Δfrequency\|=2 on same-value pairs — not a second value effect. The frequency-partialled regression is the number to trust
+- The full 8-stimulus set reproduces the predicted confound exactly (category/value/frequency all significant, near-identical magnitude) — confirms the non-figure subset was the right primary readout
+- A `test`-run sign flip in the learning-dynamics contrast failed the blocked-split robustness check and is discarded (low-SNR fragility, as `crossnobis_validation.ipynb` predicted)
+
+<!-- SOURCE: session-notes/2026-08-27_rsa-first-real-results.md findings 4-7 (rsa_roi_results.ipynb §4/§7). -->
 
 ---
 
 ## Bottom line
 
-- **Category decoding is robust and validated** — survives label-shuffle, CV-scheme, and per-run checks (3 independent controls)
-- **Reward-level decoding in whole-brain/visual cortex is likely stimulus-identity decoding under a value label** — category-demeaning can't rule this out, and the natural identity-demeaning follow-up test is itself degenerate for this target (see confound slides)
-- **No reliable value coding detected in vmPFC/striatum** by any of three independent methods — consistent with a real null, or with there never having been a dissociable value signal to detect in the first place
-- Open question: a true null, a power/resolution limit, or — most likely per this review — **a design confound that makes the objective-reward target unanswerable in this dataset**
-- Consistent with the founding principle: this null/complication is being reported, not buried
+- **Category decoding is robust and validated** — survives label-shuffle, CV-scheme, and per-run checks
+- **Reward-level decoding in whole-brain/visual cortex is likely stimulus-identity decoding under a value label** — category-demeaning can't rule this out, and identity-demeaning is degenerate for this target (see confound slides)
+- **No reliable value coding in vmPFC/striatum** by any of three decoding methods, and now a **fourth, independent method — RSA — agrees**: frequency (habit), not value, is what's represented, robustly, across wholebrain/visual cortex/fusiform
+- **The reward-decoding null is reframed, not deepened**: a genuine, well-controlled effect exists in the same data — it's habit/exposure, not reward value
+- Cue- and feedback-locked betas are **substantially redundant** (r²≈0.60 shared variance) — tempers the feedback-locked confound work's priority
+- Most likely reading overall: **a design confound makes the objective-reward target unanswerable in this dataset** — reported, not buried
 
-<!-- SOURCE: synthesis of the sourced claims on every slide above — no new numbers introduced here. -->
+<!-- SOURCE: synthesis of the sourced claims on every slide above, including the new RSA and cue/feedback-redundancy slides — no new numbers introduced here. -->
 
 ---
 
-## Open items / next steps
+## Open items / next steps (1/2)
 
 - Scale the identity-based demeaning check to the full cohort (currently n=1 smoke test, already near chance — see confound slides) to confirm the collapse-to-chance prediction
 - Switch the reward-decoding target to `value_diff` or `first_stim_value_rl`, the only targets with real variance independent of identity — the actual route to a dissociable value question
-- Evaluate variance-partitioned RSA (cross-validated distances) as a complementary/replacement approach
-- Feedback-locked GLMsingle model just finished (n=59) — run the `reward_chosen` / RPE / chosen-vs-unchosen analyses now that betas exist; expect the same identity confound for `reward_chosen` itself
-- Reward FREM and reward regression searchlight are drafted but not yet run/merged
+- Feedback-locked GLMsingle model finished (n=59) and could still support `reward_chosen`/RPE/chosen-vs-unchosen analyses, but expectations should be tempered: feedback betas already share ~60%+ variance with cue betas for most subjects, and still hit the same identity confound for `reward_chosen` itself — the multimodal redundancy split (38/18/3 subjects) is arguably the more interesting open thread here
+
+<!-- SOURCE: synthesis of the sourced claims on every slide above. -->
+
+---
+
+## Open items / next steps (2/2)
+
+- Trial-level repetition-suppression follow-up: the weak amplitude~frequency adaptation signature (visual cortex r=−0.066) motivates a per-trial pass (cumulative exposure, lag since last presentation) — per-condition amplitudes are already saved
+- FDR-correct across the RSA 5×4 ROI×model table before treating vmPFC's β(value) (p≈0.030) or striatum's β(frequency) (p≈0.02) as more than suggestive — both are singles among ~20 uncorrected comparisons
+- A dedicated commonality-analysis pass on the RSA regression would make "frequency, not value" airtight rather than inferred from two adjacent, r=−0.346-correlated coefficients
+- New `ck` (choice-kernel H-value) RSA model variant is coded and merged into the model-RDMs pipeline, not yet run/reported
+- Reward FREM, reward regression searchlight, and RSA searchlight are all drafted/discussed but not yet run
 - Possible comparison against Tor Wager's searchlight toolbox (low-priority curiosity item)
 
-<!-- SOURCE: synthesis of the sourced claims on every slide above. "Reward FREM... drafted but not yet run/merged" confirmed via `ssh uzh.cluster.cmd` 2026-08-13: no "frem" directory exists under derivatives/ (16 derivatives dirs enumerated, frem not among them), consistent with run_qvalue_frem.py never having been executed. -->
+<!-- SOURCE: synthesis of the sourced claims on every slide above. "Reward FREM... drafted but not yet run/merged" confirmed via `ssh uzh.cluster.cmd` 2026-08-13: no "frem" directory exists under derivatives/ (16 derivatives dirs enumerated, frem not among them), consistent with run_qvalue_frem.py never having been executed. Open-threads additions from session-notes/2026-08-27_rsa-first-real-results.md "Open threads" 1-3 and the ck-variant/redundancy-multimodality points sourced on their respective slides above. -->
 
 # Questions?
