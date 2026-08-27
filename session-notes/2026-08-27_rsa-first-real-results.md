@@ -51,7 +51,7 @@ Derivation: `rsa_roi_results.ipynb` §3, §7.
 sign-flipped, worse-fitting result than the label (paired r-comparison p<0.0001 in
 wholebrain/visual/fusiform) — but a diagnostic shows `|ΔH|` barely reconstructs the
 label's own pairwise structure (corr(|Δlabel|,|ΔH|) ≈ 0, highly variable across subjects)
-despite per-stimulus H correlating positively with the label (r≈+0.19). Tried a
+despite per-stimulus H correlating positively with the label (r≈+0.32). Tried a
 median-split "H-bin" as a fix for what looked like a magnitude-noise problem — doesn't
 help (same ≈0 pairwise reconstruction despite 67% item-level label agreement), so the
 noise is relational, not a scale artifact binning could fix. Read as "this
