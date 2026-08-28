@@ -43,6 +43,10 @@ VIS_MASK="${VIS_MASK:-${DECODING_DIR}/visual_cortex_mask.nii.gz}"
 VMPFC_MASK="${VMPFC_MASK:-${MASK_DIR}/vmpfc_bartra2013_MNI152NLin2009cAsym.nii}"
 STRIATUM_MASK="${STRIATUM_MASK:-${MASK_DIR}/striatum_bartra2013_MNI152NLin2009cAsym.nii}"
 FUSIFORM_MASK="${FUSIFORM_MASK:-${MASK_DIR}/fusiform_mask_MNI152NLin2009cAsym.nii}"
+HABIT_MASK="${HABIT_MASK:-${MASK_DIR}/habit_Guida2022_MNI152NLin2009cAsym.nii}"
+PUTAMEN_MASK="${PUTAMEN_MASK:-${MASK_DIR}/putamen_AAL_MNI152NLin2009cAsym.nii}"
+PREMOTOR_MASK="${PREMOTOR_MASK:-${MASK_DIR}/premotor_HMAT_MNI152NLin2009cAsym.nii}"
+PARIETAL_MASK="${PARIETAL_MASK:-${MASK_DIR}/parietal_AAL_MNI152NLin2009cAsym.nii}"
 
 NPROC="${NPROC:-8}"
 SPLIT="${SPLIT:-interleaved}"
@@ -101,7 +105,7 @@ if [ ! -f "$BBT" ]; then
     echo "ERROR: BBT not found: ${BBT} (set BBT=/path/to/bbt.csv)" >&2
     exit 1
 fi
-for mask_var in VIS_MASK VMPFC_MASK STRIATUM_MASK FUSIFORM_MASK; do
+for mask_var in VIS_MASK VMPFC_MASK STRIATUM_MASK FUSIFORM_MASK HABIT_MASK PUTAMEN_MASK PREMOTOR_MASK PARIETAL_MASK; do
     mask_path="${!mask_var}"
     if [ ! -f "$mask_path" ]; then
         echo "ERROR: ${mask_var} not found: ${mask_path}" >&2
@@ -152,6 +156,10 @@ run_one() {
         --roi-mask fusiform "${FUSIFORM_MASK}" \
         --roi-mask vmpfc "${VMPFC_MASK}" \
         --roi-mask striatum "${STRIATUM_MASK}" \
+        --roi-mask habit "${HABIT_MASK}" \
+        --roi-mask putamen "${PUTAMEN_MASK}" \
+        --roi-mask premotor "${PREMOTOR_MASK}" \
+        --roi-mask parietal "${PARIETAL_MASK}" \
         ${SHUFFLE_FLAG} ${REMOVE_MEAN_FLAG} ${OVERWRITE_FLAG}
 }
 export -f run_one
