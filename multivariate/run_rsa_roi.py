@@ -50,7 +50,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import nibabel as nib
-from nilearn.image import resample_to_img, math_img
+from nilearn.image import index_img, resample_to_img, math_img
 from nilearn.maskers import NiftiMasker
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -320,6 +320,10 @@ def build_masks(subject, base_dir, bids_dir, betas_img, roi_masks):
     for name, path in roi_masks:
         roi_func = resample_to_img(nib.load(str(path)), brain_mask_img,
                                    interpolation='nearest')
+        # Some masks carry a singleton 4th dimension (e.g. 53,65,48,1 in 3mm
+        # space); squeeze it so math_img can broadcast against the 3D brain mask.
+        if roi_func.ndim == 4 and roi_func.shape[3] == 1:
+            roi_func = index_img(roi_func, 0)
         roi_img = math_img('(v > 0) & (b > 0)', v=roi_func, b=brain_mask_img)
         sel = wb_masker.transform(roi_img)[0] > 0
         if sel.sum() == 0:
