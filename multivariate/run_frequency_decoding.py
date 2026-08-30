@@ -51,7 +51,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import nibabel as nib
-from nilearn.image import resample_to_img, math_img
+from nilearn.image import resample_to_img, math_img, index_img
 from nilearn.maskers import NiftiMasker
 from sklearn.metrics import confusion_matrix
 from sklearn.model_selection import LeaveOneGroupOut, cross_val_predict
@@ -116,6 +116,10 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path
     for name, path in roi_masks:
         roi_mni  = nib.load(str(path))
         roi_func = resample_to_img(roi_mni, brain_mask_img, interpolation='nearest')
+        # Some masks in 3mm space have a trailing singleton 4th dim (53,65,48,1);
+        # squeeze it so math_img can broadcast against the 3D brain mask.
+        if roi_func.ndim == 4 and roi_func.shape[3] == 1:
+            roi_func = index_img(roi_func, 0)
         roi_mask = math_img('(v > 0) & (b > 0)', v=roi_func, b=brain_mask_img)
         masks.append((name, roi_mask))
 
