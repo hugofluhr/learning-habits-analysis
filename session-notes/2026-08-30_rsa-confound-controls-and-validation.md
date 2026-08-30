@@ -1,4 +1,4 @@
-# Session log — RSA confound-control RDMs, FDR correction, and VIF diagnostic
+# Session log — RSA confound controls, §8c interaction validated, FDR + VIF
 
 **Date:** 2026-08-30
 **Companion note:** [2026-08-27_rsa-first-real-results.md](2026-08-27_rsa-first-real-results.md)
@@ -51,6 +51,19 @@ fusiform, whole brain; value in fusiform; second_stim_value in fusiform; choice_
 VC; contrast_value in VC and fusiform. Marginal effects (striatum frequency p=0.013,
 vmPFC value p=0.015) do not survive. Derivation: `rsa_roi_results.ipynb` §3a.
 
+### 6. §8c value × frequency interaction VALIDATED
+
+The interaction from the previous session (value predicts distance positively within
+same-frequency pairs, negatively within different-frequency pairs) survives all three
+controls:
+- **Shuffled**: collapses to ~0 (VC: orig=+1.23 vs shuf=+0.08, paired-t p<0.0001;
+  fusiform: +1.36 vs −0.12, p<0.0001)
+- **Blocked**: reproduces identically (same numbers — expected since blocked only
+  changes within-run fold splitting, not the pooled-scope RDM)
+- **Remove-mean**: slightly strengthens (fusiform +1.36 → +1.38)
+
+Derivation: `rsa_roi_results.ipynb` §8c-validation cell.
+
 ---
 
 ## Code shipped
@@ -58,7 +71,7 @@ vmPFC value p=0.015) do not survive. Derivation: `rsa_roi_results.ipynb` §3a.
 | File | Change | Git state |
 |------|--------|-----------|
 | `multivariate/run_rsa_roi.py` | Added `second_stim_value` and `choice_rate` confound-control RDMs | merged to rsa-roi (618a6c1) |
-| `multivariate/rsa_roi_results.ipynb` | §1b VIF diagnostic, §3a FDR correction, 5-term bar charts, cell reorder fix | merged to rsa-roi (6d8ed2e) |
+| `multivariate/rsa_roi_results.ipynb` | §1b VIF, §3a FDR, 5-term bar charts, §8c-validation, Findings rewrite | merged to rsa-roi (248dcbb) |
 
 ## Data produced
 
@@ -69,15 +82,16 @@ vmPFC value p=0.015) do not survive. Derivation: `rsa_roi_results.ipynb` §3a.
 
 ## Git state
 
-Branch: `rsa-roi`, pushed to origin. Local and remote agree at `6d8ed2e`.
+Branch: `rsa-roi`, pushed to origin. Local and remote agree at `248dcbb`.
 
 ---
 
 ## Open threads
 
-1. **§8c interaction validation** — the value × frequency-context interaction from the
-   previous session is still unvalidated against shuffled/blocked/remove-mean controls.
-2. **vmPFC and striatum effects** — marginal in uncorrected tests, do not survive FDR.
-   Worth revisiting with per-run scopes or targeted hypotheses.
-3. **Choice_rate negative effect in VC** — unexpected and survives FDR; worth
-   interpreting (stimuli chosen at similar rates cluster together → motor/decision signal?).
+1. ~~§8c interaction validation~~ → **DONE** (finding 6 above).
+2. **FDR-correct the §8c interaction** jointly with the §3a tests — currently the
+   interaction is tested via paired t-test but not BH-corrected in the same family.
+3. **Choice_rate negative effect in VC** — survives FDR (q=0.047); worth interpreting.
+4. **vmPFC and striatum effects** — do not survive FDR. Targeted hypotheses needed.
+5. **Per-run §8c interaction** — untested (learning dynamics of the value×frequency effect).
+6. **Branch not merged to main.**
