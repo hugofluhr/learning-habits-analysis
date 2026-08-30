@@ -5,7 +5,8 @@ ROI crossnobis RSA on GLMsingle cue betas — one subject.
 Conditions are the 8 stimulus identities. Distances are crossnobis (cross-validated
 Mahalanobis, univariate noise normalisation), computed pooled over the 3 runs and
 per-run for the learning-dynamics readout. Each RDM is regressed on category / value /
-choice-frequency model RDMs, and a targeted same-value contrast is reported.
+choice-frequency model RDMs with second-stimulus-value and choice-rate confound controls,
+and a targeted same-value contrast is reported.
 
 `first_stim_frequ` is CHOICE frequency, not presentation frequency: every stimulus is
 presented equally often (first-stim counts balanced across the +-1 labels, per-subject
@@ -58,7 +59,7 @@ from utils.data import Subject, load_target_from_bbt
 
 RUNS = ['learning1', 'learning2', 'test']
 FIGURE_CAT = 'figure'
-MODEL_TERMS = ['category', 'value', 'frequency']
+MODEL_TERMS = ['category', 'value', 'frequency', 'second_stim_value', 'choice_rate']
 
 
 # ---------------------------------------------------------------------------
@@ -265,7 +266,13 @@ def load_stimuli(subject, glmsingle_dir, bbt_path, shuffle_seed=None):
 
     per_trial = {col: load_target_from_bbt(subject, bbt_path, trial_info, target_col=col)
                  for col in ['first_stim_value', 'first_stim_frequ',
-                             'first_stim_value_rl', 'first_stim_value_ck']}
+                             'first_stim_value_rl', 'first_stim_value_ck',
+                             'second_stim_value', 'first_stim', 'chosen_stim']}
+    # Per-trial indicator: did the subject choose the first stimulus?
+    # action is coded as left/right, not first/second; `chosen_stim` resolves that.
+    # NaN chosen_stim (no-response trials) → 0 (unchosen).
+    per_trial['first_stim_chosen'] = (
+        per_trial['first_stim'] == per_trial['chosen_stim']).astype(float)
 
     stim_labels = trial_info['stim_name'].values
     run_labels = trial_info['run'].values
@@ -299,7 +306,8 @@ def load_stimuli(subject, glmsingle_dir, bbt_path, shuffle_seed=None):
         in zip(props['names'], props['cat'], props['value'], props['frequency'])))
 
     return (betas_img, trial_info, cond_idx, run_labels, props,
-            per_trial['first_stim_value_rl'], per_trial['first_stim_value_ck'])
+            per_trial['first_stim_value_rl'], per_trial['first_stim_value_ck'],
+            per_trial['second_stim_value'], per_trial['first_stim_chosen'])
 
 
 def build_masks(subject, base_dir, bids_dir, betas_img, roi_masks):
@@ -368,7 +376,8 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path
     subject_output.mkdir(parents=True, exist_ok=True)
 
     (betas_img, trial_info, cond_idx, run_labels, props,
-     rl_per_trial, ck_per_trial) = load_stimuli(
+     rl_per_trial, ck_per_trial,
+     s2v_per_trial, chosen_per_trial) = load_stimuli(
         subject, glmsingle_dir, bbt_path, shuffle_seed)
     stim_names, n_cond = props['names'], len(props['names'])
 
@@ -392,6 +401,17 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path
                                    .mean().reindex(range(n_cond)).values)
                for scope, (obs, _) in scopes.items()}
     ck_rdms = {scope: abs_diff_rdm(pd.Series(ck_per_trial[obs]).groupby(cond_idx[obs])
+                                   .mean().reindex(range(n_cond)).values)
+               for scope, (obs, _) in scopes.items()}
+
+    # Confound-control RDMs (scope-specific because pairing and choice behaviour
+    # differ across runs, especially learning vs test where feedback is absent).
+    # second_stim_value: mean objective value of the paired alternative per first-stim.
+    # choice_rate: proportion of trials where the subject chose the first stimulus.
+    s2v_rdms = {scope: abs_diff_rdm(pd.Series(s2v_per_trial[obs]).groupby(cond_idx[obs])
+                                    .mean().reindex(range(n_cond)).values)
+                for scope, (obs, _) in scopes.items()}
+    cr_rdms = {scope: abs_diff_rdm(pd.Series(chosen_per_trial[obs]).groupby(cond_idx[obs])
                                    .mean().reindex(range(n_cond)).values)
                for scope, (obs, _) in scopes.items()}
 
@@ -449,7 +469,9 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path
                         ('rl',        rl_rdms[scope],      model_rdms['frequency']),
                         ('ck',        model_rdms['value'], ck_rdms[scope])]:
                     models = {'category': model_rdms['category'], 'value': value_rdm,
-                              'frequency': freq_rdm}
+                              'frequency': freq_rdm,
+                              'second_stim_value': s2v_rdms[scope],
+                              'choice_rate': cr_rdms[scope]}
                     betas, corrs, n_pairs = fit_rdm_regression(rdm, models, keep)
                     rows.append({
                         'subject': f"sub-{subject}", 'mask': mask_name,
@@ -477,7 +499,9 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path
              stim_names=stim_names, stim_cat=props['cat'], stim_value=props['value'],
              stim_frequency=props['frequency'], non_figure=non_figure,
              **model_rdms, **{f'rl_value_{k}': v for k, v in rl_rdms.items()},
-             **{f'ck_value_{k}': v for k, v in ck_rdms.items()})
+             **{f'ck_value_{k}': v for k, v in ck_rdms.items()},
+             **{f's2v_{k}': v for k, v in s2v_rdms.items()},
+             **{f'cr_{k}': v for k, v in cr_rdms.items()})
 
     pd.DataFrame(amp_rows).to_csv(
         subject_output / f"sub-{subject}_rsa_amplitude.csv", index=False)
