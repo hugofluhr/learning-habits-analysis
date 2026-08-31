@@ -98,7 +98,7 @@ sbatch <<EOF
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=${NPROC}
 #SBATCH --mem=12G
-#SBATCH --time=20:00
+#SBATCH --time=1:00:00
 #SBATCH --partition=standard
 
 set -eo pipefail
