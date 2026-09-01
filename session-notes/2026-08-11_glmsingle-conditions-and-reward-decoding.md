@@ -78,10 +78,12 @@ well-populated (~11–23 repeats per identity per run). There is nothing finer t
 category-confound control, largely intact… there's genuine within-category variance carrying
 reward information." That within-category variance appears to be **stimulus identity**.
 
-The value assignment is fixed across all 62 subjects: each category always receives one of the
-pairs `(1,5)`, `(2,3)`, `(2,4)`, `(3,4)` — the two stimuli within a category *never* share a
-value. After dropping level 3, exactly **2 categories per subject straddle the low/high split,
-for all 62 subjects**: the `(1,5)` category and the `(2,4)` one.
+The value assignment is fixed within each subject but varies across subjects (12 counterbalanced
+assignments). The four value-pairs are always `(1,5)`, `(2,3)`, `(2,4)`, `(3,4)` — but only
+`figure→(1,5)` is invariant; the other three categories rotate among `(2,3)`, `(2,4)`, `(3,4)`.
+The two stimuli within a category *never* share a value. After dropping level 3, exactly
+**2 categories per subject straddle the low/high split, for all 62 subjects**: figure `(1,5)`
+and whichever non-figure category received `(2,4)` (varies by subject).
 
 So after `(run × category)`-demeaning, the only trials still carrying a class contrast are those
 two categories, and within each of them the low/high label **is** the individual-stimulus label.

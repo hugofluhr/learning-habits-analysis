@@ -72,7 +72,7 @@ category), so the drop reflects removed pattern variance, not a confound. Deriva
 
 ## Git state
 
-Branch: `rsa-roi`. Will push after final commit.
+Branch: `rsa-roi`, pushed to origin at `f0649af`. Local and remote agree.
 
 ---
 
