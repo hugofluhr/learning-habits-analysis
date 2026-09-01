@@ -10,7 +10,7 @@ style: |
   img { display: block; margin: 0.3em auto; }
   table { font-size: 0.75em; margin: 0 auto; }
   .caption { font-size: 0.75em; color: #555; }
-  .small { font-size: 0.65em; color: #555; }
+  .small { font-size: 0.75em; color: #555; }
 ---
 
 # Multivariate status update
@@ -196,7 +196,6 @@ SPEAKER NOTES:
 
 - 12 distinct value assignments across 62 subjects — value dissociated from any fixed image pair
 - **Caveat**: values {1, 5} always on `figure` category → non-figure 6-stimulus subset is the primary readout
-- Frequency = **choice frequency**, not presentation (all stimuli shown equally, 84×/ea)
 
 </div>
 
@@ -210,59 +209,56 @@ SPEAKER NOTES:
 2. **Model RDMs** — build 5 predictor dissimilarity matrices from stimulus properties: |Δcategory|, |Δvalue|, |Δfrequency|, |Δsecond_stim_value|, |Δchoice_rate|
 3. **Multiple regression** — per subject, per ROI:
 
-   *d*<sub>neural</sub>(*i,j*) = β₁·|Δcategory| + β₂·|Δvalue| + β₃·|Δfrequency| + β₄·|Δsecond_stim_value| + β₅·|Δchoice_rate| + ε
+   *d*<sub>neural</sub>(*i,j*) = β₁·|Δcategory| + β₂·|Δvalue| + β₃·|Δfrequency| + β₄·|Δsecond_stim_value| + <br> β₅·|Δchoice_rate| + ε
 
-4. **Group inference** — one-sample t-tests on subject-level βs against 0 (valid because crossnobis is unbiased), FDR-corrected across all ROI × predictor tests
-
-<div class="small">
-
-- Crossnobis implementation validated bit-exact against rsatoolbox (max |deviation| = 1.1e-16)
-- Primary readout: **non-figure subset** (6 stimuli, 15 pairs) — avoids the category–value confound on figure stimuli
-
-</div>
+4. **Group inference** — one-sample t-tests on subject-level βs against 0, FDR-corrected across all ROI × predictor tests
 
 ---
 
-## RSA results — frequency robust, value ≈ 0 in joint model
+## RSA model RDMs — what the regression fits
 
-<style scoped>
-.row { display: grid; grid-template-columns: 2fr 3fr; gap: 0.8em; align-items: center; }
-.row .text { font-size: 0.8em; }
-</style>
+![w:900](presentation_assets/18-rsa-model-rdms.png)
 
-<div class="row">
-<div class="text">
+<div class="small">
+
+One example subject, 8×8 stimulus dissimilarity predictions (darker = predicted more dissimilar)
+- **category**: block structure — 0 within category, 1 across
+- **value**: graded by |Δreward level| — counterbalanced value map differs per subject
+- **frequency**: graded by |Δchoice frequency label|
+- These (+ 2 confound RDMs, not shown) are regressed jointly against each subject's empirical crossnobis RDM per ROI
+
+</div>
+
+<!-- SOURCE: multivariate/rsa_roi_results.ipynb §2 (cell 6). -->
+
+---
+
+## RSA results — frequency robust, value weakly negative
+
+![w:1000](presentation_assets/19-rsa-5term-bar.png)
+
+<div class="small">
 
 5-term regression, non-figure subset, n=58
+- **Frequency**: VC β=+0.337*** · fusiform β=+0.373*** · WB β=+0.203*** — all FDR q<0.001
+- **Value**: weakly *negative* — fusiform β=−0.118** (FDR q=0.006), VC −0.080* and vmPFC −0.122* (uncorrected only) · VIF < 5; condition κ median=2.7
+- **Why non-figure vs. all differs** (right panel): values {1,5} always sit on `figure`, collinear with |Δcategory| in the full 8-stimulus set — non-figure (left) removes it.
 
-- **Frequency**: VC β=+0.337***
-  fusiform β=+0.373***
-  WB β=+0.203***
-  all FDR q<0.001
-- **Value**: ≈0 everywhere (FDR n.s.)
-- VIF < 5; condition κ median=2.7
-
-</div>
-<div>
-
-![w:600](presentation_assets/19-rsa-5term-bar.png)
-
-</div>
 </div>
 
 <!-- SOURCE: multivariate/rsa_roi_results.ipynb §3/§3a; session-notes/2026-08-30. -->
 
 ---
 
-## RSA confound controls — frequency survives everything
+## RSA confound controls — frequency survives
 
-![w:560](presentation_assets/20-rsa-shuffled.png)
+![w:750](presentation_assets/20-rsa-shuffled.png)
 
 <div class="small">
 
-- **Shuffled-label**: frequency collapses to ~0 — the real effect is genuine
-- **Remove-mean**: frequency β *grows* (VC +0.337→+0.375, fusiform +0.373→+0.420)
-- **Confound RDMs** don't absorb frequency: second_stim_value independent only in fusiform (β=+0.159, q=0.002); choice_rate opposite-sign in VC (β=−0.120, q=0.047)
+- **Shuffled-label** (pictured): frequency collapses to ~0 under random relabeling — the real effect is genuine
+- **Confound terms** (pictured, right-hand bars, same slide-15 model): second_stim_value sig. only in fusiform (β=+0.159, q=0.002); choice_rate opposite-sign in VC (β=−0.120, q=0.047) — neither absorbs frequency
+- **Remove-mean** (separate control, not pictured): frequency β survives, even *grows* (VC +0.337→+0.375)
 
 </div>
 
@@ -273,8 +269,6 @@ SPEAKER NOTES:
 ## What the frequency effect means
 
 <style scoped>section { justify-content: center; }</style>
-
-All stimuli are shown equally often (84 trials each) — **choice frequency** is the only thing that differs
 
 - A positive β(frequency) on neural *distance* means: stimuli with different choice frequencies have **more separable neural patterns** in visual cortex
 - **Potential concern:** frequency splits 6 stimuli into two fixed groups of 3 per subject — could this just be identity discrimination between two arbitrary sets?
@@ -296,24 +290,24 @@ SPEAKER NOTES:
 
 ## Value × frequency interaction — two real effects cancelling
 
-![w:780](presentation_assets/21-rsa-interaction.png)
+![w:850](presentation_assets/21-rsa-interaction.png)
 
 <div class="small">
 
-Value slope (|Δv|=2 minus |Δv|=1) by frequency-match, non-figure pairs, n=58:
-- **Same-frequency**: VC +0.651***, fusiform +0.869*** — value predicts *more* distance
-- **Diff-frequency**: VC −0.579***, fusiform −0.488*** — value predicts *less* distance
-- **Interaction**: VC +1.230***, fusiform +1.357*** — this is *why* pooled β(value)≈0
+**|Δv|** = absolute reward-level difference between two stimuli (1–5 scale). The **value slope** = neural distance for |Δv|=2 pairs minus |Δv|=1 pairs — steeper slope means bigger reward differences drive more distinct patterns. Split by whether the pair shares the same choice-frequency label (non-figure pairs, n=58):
+- **Same-frequency** (blue): VC +0.651***, fusiform +0.869*** — value predicts *more* distance
+- **Diff-frequency** (orange): VC −0.579***, fusiform −0.488*** — value predicts *less* distance
+- **Interaction** (same − diff): VC +1.230***, fusiform +1.357***
 
 </div>
 
-<!-- SOURCE: multivariate/rsa_roi_results.ipynb §8a-§8c; session-notes/2026-08-27, 2026-08-30. -->
+<!-- SOURCE: multivariate/rsa_roi_results.ipynb §8c (single-panel value-slope figure, VC/fusiform highlighted); session-notes/2026-08-27, 2026-08-30. -->
 
 ---
 
 ## Interaction validated against all controls
 
-![w:780](presentation_assets/22-rsa-interaction-validation.png)
+![w:1050](presentation_assets/22-rsa-interaction-validation.png)
 
 <div class="small">
 
@@ -328,16 +322,16 @@ Value slope (|Δv|=2 minus |Δv|=1) by frequency-match, non-figure pairs, n=58:
 
 ---
 
-## What the interaction means
+## What the interaction means?
 
 <style scoped>section { justify-content: center; }</style>
 
 Value β ≈ 0 in the joint model does **not** mean "no value coding" — it means two real effects cancel:
 
 - **Within a frequency group** (both high-choice or both low-choice): value *differentiates* — higher Δvalue → more distinct patterns. The brain tells apart stimuli that share a habit level but differ in reward.
-- **Across frequency groups** (one high, one low): value *compresses* — higher Δvalue → more similar patterns. The frequency-driven reorganisation overrides or inverts the value signal.
+- **Across frequency groups** (one high, one low): value *compresses* — higher Δvalue → more similar patterns. The frequency-driven representation change overrides or inverts the value signal.
 
-**Interpretation:** frequency (habit) is the **primary organising axis** of stimulus representations. Value coding is real but **nested within** that structure — it only adds separation among stimuli that share the same habit status.
+Not sure how to interpret this
 
 <!--
 SPEAKER NOTES:
@@ -358,7 +352,7 @@ SPEAKER NOTES:
 <style scoped>section { justify-content: center; }</style>
 
 - **Frequency (habit) is the dominant signal** — repeated choice reshapes visual representations, making high- and low-frequency stimuli more separable
-- **Value is coded, but context-dependent** — it differentiates within a frequency group but compresses across groups, cancelling to ≈ 0 when pooled
+- **Value seems to be coded, in a context-dependent manner** — it differentiates within a frequency group but compresses across groups, cancelling to ≈ 0 when pooled
 - **Convergent evidence needed** — does an independent method also find frequency coding?
 
 ---
@@ -402,19 +396,22 @@ SPEAKER NOTES:
 8,245 voxels decode frequency above chance (FDR q<0.05) — 16% of brain
 - Peak t=17.6 in right fusiform (42, −57, −15); one large occipitotemporal cluster (232k mm³)
 - Parietal and premotor clusters survive FDR — **new** (not significant in ROI RSA)
-- Spatial correlation with category searchlight r=0.868
+- **Spatial correlation with category searchlight r=0.868**: the decoded might just be using stimulus identity information
 
 </div>
 
 <!-- SOURCE: multivariate/frequency_searchlight_results.ipynb §3-§4; session-notes/2026-08-31. -->
 
----
+<!-- HIDDEN SLIDE — "Three methods converge on frequency" — removed from the deck flow
+   at the user's request (2026-09-01); content kept here to restore easily later.
 
 ## Three methods converge on frequency
 
+<br>
+
 <style scoped>
 table { font-size: 0.7em; }
-td, th { padding: 0.15em 0.5em; }
+td, th { padding: 0.25em 0.5em; }
 </style>
 
 | ROI | RSA β(freq) | Decoding | Searchlight |
@@ -435,9 +432,8 @@ td, th { padding: 0.15em 0.5em; }
 
 </div>
 
-<!-- SOURCE: rsa_roi_results.ipynb §3a, frequency_decoding_results.ipynb §2, frequency_searchlight_results.ipynb §5. -->
+SOURCE: rsa_roi_results.ipynb §3a, frequency_decoding_results.ipynb §2, frequency_searchlight_results.ipynb §5.
 
-<!--
 SPEAKER NOTES:
 - Convergence across methods strengthens the claim, but the methods are not
   equally informative about the 3-vs-3 identity concern:
@@ -459,7 +455,7 @@ SPEAKER NOTES:
 ## RSA searchlight — extending the regression to every voxel
 
 - Same 5-term regression as the ROI-level RSA (category, value, frequency, second_stim_value, choice_rate), run in a 6mm-radius sphere around every voxel, n=58
-- Plus the value×frequency **interaction**, computed as a same-vs-different-frequency slope difference (not a 6th joint regressor — that version was severely collinear with frequency, r=−0.89 in a realistic design; caught and fixed before this run)
+- Plus the value×frequency **interaction**, computed as a same-vs-different-frequency slope difference (not a 6th joint regressor — that version was severely collinear with frequency)
 - Tests whether ROI averaging was hiding localized signal, especially in vmPFC/striatum, and whether frequency/interaction extend beyond the fusiform/VC territory already seen
 
 <!-- SOURCE: multivariate/rsa_searchlight_results.ipynb; session-notes/2026-08-31_rsa-searchlight-and-interaction.md finding 5 (collinearity bug + fix). -->
@@ -493,7 +489,7 @@ ROI mean β(frequency), FDR across 40 term×ROI tests:
 - Fusiform **+0.174\*\*\***, visual cortex **+0.086\*\*\*** — confirms ROI-level RSA
 - **Striatum +0.047\*** — **NEW**: null at the ROI level (β=+0.091, n.s.), significant here
 - Parietal trending (+0.030, uncorrected p=0.018, FDR q=0.091); vmPFC/habit/putamen/premotor n.s.
-- Local-neighborhood averaging over voxel spheres is more sensitive than whole-ROI averaging for this weak, spatially-restricted effect
+- **What this is**: the *mean of the per-voxel searchlight β* across the ROI, tested across subjects — not purely an ROI-averaging artifact: 17/128 striatum voxels (left ventral striatum, MNI≈−5,8,−1) individually clear whole-brain FDR too (one contiguous cluster, mean t=4.14), and the rest trend positive (80.5% of the ROI, mean t=1.05) — both the small real cluster and the diffuse tendency contribute to the ROI-mean result
 
 </div>
 

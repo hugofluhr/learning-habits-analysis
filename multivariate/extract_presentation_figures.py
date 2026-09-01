@@ -15,10 +15,11 @@ ASSETS_DIR = Path(__file__).parent / "presentation_assets"
 
 # (target_filename, notebook, cell_index, output_index_within_cell)
 FIGURES = [
+    ("18-rsa-model-rdms.png",             "rsa_roi_results.ipynb",               6, 0),
     ("19-rsa-5term-bar.png",              "rsa_roi_results.ipynb",              11, 0),
     ("20-rsa-shuffled.png",               "rsa_roi_results.ipynb",              19, 0),
-    ("21-rsa-interaction.png",            "rsa_roi_results.ipynb",              28, 0),
-    ("22-rsa-interaction-validation.png", "rsa_roi_results.ipynb",              30, 0),
+    ("21-rsa-interaction.png",            "rsa_roi_results.ipynb",              30, 0),
+    ("22-rsa-interaction-validation.png", "rsa_roi_results.ipynb",              32, 0),
     ("23-freq-decoding-roi.png",          "frequency_decoding_results.ipynb",    6, 0),
     ("24-freq-searchlight-tmap.png",      "frequency_searchlight_results.ipynb", 8, 0),
     ("25-freq-searchlight-roi.png",       "frequency_searchlight_results.ipynb", 13, 0),
