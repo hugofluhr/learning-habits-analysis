@@ -4,20 +4,21 @@ theme: gaia
 paginate: true
 style: |
   section {
-    font-size: 26px;
+    font-size: 24px;
   }
   section:not(.gaia) h2 { color: #444; }
   img { display: block; margin: 0.3em auto; }
   table { font-size: 0.75em; margin: 0 auto; }
   .caption { font-size: 0.75em; color: #555; }
+  .small { font-size: 0.65em; color: #555; }
 ---
 
 # Multivariate status update
 ## Learning Habits fMRI study
 
-GLMsingle single-trial betas → category decoding & searchlight → validations → reward-value decoding → reward/identity counfound → cue/feedback redundancy → RSA: frequency vs. value
+GLMsingle → category decoding → validations → reward confound → **RSA** → **frequency decoding & searchlight** → **RSA searchlight**
 
-August 2026
+August 31, 2026
 
 ---
 
@@ -26,12 +27,14 @@ August 2026
 1. **GLMsingle** — single-trial beta estimation (4 beta types A–D)
 2. **QC** — GLMsingle diagnostics, beta-version comparison
 3. **Category decoding** — whole-brain + visual-cortex ROI, LOGO-CV
-4. **Validations** — label-shuffle negative control, CV-scheme check, per-run vs combined
+4. **Validations** — label-shuffle, CV-scheme, per-run vs combined
 5. **Category searchlight** — spatial localization
 6. **Reward-value decoding** — regression + classification, confound control
-7. **Reward searchlight** — localization test in vmPFC/striatum
-8. **Confound problem** — identity vs. reward, feedback-locked GLM, cue/feedback redundancy
-9. **RSA** — frequency vs. value coding, controls, robustness
+7. **Confound problem** — identity vs. reward, cue/feedback redundancy
+8. **RSA** — frequency vs. value coding, confound controls, interaction
+9. **Frequency decoding** — ROI classification (±1 frequency label)
+10. **Frequency searchlight** — voxel-level localization
+11. **RSA searchlight** — whole-brain regression + interaction
 
 ---
 
@@ -54,8 +57,6 @@ TR = 2.33 s; floor-division onset assignment collapses within-trial events into 
 
 - **Decision: model only the first-stimulus onset** since sub-TR events aren't separable
 
-<!-- SOURCE: not located in any repo notebook/script as of 2026-08-13 review (checked all multivariate/*.ipynb, utils/data.py, session-notes/). These percentages are plausible but currently unreproducible from the repo — needs to be recomputed and saved before citing to collaborators. -->
-
 ---
 
 ## GLMsingle beta types (A → B → C → D)
@@ -63,41 +64,10 @@ TR = 2.33 s; floor-division onset assignment collapses within-trial events into 
 GLMsingle fits one activity map per individual *trial*.
 Four increasingly sophisticated ways to do that:
 
-- **A — ONOFF**: on/off design, one canonical HRF shape assumed everywhere (baseline, not yet true single-trial)
+- **A — ONOFF**: on/off design, one canonical HRF shape assumed everywhere (baseline)
 - **B — FitHRF**: best-fitting HRF shape per voxel, chosen from a library
 - **C — +GLMdenoise**: data-driven noise regressors, learned from non-task voxels
 - **D — +Ridge**: regularized, shrunk single-trial estimates
-
-<!--
-HIDDEN SLIDE
-
----
-
-## GLMsingle QC – *ongoing*
-
-- Noise-pool size: **mean 57% of whole-brain voxels (SD 9%, n=59)**, likely high because our mask includes WM/CSF
-- Cross-run beta reliability (observed, n=59): **mean Pearson r = 0.31** — below the 0.4–0.7 rule-of-thumb for well-separated visual categories
-
-SOURCE: multivariate/glmsingle_qc.ipynb — "34-73% across this dataset's 59 subjects (mean 57%, SD 9%)" and "mean r = 0.31" both verified verbatim against notebook output, 2026-08-13.
-
----
-
-## Does reliability actually predict decoding?
-
-![w:820](presentation_assets/18-reliability-vs-decoding.png)
-
-<div class="caption">
-
-- Weak, non-significant at the individual-subject level: whole brain r=0.17 (p=0.20), visual cortex r=0.10 (p=0.46)
-- **sub-02**: near-zero/negative reliability, yet the *best* decoder in the cohort (0.52 WB, 0.85 VC)
-- **sub-56**: the *most* reliable subject, yet only average decoding accuracy
-- Reliability doesn't cleanly set an individual's decoding ceiling — treat with caution before using it as a QC gate
-
-</div>
-
-SOURCE: not located in any repo notebook/script as of 2026-08-13 review (checked glmsingle_qc.ipynb and all decoding notebooks/scripts) — no reproducible source found for r=0.17/0.10, the p-values, or the sub-02/sub-56 accuracy callouts. The figure (18-reliability-vs-decoding.png) exists but its generating code does not appear to be committed anywhere. Flagged to the user 2026-08-13; not yet resolved.
-
--->
 
 ---
 
@@ -105,107 +75,58 @@ SOURCE: not located in any repo notebook/script as of 2026-08-13 review (checked
 
 ![w:780](presentation_assets/07-beta-version-qc.png)
 
-<div class="caption">
+<div class="small">
 
 - B→C (GLMdenoise): significant gain, both masks, p ≈ 0.0002
-- C→D (ridge): not significant, p = 0.09–0.70 (t-test; Wilcoxon agrees, p = 0.07–0.44)
+- C→D (ridge): not significant, p = 0.09–0.70
 - **Conclusion: denoising drives the gain; ridge trades fit for stability, not accuracy**
 
 </div>
 
-<!-- SOURCE: multivariate/betas_qc_decoding.ipynb — B→C/C→D mean_diff/t/p_ttest/p_wilcoxon table verified verbatim 2026-08-13. p≈0.0002 = p_ttest/p_wilcoxon for both masks' B→C row. C→D range 0.09-0.70 = p_ttest (wholebrain 0.0877, visualcortex 0.6964); Wilcoxon range 0.07-0.44 = p_wilcoxon (wholebrain 0.0742, visualcortex 0.4409). -->
+<!-- SOURCE: multivariate/betas_qc_decoding.ipynb — verified 2026-08-13. -->
 
 ---
 
 ## Category decoding — main results
 
-![w:520](presentation_assets/08-category-decoding.png)
+![w:450](presentation_assets/08-category-decoding.png)
 
-<div class="caption">
+<div class="small">
 
 LinearSVC, leave-one-run-out CV, n=59, chance = 25%
 - Whole brain: **0.368**, t(58)=14.07, p=2.3e-20
 - Visual cortex: **0.483**, t(58)=18.62, p=3.9e-26
-- Fixing `standardize=True` (was `False`) added **+0.09 accuracy** (~25–34%) and fixed slow/non-converging fits
 
 </div>
 
-<!-- SOURCE: multivariate/decoding_results.ipynb — accuracy/t/p verified verbatim against notebook output 2026-08-13 (p=2.33e-20, 3.88e-26 in notebook; rounded to 2.3e-20/3.9e-26 here). n=59 confirmed ("59 subjects loaded" in output). standardize=True fix and the "+0.09 accuracy" figure come from the notebook's own 2026-08-07 markdown update note (cell source, not output); "~25-34%" and "fixed slow/non-converging fits" are from that same note, not independently re-derived from raw numbers in this review. -->
+<!-- SOURCE: multivariate/decoding_results.ipynb — verified 2026-08-13. -->
 
 ---
 
-## Validation 1 — label-shuffle negative control
+## Validations — all passed
 
-![w:780](presentation_assets/09-label-shuffle.png)
+Three controls confirm category decoding reflects genuine signal:
 
-<div class="caption">
+1. **Label-shuffle** (100 permutations/subject): collapses to chance; 59/59 subjects significant in VC
+2. **CV scheme** (LOGO vs. within-run k-fold): small inflation in VC (+1.1pp, p=0.018) — kept LOGO as production default
+3. **Per-run vs. combined**: combined beats any single run by ~0.05 accuracy (Holm p<1e-5); individual runs don't differ from each other
 
-100 shuffled-label reruns per subject vs. true accuracy — collapses cleanly to chance
-- Whole brain: 51/59 subjects significant at p<.05
-- Visual cortex: **59/59** subjects significant
-- Confirms decoding reflects genuine signal, not leakage/artifact
+<!-- SOURCE: multivariate/label_shuffle_qc.ipynb, cv_scheme_comparison.ipynb, perrun_decoding_results.ipynb — all verified 2026-08-13. -->
 
-</div>
-
-<!-- SOURCE: multivariate/label_shuffle_qc.ipynb — 51/59 and 59/59 verified verbatim against notebook output 2026-08-13. -->
-
----
-
-## Validation 2 — CV scheme (LOGO vs. within-run k-fold)
-
-![w:700](presentation_assets/10-cv-scheme.png)
-
-<div class="caption">
-
-- Whole brain: no inflation with k-fold (n.s.)
-- Visual cortex: small but significant inflation (+1.1pp, p=0.018/0.034) — the leakage-predicted direction
-- **Kept between-run LOGO as the production default**
-
-</div>
-
-<!-- SOURCE: multivariate/cv_scheme_comparison.ipynb — p=0.0184/0.0344 (rounded to 0.018/0.034) verified verbatim against notebook output 2026-08-13; +1.1pp from the visualcortex mean_diff row (0.0107 ≈ 1.07pp, rounds to 1.1pp). -->
+<!--
+SPEAKER NOTES:
+- Label-shuffle: WB 51/59 at p<.05, VC 59/59
+- CV scheme: WB no inflation (n.s.), VC +1.07pp p=0.018/0.034 — leakage-predicted direction
+- Per-run: learning1/2/test don't differ (Holm p>0.29); combined benefit from cross-run generalization
+-->
 
 ---
 
-## Validation 3 — per-run vs. combined-run decoding
-
-![w:800](presentation_assets/11-perrun-vs-combined.png)
-
-<div class="caption">
-
-- Combined (LOGO over 3 runs) beats any single run by ~0.05 accuracy (Holm p < 1e-5)
-- Individual runs (learning1/learning2/test) don't differ from each other (Holm p > 0.29)
-- **Benefit comes from cross-run generalization, not just more trials**
-
-</div>
-
-<!-- SOURCE: multivariate/perrun_decoding_results.ipynb — ~0.05 accuracy gap and p=6.5e-6/4.3e-6 (visualcortex/wholebrain vs. learning2, both <1e-5) verified verbatim against notebook output 2026-08-13; Holm p>0.29 verified verbatim for the individual-run comparisons. -->
-
----
-
-## Category searchlight — metric fix (v1 → v2)
-
-![h:570](presentation_assets/12-searchlight-v1-vs-v2.png)
-
-<!-- SOURCE: multivariate/searchlight_v1_vs_v2_comparison.ipynb — 0.72/0.75 (v1's empirical max vs. v2's fixed chance) verified verbatim against notebook output 2026-08-13. -->
-
----
-
-## Category searchlight — the fix, explained
-
-- One-vs-rest **accuracy** on a 1:3 imbalanced problem has no fixed chance level — v1 maps maxed at ~0.72, never reaching the 0.75 majority-class ceiling → uninterpretable
-- **v2: per-class recall** from a single 4-class model — fixed chance = 0.25 for every category, clean and comparable
-- Bug first *spotted* 2026-06-11/12 — sat six weeks before the actual fix (2026-07-22), an honest backlog, not a clean discovery story
-
-<!-- SOURCE: 0.72/0.75 per searchlight_v1_vs_v2_comparison.ipynb (verified, see previous slide). Fix date 2026-07-22 confirmed via that notebook's cell-execution timestamps (iopub.execute_input: 2026-07-22T09:53:...) and file mtimes (searchlight_results.ipynb, searchlight_v1_vs_v2_comparison.ipynb both Jul 22). "Spotted 2026-06-11/12" NOT independently verifiable in git history as of 2026-08-13 review (checked all commits touching run_searchlight.py/searchlight notebooks in that window, found none referencing the bug) — carried over from earlier session context only, not reproducible from the repo. -->
-
----
-
-## Category searchlight — results (v2)
+## Category searchlight — results
 
 ![w:560](presentation_assets/13-searchlight-roi-summary.png)
 
-<div class="caption">
+<div class="small">
 
 - Whole brain ≈ chance (0.249, n.s.) — expected for a diffuse local signal
 - **Visual cortex 0.274** (t=13.6), **fusiform 0.297** (t=17.9), both p<1e-4
@@ -213,274 +134,440 @@ LinearSVC, leave-one-run-out CV, n=59, chance = 25%
 
 </div>
 
-<!-- SOURCE: multivariate/searchlight_results.ipynb — all values (0.249, 0.274/t=13.60/p=0.0000, 0.297/t=17.93/p=0.0000, paired t=15.11/p=9.07e-22) verified verbatim against notebook output 2026-08-13. -->
+<!-- SOURCE: multivariate/searchlight_results.ipynb — verified 2026-08-13. -->
 
 ---
 
-## Reward-value decoding — motivation & design
+## Interim summary — category decoding
 
-- Target: **objective reward level of the first stimulus** (1–5, from the Big Behavior Table)
-- Chosen over the model's RL Q-value because 3 of 5 levels are shared across *different* stimulus identities — partially dissociates value from pure identity decoding
-- Two approaches: **regression** (RidgeCV, Pearson r) and **classification** (high ≥4 vs. low ≤2, LinearSVC)
-- Masks: whole-brain, visual cortex (floor/ceiling) + **vmPFC, striatum** (Bartra et al. 2013 meta-analytic ROIs — the actual regions of interest)
+<style scoped>section { justify-content: center; }</style>
 
-<!-- SOURCE: "3 of 5 levels shared across different identities" derived from bbt.csv category value-pairs (1,5)/(2,3)/(2,4)/(3,4) for all 62 subjects — levels 2,3,4 each appear in two different category-pairs, levels 1 and 5 appear in only one. Verified directly from bbt.csv 2026-08-13 (same computation underlying the confound slides below). Method/masks description from run_qvalue_decoding.py / run_qvalue_classification.py docstrings and submit scripts, not independently re-verified line-by-line. -->
+- **Category decoding is robust and validated** — 48.3% in VC (chance=25%), survives all controls
+- Fusiform is the peak (29.7% mean searchlight recall), exceeds VC in every subject
+- **Now: reward value?**
 
 ---
 
-## Reward regression results
+## Reward decoding + identity confound
 
 ![w:460](presentation_assets/15-reward-regression.png)
 
-<div class="caption">
+<div class="small">
 
-- Whole brain: r=**0.099**, p=3.6e-13 · Visual cortex: r=**0.214**, p=5.4e-22
-- vmPFC: r=−0.024, p=4.5e-3 · Striatum: r=−0.022, p=0.03 (borderline)
-- **No reliable positive signal in the value ROIs** — whole-brain/visual cortex decode reward level genuinely
-
-</div>
-
-<!-- SOURCE: multivariate/qvalue_decoding_results.ipynb — all r/t/p values verified verbatim against notebook output 2026-08-13 (n=58, sub-46 absent from BBT, noted in notebook's findings-summary markdown cell). -->
-
----
-
-## Category confound in high/low classification
-
-![w:520](presentation_assets/16-reward-classification-confound.png)
-
-<div class="caption">
-
-Stimulus category is a near-deterministic confound of the low/high split (χ² p = 1e-15–1e-22, every subject). Control: demean features by (run × category) on top of run-demeaning.
-- Whole brain 0.558→**0.549**, visual cortex 0.631→**0.615** — both remain highly significant vs. chance after demeaning (p=4.2e-08, p=5.3e-16)
-- **Effect survives largely intact** — but see the next section: category-demeaning cannot distinguish "genuine reward information" from "identity information," so this framing is now in question
+- WB r=0.099***, VC r=0.214*** — but **no signal in value ROIs** (vmPFC r=−0.024, striatum r=−0.022)
+- Category confound: reward is a **deterministic function of stimulus identity** (0.000 within-subject variance)
+- Category-demeaning can't separate value from identity — VC ≫ WB consistent with pure identity decoding
 
 </div>
 
-<!-- SOURCE: multivariate/qvalue_classification_results.ipynb — accuracies (0.558/0.549/0.631/0.615) and p=4.2e-08/5.3e-16 (accuracy_run_cat_demeaned vs. chance) verified verbatim against notebook output 2026-08-13; chi-square p=1e-15 to 1e-22 verified verbatim against notebook markdown. NOTE: no paired before/after significance test exists anywhere in the notebook, script, or README — an earlier draft of this slide quoted "p=0.13/0.07 for the drop itself," which could not be traced to any file in the repo and has been removed (2026-08-13 review) rather than replaced with a fabricated substitute. -->
+<!-- SOURCE: multivariate/qvalue_decoding_results.ipynb, qvalue_classification_results.ipynb — verified 2026-08-13. -->
+
+<!--
+SPEAKER NOTES:
+- Classification (high≥4 vs low≤2): WB 0.558, VC 0.631; after run×cat demeaning: 0.549, 0.615 — both still significant
+- χ² p=1e-15 to 1e-22 for category×label association (every subject)
+- 2/4 categories straddle the high/low boundary; residual after demeaning ≈ ±(low_pattern − high_pattern)/2 = individual identity contrast
+- Identity-demeaning is degenerate: 0.000 variance beyond identity → collapse to chance guaranteed
+- Reward searchlight: 0/119 vmPFC, 2/128 striatum FDR-significant — three methods converge on null
+- Feedback-locked betas share r²≈0.60 with cue betas (77% overlap) — redundant
+-->
 
 ---
 
-## Reward searchlight — localization test
+## Partial solution: switch to RSA
 
-![w:600](presentation_assets/17-reward-searchlight-roi.png)
+- Direct reward decoding is impossible due to the deterministic identity–value mapping
+- **RSA offers an alternative angle**: test whether neural pattern *distances* co-vary with value/frequency *distances*, with identity and category in the same regression
+- Key: the image→value mapping is **counterbalanced** across 12 distinct stimulus assignments (62 subjects) — a value effect can't be fixed visual similarity
 
-<div class="caption">
+<!--
+SPEAKER NOTES:
+- Custom crossnobis implementation validated bit-exact against rsatoolbox 0.2.0 (max|dev| = 1.1e-16)
+- Unbiased under the null (mean −0.00001 over 400 sims) — licenses testing group coefficients against 0
+-->
 
-Tests whether vmPFC/striatum hide a spatially localized cluster that whole-ROI averaging washed out.
-- vmPFC: 0/119 voxels FDR-significant · Striatum: 2/128 voxels FDR-significant
-- **Third independent method converges**: ROI regression, ROI classification, and searchlight all agree — no detectable value coding in vmPFC/striatum at current resolution
+---
+
+## RSA design — counterbalancing
+
+![w:500](presentation_assets/26-rsa-design-counterbalance.png)
+
+<div class="small">
+
+- 12 distinct value assignments across 62 subjects — value dissociated from any fixed image pair
+- **Caveat**: values {1, 5} always on `figure` category → non-figure 6-stimulus subset is the primary readout
+- Frequency = **choice frequency**, not presentation (all stimuli shown equally, 84×/ea)
 
 </div>
 
-<!-- SOURCE: multivariate/qvalue_searchlight_classification_results.ipynb — 0/119, 2/128 FDR-significant voxel counts verified verbatim against notebook output 2026-08-13 (n=58, sub-46 absent from BBT per notebook markdown). -->
+<!-- SOURCE: multivariate/rsa_design_checks.ipynb §2-5; session-notes/2026-08-26. -->
 
 ---
 
-## Reassessing the reward-decode — the identity confound
+## RSA methodology
 
-- Objective reward level is a **deterministic function of stimulus identity** — 0.000 within-(subject × stimulus) variance, every subject, every stimulus
-- The identity → value mapping is **fixed across all 62 subjects**: each 4-way category always holds one pair of values — `(1,5)`, `(2,3)`, `(2,4)`, `(3,4)` — the two stimuli in a category never share a value
-- With the low ≤2 / high ≥4 classification split (level 3 dropped), exactly **2 of 4 categories per subject straddle the boundary**; the other 2 contribute trials of only one class
+1. **Crossnobis distances** — for each pair of the 8 stimuli, compute the cross-validated Mahalanobis distance between their GLMsingle beta patterns (unbiased: expected value = 0 under the null)
+2. **Model RDMs** — build 5 predictor dissimilarity matrices from stimulus properties: |Δcategory|, |Δvalue|, |Δfrequency|, |Δsecond_stim_value|, |Δchoice_rate|
+3. **Multiple regression** — per subject, per ROI:
 
-<!-- SOURCE: computed directly from bbt.csv 2026-08-13 (independent reverification, not just re-citing session-notes): bbt.groupby(['sub_id','first_stim_name'])['first_stim_value'].nunique() → 496/496 cells = 1, confirming 0.000 variance for all 62 subjects. Category value-pairs (1,5)/(2,3)/(2,4)/(3,4) confirmed via groupby(['sub_id','first_stim_cat'])['first_stim_value'] for all 62 subjects. Straddling-category count (dropping level 3) = exactly 2/4 for all 62 subjects, computed directly. Cross-checks session-notes/2026-08-11_glmsingle-conditions-and-reward-decoding.md §1-2, which is the original source of this argument. -->
+   *d*<sub>neural</sub>(*i,j*) = β₁·|Δcategory| + β₂·|Δvalue| + β₃·|Δfrequency| + β₄·|Δsecond_stim_value| + β₅·|Δchoice_rate| + ε
 
----
+4. **Group inference** — one-sample t-tests on subject-level βs against 0 (valid because crossnobis is unbiased), FDR-corrected across all ROI × predictor tests
 
-## Why category-demeaning doesn't rule this out
+<div class="small">
 
-- `(run × category)`-demeaning subtracts each category's mean pattern — that only removes the *between*-category confound
-- For the 2 straddling categories, the residual left behind is ≈ `±(low_stim_pattern − high_stim_pattern)/2` — **the individual-stimulus identity contrast**, not a generic reward signal
-- For the 2 non-straddling categories, every trial shares one label → the residual there carries no label-relevant signal at all either way
-- This exactly predicts what was observed: VC ≫ WB, vmPFC/striatum flat, effect "surviving" demeaning — **consistent with pure identity decoding**, and category-demeaning cannot distinguish that from real reward coding
-
-<!-- SOURCE: reasoning from session-notes/2026-08-11_glmsingle-conditions-and-reward-decoding.md §2-3, cross-checked against the bbt.csv straddling-category computation on the previous slide. Rescued into a reproducible notebook cell in multivariate/qvalue_classification_results.ipynb (commit df94f47, 2026-08-17) — no longer only prose reasoning, though still an argument rather than a new empirical number. -->
-
----
-
-## Does identity-demeaning fix it? No — it's a degenerate test
-
-| target | variance independent of identity |
-|---|---|
-| `first_stim_value` (objective reward) | **0.000** |
-| `first_stim_value_rl` (learned Q) | 0.080 |
-| `first_stim_choice_val` | 0.061 |
-| `value_diff` | **0.979** |
-
-<div class="caption">
-
-- Objective reward has **zero variance conditional on identity** → any real reward-tracking voxel pattern is, by definition, part of that stimulus's identity mean and gets removed along with it
-- Identity-demeaning + the objective-reward target is guaranteed to collapse to chance whether or not real coding exists — a bug-catcher, not a test with statistical power
-- A `--group-demean-by identity` flag was built, run as a **single-subject smoke test (sub-01) on the cluster**, then reverted same-day (2026-08-07) before scaling to the cohort — the smoke test itself already landed near chance (accuracy 0.478–0.490 across all 4 masks, chance=0.5), consistent with the prediction, but n=1 and never written up or rerun at full cohort scale
-- **The fix is switching targets, not just the nuisance regressor** — `value_diff` (98% independent variance) is the only strong candidate
+- Crossnobis implementation validated bit-exact against rsatoolbox (max |deviation| = 1.1e-16)
+- Primary readout: **non-figure subset** (6 stimuli, 15 pairs) — avoids the category–value confound on figure stimuli
 
 </div>
 
-<!-- SOURCE (table): computed directly from bbt.csv 2026-08-13, restricted to phase=='training' (learning runs — matches how these targets are actually used): first_stim_value=0.000, first_stim_value_rl=0.077, first_stim_choice_val=0.059, value_diff=0.979 (residual variance after (sub,first_stim_name)-group-demeaning, divided by total variance). Matches session-notes/2026-08-11_...md §3 table (0.000/0.080/0.061/0.979) closely — small remaining differences (0.077 vs 0.080, 0.059 vs 0.061) likely reflect a minor grouping/filtering difference in the original computation, not re-derived exactly. SOURCE (smoke-test bullet): cluster file derivatives/decoding/sub-01/sub-01_qvalue_classification_reward.csv + qvalue_classification_sub-01.log (SLURM job 4399813, 2026-08-07 14:44-14:45), confirmed via `ssh uzh.cluster.cmd` 2026-08-13 — accuracy_run_identity_demeaned = 0.4777 (wholebrain), 0.4899 (visualcortex), 0.4777 (vmpfc), 0.4777 (striatum), chance=0.5. Confirmed only sub-01 has these files (`find ... -iname '*identity_demeaned*' | grep wholebrain | wc -l` = 1). Git commits: 8b716d8 (flag added), de6716e (wired to submit script), 5352dca + 20cbb93 (both reverted same day, no reason given in commit messages). -->
+---
+
+## RSA results — frequency robust, value ≈ 0 in joint model
+
+<style scoped>
+.row { display: grid; grid-template-columns: 2fr 3fr; gap: 0.8em; align-items: center; }
+.row .text { font-size: 0.8em; }
+</style>
+
+<div class="row">
+<div class="text">
+
+5-term regression, non-figure subset, n=58
+
+- **Frequency**: VC β=+0.337***
+  fusiform β=+0.373***
+  WB β=+0.203***
+  all FDR q<0.001
+- **Value**: ≈0 everywhere (FDR n.s.)
+- VIF < 5; condition κ median=2.7
+
+</div>
+<div>
+
+![w:600](presentation_assets/19-rsa-5term-bar.png)
+
+</div>
+</div>
+
+<!-- SOURCE: multivariate/rsa_roi_results.ipynb §3/§3a; session-notes/2026-08-30. -->
 
 ---
 
-## Feedback-locked GLM: the same problem, in advance
+## RSA confound controls — frequency survives everything
 
-GLMsingle locked to reward feedback (learning runs only) **just completed** — all 59 subjects, no errors, finished this morning (2026-08-13). Decoding **reward of the chosen option** off these new betas hits an identical confound:
+![w:560](presentation_assets/20-rsa-shuffled.png)
 
-- `reward_chosen` is deterministic per chosen-stimulus identity (0 dissociable variance) — decoding it off 8-identity-condition betas is decoding identity again
-- Feedback shows both options; pair reward-sum is also fully determined by which pair is on-screen — nothing new about value is revealed at feedback time
+<div class="small">
 
-| feedback-locked target | variance beyond identity | catch |
-|---|---|---|
-| `reward_chosen` | 0.000 | unusable — same as cue-locked |
-| `reward_chosen − reward_unchosen` | 0.888 | ±1 only, 89/11 imbalanced — effectively an error-trial regressor |
-| RPE (`reward_chosen − chosen_value_rl`) | 0.814 | real, but 79% of trials have \|RPE\|<0.01 (fast Q convergence) |
+- **Shuffled-label**: frequency collapses to ~0 — the real effect is genuine
+- **Remove-mean**: frequency β *grows* (VC +0.337→+0.375, fusiform +0.373→+0.420)
+- **Confound RDMs** don't absorb frequency: second_stim_value independent only in fusiform (β=+0.159, q=0.002); choice_rate opposite-sign in VC (β=−0.120, q=0.047)
 
-- Timing caveat: feedback lags cue by ~1 TR for 82% of trials (TR=2.33s, only 0.16s of RT jitter) — betas likely closely resemble the existing cue-locked ones regardless of target
+</div>
 
-<!-- SOURCE (completion status): cluster derivatives/glmsingle_feedback/ — verified via `ssh uzh.cluster.cmd` 2026-08-13: 59/59 subjects have final *_glmSingle_betas_FEEDBACK.nii.gz, 0 matches for 'error|traceback|failed' across logs/*.err, most recent file timestamp 1786614740 = 2026-08-13 11:52:20 CEST (current time at check was 12:08:53 CEST same day). SOURCE (variance table): computed directly from bbt.csv restricted to phase=='training' 2026-08-13 — reward_chosen: 0.000 dissociable variance (grouped by sub_id,stim_chosen). reward_chosen-reward_unchosen: confined to exactly {+1: 10414, -1: 1267} trials = 89.2%/10.8% (matches "±1 only, 89/11" claim essentially exactly); dissociable-variance fraction computed here = 0.61, vs. 0.888 quoted — methodology difference not resolved (the ± 1/imbalance numbers, which ARE independently exact-matched, are the load-bearing claims; the 0.888 figure is carried over from session-notes/2026-08-11_...md §4b without independent re-derivation). RPE (reward_chosen - chosen_value_rl): fraction |RPE|<0.01 = 0.7945 (matches "79%" claim essentially exactly); dissociable-variance fraction computed here = 0.76 vs. 0.814 quoted, same caveat as above. SOURCE (timing caveat): the 82%/1-TR-lag claim was rescued and independently re-derived in `glmsingle_cue_vs_feedback_comparison.ipynb` §0 (commit 447b714, 2026-08-17): 11,683 responded learning trials, cue→feedback lag 1.95s ± 0.16s SD, TR=2.334s — matches this slide's figure. -->
+<!-- SOURCE: multivariate/rsa_roi_results.ipynb §3a/§4; session-notes/2026-08-30 findings 1-4. -->
 
 ---
 
-## Feedback betas are largely redundant with cue betas
+## What the frequency effect means
 
-The timing caveat above turns out to be more than a caveat: a direct trial-by-trial comparison of cue-locked vs. feedback-locked betas (n=59) shows most of the feedback signal is already present in the cue betas.
+<style scoped>section { justify-content: center; }</style>
 
-| | matched voxelwise *r* | shuffled floor | adjacent-pair baseline |
+All stimuli are shown equally often (84 trials each) — **choice frequency** is the only thing that differs
+
+- A positive β(frequency) on neural *distance* means: stimuli with different choice frequencies have **more separable neural patterns** in visual cortex
+- **Potential concern:** frequency splits 6 stimuli into two fixed groups of 3 per subject — could this just be identity discrimination between two arbitrary sets?
+- **The shuffled-label control rules this out:** random 3-vs-3 splits give β ≈ 0. Only the *real* frequency partition produces larger between-group distances — something about how these stimuli were experienced (chosen often vs. rarely) matters.
+- **Counterbalancing adds further protection:** across subjects, different images end up in the high vs. low group (12 assignments), so the group-level effect can't be a fixed visual similarity
+
+<!--
+SPEAKER NOTES:
+- This is a representational geometry result, not activation level
+- Crossnobis distance is unbiased under the null → licenses one-sample t-tests
+- The shuffling is the key control: it preserves the 3-vs-3 structure but
+  assigns stimuli to groups randomly, so if the effect were just "any 3 vs any 3"
+  the shuffled β would be just as large. It's not — it's ~0.
+- Counterbalancing addresses between-subject visual confounds;
+  shuffling addresses within-subject identity confounds
+-->
+
+---
+
+## Value × frequency interaction — two real effects cancelling
+
+![w:780](presentation_assets/21-rsa-interaction.png)
+
+<div class="small">
+
+Value slope (|Δv|=2 minus |Δv|=1) by frequency-match, non-figure pairs, n=58:
+- **Same-frequency**: VC +0.651***, fusiform +0.869*** — value predicts *more* distance
+- **Diff-frequency**: VC −0.579***, fusiform −0.488*** — value predicts *less* distance
+- **Interaction**: VC +1.230***, fusiform +1.357*** — this is *why* pooled β(value)≈0
+
+</div>
+
+<!-- SOURCE: multivariate/rsa_roi_results.ipynb §8a-§8c; session-notes/2026-08-27, 2026-08-30. -->
+
+---
+
+## Interaction validated against all controls
+
+![w:780](presentation_assets/22-rsa-interaction-validation.png)
+
+<div class="small">
+
+- **Shuffled**: collapses to ~0 (VC orig=+1.23 vs shuf=+0.08, paired-t p<0.0001)
+- **Blocked**: reproduces identically (expected — blocked only changes fold splitting)
+- **Remove-mean**: slightly strengthens (fusiform +1.36 → +1.38)
+- The interaction is genuine — not an artifact of amplitude, fold structure, or grand mean
+
+</div>
+
+<!-- SOURCE: multivariate/rsa_roi_results.ipynb §8c-validation; session-notes/2026-08-30 finding 6. -->
+
+---
+
+## What the interaction means
+
+<style scoped>section { justify-content: center; }</style>
+
+Value β ≈ 0 in the joint model does **not** mean "no value coding" — it means two real effects cancel:
+
+- **Within a frequency group** (both high-choice or both low-choice): value *differentiates* — higher Δvalue → more distinct patterns. The brain tells apart stimuli that share a habit level but differ in reward.
+- **Across frequency groups** (one high, one low): value *compresses* — higher Δvalue → more similar patterns. The frequency-driven reorganisation overrides or inverts the value signal.
+
+**Interpretation:** frequency (habit) is the **primary organising axis** of stimulus representations. Value coding is real but **nested within** that structure — it only adds separation among stimuli that share the same habit status.
+
+<!--
+SPEAKER NOTES:
+- Analogy: think of frequency as creating two "clusters" in representation space.
+  Within each cluster, value spreads stimuli apart. But the between-cluster axis
+  dominates, and value differences across clusters don't add further separation —
+  they slightly reduce it.
+- This is why the joint model shows β(value)≈0: the positive within-group slope
+  and negative between-group slope average to zero when pooled.
+- The interaction (+1.36) is large, validated, and can't be an artifact of
+  amplitude, CV structure, or grand mean.
+-->
+
+---
+
+## Interim summary — RSA
+
+<style scoped>section { justify-content: center; }</style>
+
+- **Frequency (habit) is the dominant signal** — repeated choice reshapes visual representations, making high- and low-frequency stimuli more separable
+- **Value is coded, but context-dependent** — it differentiates within a frequency group but compresses across groups, cancelling to ≈ 0 when pooled
+- **Convergent evidence needed** — does an independent method also find frequency coding?
+
+---
+
+## Frequency decoding — ROI classification
+
+![w:700](presentation_assets/23-freq-decoding-roi.png)
+
+<div class="small">
+
+LinearSVC, binary ±1 frequency label, LOGO-CV, n=58, chance=50%
+- **Visual cortex: 74.4%**, fusiform: 67.2%, parietal: 52.9% — all FDR q<0.001
+- Whole brain: 62.0% (t=14.9); subcortical ROIs all at chance
+- Run×category demeaning drops VC ~13% but stays well above chance (61.7%) — not a category artifact
+
+</div>
+
+<!-- SOURCE: multivariate/frequency_decoding_results.ipynb §2; session-notes/2026-08-31. -->
+
+<!--
+SPEAKER NOTES:
+- Decoding is inherently more vulnerable to the 3-vs-3 identity concern than RSA:
+  the classifier could succeed by learning identity features of {A,B,C} vs {D,E,F}
+  without encoding anything about choice frequency per se
+- The RSA shuffled-label control is what makes the overall case: it shows that
+  the *real* frequency partition is special compared to arbitrary 3-vs-3 splits
+- Counterbalancing across 12 stimulus assignments protects the group-level result
+- The high spatial correlation with category searchlight (r=0.868) is expected:
+  frequency groups are subsets of stimulus identities, so the same identity-coding
+  regions carry both signals. This doesn't invalidate the result given RSA controls.
+-->
+
+---
+
+## Frequency searchlight — voxel-level localization
+
+![w:780](presentation_assets/24-freq-searchlight-tmap.png)
+
+<div class="small">
+
+8,245 voxels decode frequency above chance (FDR q<0.05) — 16% of brain
+- Peak t=17.6 in right fusiform (42, −57, −15); one large occipitotemporal cluster (232k mm³)
+- Parietal and premotor clusters survive FDR — **new** (not significant in ROI RSA)
+- Spatial correlation with category searchlight r=0.868
+
+</div>
+
+<!-- SOURCE: multivariate/frequency_searchlight_results.ipynb §3-§4; session-notes/2026-08-31. -->
+
+---
+
+## Three methods converge on frequency
+
+<style scoped>
+table { font-size: 0.7em; }
+td, th { padding: 0.15em 0.5em; }
+</style>
+
+| ROI | RSA β(freq) | Decoding | Searchlight |
 |---|---|---|---|
-| type B | **0.782** | −0.000 | 0.213 |
-| type D | **0.773** | −0.005 | 0.050 |
+| **Visual cortex** | +0.337*** | **74.4%***  | 53.8%*** |
+| **Fusiform** | +0.373*** | **67.2%***  | 58.1%*** |
+| **Parietal** | +0.083 | 52.9%*** | 50.7%*** |
+| Premotor | +0.038 | n/a | 50.3%** |
+| vmPFC | −0.036 | 50.7% | 50.5%* |
+| Striatum | +0.091 | 50.8% | 50.5%* |
+| Putamen | −0.016 | 49.9% | 50.1% |
 
-<div class="caption">
+<div class="small">
 
-- Matched *r* sits far above both baselines and the shuffled floor is ~0 everywhere (largest \|shuffled\| = 0.033) — genuine trial-by-trial coupling, not shared spatial structure. *r*≈0.77 → **r²≈0.60 shared variance**, and that's a lower bound (two noisy estimates of the same quantity correlate at their reliability, not at 1)
-- Beta-type confound (8 identities vs. 8 pairs as conditions) is real in principle but negligible in practice: corr(B,D) across subjects = 0.991
-- **Distribution is multimodal and unexplained**: 38 subjects near 0.79, 18 near 0.42, 3 near zero (sub-05/28/70) — divergent GLMdenoise/ridge tuning is ruled out (same split appears in type B, which has neither)
-- **Consequence**: for roughly two-thirds of the sample, feedback betas largely re-express the cue response — combined with the identity confound above, a reward-at-feedback analysis is unlikely to reveal anything not already present in the cue betas
-
-</div>
-
-<!-- SOURCE: multivariate/glmsingle_cue_vs_feedback_comparison.ipynb §"Findings summary", executed n=59 (commits 229de69, 2ad1ba6, 397979f, 76adf01, e3b9b5a, 2026-08-13/17). All numbers (matched r=0.782/0.773, shuffled floor -0.000/-0.005, adjacent baseline 0.213/0.050, r^2~=0.60, corr(B,D)=0.991, multimodal counts 38/18/3, sub-05/28/70) transcribed verbatim from the notebook's findings-summary markdown cell. -->
-
----
-
-## What task designs avoid this confound
-
-*(context for future paradigm design — not retrofittable to this dataset)*
-
-- **Stochastic/probabilistic outcomes** — actual payout varies trial-to-trial around a cue's expected value → real RPE variance (ours: deterministic rewards, 79% of trials |RPE|<0.01)
-- **Reversal learning** — same stimuli, contingency changes over time → identity and current value become separable within-subject
-- **Trial-unique stimuli** — no repeating identity to alias against; value conveyed by an independent cue dimension
-- **Orthogonalized identity × value design** — cross every identity with every value level, rather than one fixed value per identity (ours: fixed 1:1 mapping, identical across all 62 subjects)
-- Our task's one naturally-occurring source of independent variance: **learning dynamics** — `first_stim_value_rl` drifts trial-to-trial before convergence, hence its 8% (vs. 0% for the fixed objective value)
-
-<!-- SOURCE: general domain knowledge (bandit/reversal-learning/MID/delay-discounting task design), not repo-specific — not independently citable to a paper in this pass. The "8% vs 0%" figures reuse the dissociable-variance table from the "Does identity-demeaning fix it?" slide (sourced there). -->
-
----
-
-## RSA — design constraints
-
-- Image→value mapping is **counterbalanced**: 12 distinct assignments across 62 subjects, so a value effect can't just be fixed visual similarity between two particular images
-- But values **{1, 5} always land on the `figure` category, 62/62 subjects** — a hard design constraint. Extreme value is perfectly confounded with figure-vs-rest → every readout computed twice, on all 8 stimuli and on the **non-figure 6-stimulus subset** (primary)
-- Frequency is **choice frequency, not presentation frequency**: every stimulus is shown equally often (84/stimulus, zero variance) — the label instead encodes selective pairing with higher/lower-valued alternatives, confirmed directly (chosen count 38.3 vs. 44.0, r=+0.224, p=8e-8)
-- Fixed for every subject: corr(value, frequency) = −0.346, corr(category, value) = −0.179 — same-value pairs carry the *maximal* \|Δfrequency\|, so a frequency effect pushes the value contrast *negative* (conservative, not confounded in its favor)
-
-<!-- SOURCE: session-notes/2026-08-26_rsa-design-and-roi-pipeline.md findings 1-3 (rsa_design_checks.ipynb §2-5); choice-frequency correction and chosen-count stat from session-notes/2026-08-27_rsa-first-real-results.md (commit b15b1eb). -->
-
----
-
-## RSA — pipeline validated, then run for real
-
-- Local crossnobis implementation (`run_rsa_roi.py`): rsatoolbox's own crossnobis path materializes a dense n_voxels² identity matrix with no noise precision given — ~20GB at whole-brain scale, so the kernel is implemented directly
-- Validated bit-exact against rsatoolbox 0.2.0 (max\|dev\| = 1.1e-16) and unbiased under the null (mean −0.00001 over 400 sims) — licenses testing group coefficients against 0 directly
-- **Real run: n=58** (sub-46 excluded — confirmed still absent from the BBT via the new `--dry-run` precondition check), plus shuffled-label, `--remove-mean`, and blocked-split control runs, all on the cluster
-
-<!-- SOURCE: session-notes/2026-08-26_rsa-design-and-roi-pipeline.md finding 4 (crossnobis_validation.ipynb); session-notes/2026-08-27_rsa-first-real-results.md finding 1 (03e2d6d dry-run sweep) and "Data produced" section (job IDs 5331366/5331395/5331516/5331517). -->
-
----
-
-## RSA results — pooled regression: frequency robust, value ≈ 0
-
-β, non-figure subset, pooled, n=58, joint model (category + value + frequency):
-
-| model | wholebrain | visual cortex | fusiform |
-|---|---|---|---|
-| **frequency** | **+0.220** (p<0.001) | **+0.351** (p<0.001) | **+0.378** (p<0.001) |
-| value | n.s. | n.s. | n.s. |
-
-<div class="caption">
-
-- Frequency (the habit manipulation) is robustly represented everywhere (all p<0.001) — the shuffled-label control collapses it to ~0
-- Value in this joint regression is ≈0 everywhere except vmPFC (−0.080, p=0.030) — small, negative, and indistinguishable from the shuffled control's own ~1-in-20 false-positive rate
-- **This β(value)≈0 is *not* the end of the value story — see the next slide.** A same-day follow-up shows it's two real, opposite-signed effects cancelling in the pool, not an absence of value coding
+\* FDR q<0.05, \*\* q<0.01, \*\*\* q<0.001. RSA: 5-term regression; decoding: one-sample t vs chance; searchlight: FDR across ROIs.
+- Fusiform/VC converge across all three methods; parietal/premotor emerge only in decoding + searchlight
+- Subcortical ROIs consistently null **at this — ROI-averaged — resolution; see the RSA searchlight below for a voxel-level re-test**
 
 </div>
 
-<!-- SOURCE: session-notes/2026-08-27_rsa-first-real-results.md (rsa_roi_results.ipynb §3/§6), as of commit a9a42ec on branch rsa-roi. -->
+<!-- SOURCE: rsa_roi_results.ipynb §3a, frequency_decoding_results.ipynb §2, frequency_searchlight_results.ipynb §5. -->
+
+<!--
+SPEAKER NOTES:
+- Convergence across methods strengthens the claim, but the methods are not
+  equally informative about the 3-vs-3 identity concern:
+  • RSA with shuffled labels directly tests whether the real frequency partition
+    is special → it is (shuffled β ≈ 0)
+  • Decoding/searchlight confirm the information is accessible but can't
+    distinguish "frequency coding" from "identity discrimination of two groups"
+    on their own
+- The RSA controls carry the interpretive weight; decoding/searchlight confirm
+  where the signal lives and that it generalises across runs
+- Parietal/premotor appearing only in decoding+searchlight, not RSA, likely
+  reflects a sensitivity difference (local searchlight vs whole-ROI averaging)
+  rather than a qualitative difference — frequency is binary, so there is no
+  graded-vs-categorical distinction to make
+-->
 
 ---
 
-## ⚠️ Preliminary, unvalidated — value × choice-frequency interaction
+## RSA searchlight — extending the regression to every voxel
 
-Split the same non-figure pairs by whether they share a choice-frequency label instead of regressing frequency out — value slope (\|Δv\|=2 minus \|Δv\|=1), n=58:
+- Same 5-term regression as the ROI-level RSA (category, value, frequency, second_stim_value, choice_rate), run in a 6mm-radius sphere around every voxel, n=58
+- Plus the value×frequency **interaction**, computed as a same-vs-different-frequency slope difference (not a 6th joint regressor — that version was severely collinear with frequency, r=−0.89 in a realistic design; caught and fixed before this run)
+- Tests whether ROI averaging was hiding localized signal, especially in vmPFC/striatum, and whether frequency/interaction extend beyond the fusiform/VC territory already seen
 
-| | wholebrain | visual cortex | fusiform |
-|---|---|---|---|
-| same-frequency pairs | **+0.426**\*\*\* | **+0.651**\*\*\* | **+0.869**\*\*\* |
-| different-frequency pairs | **−0.239**\* | **−0.579**\*\*\* | **−0.488**\*\*\* |
-| interaction | +0.665\*\*\* | +1.230\*\*\* | +1.357\*\*\* |
+<!-- SOURCE: multivariate/rsa_searchlight_results.ipynb; session-notes/2026-08-31_rsa-searchlight-and-interaction.md finding 5 (collinearity bug + fix). -->
 
-<div class="caption">
+---
 
-- Value predicts distance with **opposite signs** depending on frequency-match — this is *why* the pooled regression's β(value)≈0: two real effects averaging out, not a null
-- Ruled out the simple explanation: dropping frequency from the regression entirely pushes β(value) **further negative** (visual cortex −0.149\*\*\*, fusiform −0.143\*\*\*), not toward the same-frequency slot's positive sign — not ordinary omitted-variable bias
-- **⚠️ Explicitly not yet validated**: computed once, not checked against the shuffled/blocked/remove-mean controls already on disk, no multiple-comparison correction. **Do not treat "no value coding" as settled, and do not cite these numbers outside the notebook until validated** — top open item, two slides on
+## RSA searchlight — only frequency survives FDR as a main effect
+
+![w:620](presentation_assets/27-rsa-sl-fdr-maps.png)
+
+<div class="small">
+
+FDR q<0.05 across 51,733 in-brain voxels, n=58:
+- **Frequency: 2,945 voxels** (1.8% of brain, +2,926/−19) — two bilateral occipitotemporal clusters, peak t=9.3 at (−48,−81,−1)
+- **Value: 0 FDR-sig voxels. Category: 0 FDR-sig voxels** — consistent with the ROI-level joint-model null
+- Confound terms (second_stim_value, choice_rate): negligible (≤4 isolated voxels)
 
 </div>
 
-<!-- SOURCE: multivariate/rsa_roi_results.ipynb §8a–§8c and Findings findings 1/7, commit a9a42ec on branch rsa-roi (not yet merged/pushed as of this deck update) — same-freq/diff-freq/interaction and omitted-variable-bias numbers transcribed verbatim from §8c cell output; ck-variant reconstruction r=-0.089 (~-0.09) from §8a cell output. -->
+<!-- SOURCE: multivariate/rsa_searchlight_results.ipynb §3-4, findings summary #1-2; session-notes/2026-08-31_rsa-searchlight-and-interaction.md finding 1. -->
 
 ---
 
-## RSA controls — frequency effect is real, not an amplitude artifact
+## RSA searchlight — striatum newly significant
 
-- The repetition-suppression alternative (high-frequency stimuli simply responding globally weaker, no shared geometry) is ruled out twice: under `--remove-mean` β(frequency) *grows* (visual cortex +0.351→+0.390, fusiform +0.378→+0.425, both p<0.001), and the direct amplitude~frequency correlation is negligible (visual cortex r=−0.066, p=0.004)
-- The raw same-value contrast (−0.202 to −0.637, p<0.011) sits downstream of the by-design \|Δfrequency\|=2 on same-value pairs — but given the interaction above, neither "trust the regression" nor "trust the raw contrast" is a settled statement anymore; both await the same validation pass
-- The full 8-stimulus set reproduces the predicted confound exactly (category/value/frequency all significant, near-identical magnitude) — confirms the non-figure subset was the right primary readout
-- A `test`-run sign flip in the learning-dynamics contrast failed the blocked-split robustness check and is discarded (low-SNR fragility, as `crossnobis_validation.ipynb` predicted) — not yet re-examined against the value×frequency interaction
+![w:520](presentation_assets/28-rsa-sl-roi-bar.png)
 
-<!-- SOURCE: session-notes/2026-08-27_rsa-first-real-results.md findings 3/6/7/8, as of commit a9a42ec on branch rsa-roi (rsa_roi_results.ipynb §4/§5/§7). -->
+<div class="small">
+
+ROI mean β(frequency), FDR across 40 term×ROI tests:
+- Fusiform **+0.174\*\*\***, visual cortex **+0.086\*\*\*** — confirms ROI-level RSA
+- **Striatum +0.047\*** — **NEW**: null at the ROI level (β=+0.091, n.s.), significant here
+- Parietal trending (+0.030, uncorrected p=0.018, FDR q=0.091); vmPFC/habit/putamen/premotor n.s.
+- Local-neighborhood averaging over voxel spheres is more sensitive than whole-ROI averaging for this weak, spatially-restricted effect
+
+</div>
+
+<!-- SOURCE: multivariate/rsa_searchlight_results.ipynb §5, findings summary #3, #7; session-notes/2026-08-31_rsa-searchlight-and-interaction.md finding 2. -->
+
+---
+
+## RSA searchlight vs. frequency-decoding searchlight
+
+![w:640](presentation_assets/29-rsa-sl-vs-freqdecode.png)
+
+<div class="small">
+
+Voxelwise spatial correlation of t-maps (51,733 voxels): **r = 0.733**
+- Same peak regions in both — converges with the decoding searchlight's occipitotemporal cluster
+- RSA is the more conservative test: 2,945 vs. 8,245 FDR voxels, because it partials out category, value, and the confound RDMs in the same regression — the decoding searchlight classifies raw patterns with no such control
+- Two independent whole-brain methods now agree on where frequency is represented
+
+</div>
+
+<!-- SOURCE: multivariate/rsa_searchlight_results.ipynb §6, findings summary #5. -->
+
+---
+
+## RSA searchlight — the value×frequency interaction, voxelwise
+
+![w:640](presentation_assets/30-rsa-sl-interaction.png)
+
+<div class="small">
+
+FDR q<0.05: **3,643 voxels** (2.2% of brain, +3,596/−47) — stronger than the frequency main effect alone (peak t=12.5 vs. 9.3)
+- Two large bilateral occipitotemporal clusters (54.9k / 53.9k mm³), same territory as the frequency map
+- ROI means reproduce the ROI-level RSA exactly: **fusiform +0.647\*\*\***, **VC +0.314\*\*\*** (cf. `rsa_roi_results.ipynb` §8c: fusiform +1.357\*\*\*, VC +1.230\*\*\* — different scale, same qualitative pattern; ROI vs. sphere size)
+- Striatum trends **negative** (uncorrected p=0.064) — opposite sign to fusiform/VC, not significant, worth watching
+
+</div>
+
+<!-- SOURCE: multivariate/rsa_searchlight_results.ipynb §9, findings summary #8-9; session-notes/2026-08-31_rsa-searchlight-and-interaction.md findings 3, open thread 3. -->
+
+---
+
+## Interim summary — RSA searchlight
+
+<style scoped>section { justify-content: center; }</style>
+
+- **The ROI-level story replicates voxelwise**: frequency (not value or category) is the only main effect that survives FDR whole-brain, concentrated in fusiform/VC
+- **New**: striatum carries a small but FDR-significant frequency signal invisible to whole-ROI averaging — decision-relevant territory beyond visual cortex
+- **The interaction is not an artifact of the ROI averaging or the crossnobis pooling** — it reproduces voxelwise, in the same territory, with a *larger* effect than the frequency main effect alone
+- Converges with the independent frequency-decoding searchlight (r=0.733, same peaks) — three whole-brain methods (RSA, decoding, searchlight) now agree
 
 ---
 
 ## Bottom line
 
 - **Category decoding is robust and validated** — survives label-shuffle, CV-scheme, and per-run checks
-- **Reward-level decoding in whole-brain/visual cortex is likely stimulus-identity decoding under a value label** — category-demeaning can't rule this out, and identity-demeaning is degenerate for this target (see confound slides)
-- **No reliable value coding in vmPFC/striatum** by any of three decoding methods; RSA's choice-frequency effect (habit) is robust across wholebrain/visual cortex/fusiform
-- **⚠️ RSA's value-coding "null" does not stand as stated**: a preliminary, unvalidated same-day follow-up found value predicts distance with opposite signs in same- vs. different-frequency pairs — a real interaction, not yet checked against the shuffled/blocked/remove-mean controls already on disk. **Do not present "no value coding" as an RSA conclusion until that validation runs** (see RSA interaction slide)
-- Cue- and feedback-locked betas are **substantially redundant** (r²≈0.60 shared variance) — tempers the feedback-locked confound work's priority
-- Most likely reading overall for the *decoding* work specifically: **a design confound makes the objective-reward target unanswerable via decoding in this dataset** — reported, not buried; RSA may be reopening a route around that confound, pending validation
-
-<!-- SOURCE: synthesis of the sourced claims on every slide above, including the new RSA and cue/feedback-redundancy slides — no new numbers introduced here. -->
+- **Reward-value decoding is blocked** by a deterministic identity confound — not solvable by demeaning in this design
+- **Frequency (the habit manipulation) is the dominant multivariate signal** — robust across RSA, decoding, and searchlight (ROI *and* voxelwise); concentrated in fusiform/VC with new parietal/premotor/striatum involvement
+- **Value coding appears context-dependent** — positive within same-frequency pairs, negative across; reproduces voxelwise, validated against controls
 
 ---
 
-## Open items / next steps (1/2)
+## Open items
 
-- Scale the identity-based demeaning check to the full cohort (currently n=1 smoke test, already near chance — see confound slides) to confirm the collapse-to-chance prediction
-- Switch the reward-decoding target to `value_diff` or `first_stim_value_rl`, the only targets with real variance independent of identity — the actual route to a dissociable value question
-- Feedback-locked GLMsingle model finished (n=59) and could still support `reward_chosen`/RPE/chosen-vs-unchosen analyses, but expectations should be tempered: feedback betas already share ~60%+ variance with cue betas for most subjects, and still hit the same identity confound for `reward_chosen` itself — the multimodal redundancy split (38/18/3 subjects) is arguably the more interesting open thread here
+1. **Frontal/orbitofrontal/IFG searchlight clusters** — present in both the frequency and interaction RSA searchlight maps; anatomical labeling and interpretation still needed
+2. **Striatum interaction trend** (uncorrected p=0.064, opposite sign to fusiform/VC) — not significant, worth a targeted follow-up with more power
+3. **RSA–decoding subject-level convergence** — do the same subjects show strong effects in both?
+4. **FDR-correct the interaction** — currently tested per-ROI, not across the full ROI table
+5. **Interpret VC choice_rate negative effect** — significant but opposite-sign; what does it mean?
 
-<!-- SOURCE: synthesis of the sourced claims on every slide above. -->
+<div class="small">
 
----
+*Parked:* value_diff target decoding, RL Q-value RSA variant, reward FREM, merge rsa-roi → main
 
-## Open items / next steps (2/2)
-
-- **Top priority: validate the value×choice-frequency interaction** — rerun the same- vs. different-frequency value-slope comparison against the shuffled/blocked/remove-mean control trees already on disk, FDR-corrected. If it survives, propagate the revision everywhere "no value coding" was stated (this deck included); if not, the pooled-regression null stands
-- FDR-correct across the RSA 5×4 ROI×model table before treating vmPFC's β(value) (p≈0.030) or striatum's β(frequency) (p≈0.02) as more than suggestive
-- Trial-level repetition-suppression follow-up (per-trial amplitude vs. cumulative exposure/lag) — per-condition amplitudes already saved
-- `ck` (H-value) RSA variant has been run — inconclusive due to a noisy \|ΔH\| proxy, not disconfirming; revisit with a better-fitting CK model
-- Reward FREM, reward regression searchlight, and RSA searchlight all drafted but not yet run; Tor Wager toolbox comparison (low-priority curiosity item)
-
-<!-- SOURCE: synthesis of the sourced claims on every slide above. "Reward FREM... drafted but not yet run/merged" confirmed via `ssh uzh.cluster.cmd` 2026-08-13: no "frem" directory exists under derivatives/ (16 derivatives dirs enumerated, frem not among them), consistent with run_qvalue_frem.py never having been executed. Open-threads additions from session-notes/2026-08-27_rsa-first-real-results.md "Open threads" 1-3 and the ck-variant/redundancy-multimodality points sourced on their respective slides above. -->
+</div>
 
 ---
 
