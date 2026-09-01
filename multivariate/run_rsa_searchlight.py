@@ -3,10 +3,26 @@
 RSA searchlight — one subject.
 
 For each voxel, compute a crossnobis RDM over a local sphere (radius 6 mm) on
-the 8 stimulus conditions, then regress it on the same 5-term model used in the
-ROI analysis (category + value + frequency + second_stim_value + choice_rate).
-Output: one brain map per regression coefficient (beta_category, beta_value,
-beta_frequency, beta_second_stim_value, beta_choice_rate).
+the 8 stimulus conditions, then regress it on the 5-term model used in the ROI
+analysis (category + value + frequency + second_stim_value + choice_rate).
+Output: one brain map per regression coefficient, plus a 6th map for the
+value x frequency-context interaction (see below).
+
+IMPORTANT — the interaction is NOT a 6th regressor in the same OLS as the main
+effects. An earlier version tried that and the interaction RDM turned out
+severely collinear with the frequency main-effect regressor (r=-0.89 in a
+6-stimulus, 3-per-frequency-class design — the interaction's sign is dominated
+by the same same/different-frequency split that defines the frequency RDM
+itself). Adding it visibly contaminated every other beta (frequency's sign and
+magnitude both changed). Instead, mirroring the ROI notebook's §8b/§8c method
+exactly, the interaction is a **slope-difference** computed on the side:
+    slope(same-frequency pairs)  = mean(y | |Δvalue|=2) - mean(y | |Δvalue|=1)
+    slope(diff-frequency pairs)  = mean(y | |Δvalue|=2) - mean(y | |Δvalue|=1)
+    interaction = slope(same-frequency) - slope(diff-frequency)
+computed on the same z-scored crossnobis distances (y) used for the main
+regression, restricted to the non-figure subset. This uses only within-subset
+mean differences, so it cannot compete with the main-effect regressors for
+shared variance.
 
 Searchlight counterpart of run_rsa_roi.py. Uses the non-figure subset (6
 stimuli) to avoid the figure-category confound. Operates on the 'pooled' scope
@@ -29,7 +45,8 @@ python multivariate/run_rsa_searchlight.py --subject 01 \\
 Outputs (per subject)
 ---------------------
 <output-dir>/sub-<id>/
-    sub-<id>_rsa_searchlight_beta_<term>.nii.gz   — per-voxel beta map (5 files)
+    sub-<id>_rsa_searchlight_beta_<term>.nii.gz             — 5 regression betas
+    sub-<id>_rsa_searchlight_interaction_value_freq.nii.gz  — interaction slope-diff
     rsa_searchlight_sub-<id>.log
 """
 
@@ -65,6 +82,8 @@ from multivariate.run_rsa_roi import (
 )
 
 MODEL_TERMS = ['category', 'value', 'frequency', 'second_stim_value', 'choice_rate']
+INTERACTION_TERM = 'interaction_value_freq'
+ALL_OUTPUTS = MODEL_TERMS + [INTERACTION_TERM]
 
 
 # ---------------------------------------------------------------------------
@@ -102,8 +121,8 @@ def _build_adjacency(brain_mask_img, radius):
 # Per-sphere RSA regression
 # ---------------------------------------------------------------------------
 def _sphere_rsa(voxel_indices, X_pw, cond_idx, fold_idx, n_cond,
-                model_rdms_triu, keep):
-    """Compute crossnobis RDM on a sphere and regress on model RDMs.
+                model_rdms_triu, keep, value_triu, same_freq_triu):
+    """Compute crossnobis RDM on a sphere: 5-term regression + interaction slope.
 
     Parameters
     ----------
@@ -115,29 +134,35 @@ def _sphere_rsa(voxel_indices, X_pw, cond_idx, fold_idx, n_cond,
         Condition and fold labels per trial.
     n_cond : int
     model_rdms_triu : dict {name: 1D array}
-        z-scored upper-triangular model RDMs, precomputed on the kept subset.
+        z-scored upper-triangular model RDMs (5-term regression), precomputed
+        on the kept subset.
     keep : bool array
         Which of the n_cond conditions to include (non-figure mask).
+    value_triu : 1D array
+        |Δvalue| upper-triangular vector on the kept subset (unstandardised).
+    same_freq_triu : 1D bool array
+        Same-frequency indicator, upper-triangular, on the kept subset.
 
     Returns
     -------
-    betas : dict {term: float}
+    betas : dict {term: float} — 5 regression coefficients + the interaction.
     """
+    out = {t: np.nan for t in ALL_OUTPUTS}
     sphere_data = X_pw[:, voxel_indices]
     if sphere_data.shape[1] < 2:
-        return {t: np.nan for t in MODEL_TERMS}
+        return out
 
     try:
         rdm = _crossnobis_loo(sphere_data, cond_idx, fold_idx, n_cond)
     except ValueError:
-        return {t: np.nan for t in MODEL_TERMS}
+        return out
 
     sub = np.ix_(keep, keep)
     y = _z(_triu(rdm[sub]))
     if y.std() == 0:
-        return {t: np.nan for t in MODEL_TERMS}
+        return out
 
-    # Build design matrix from pre-computed model RDM upper triangulars
+    # --- 5-term regression (unchanged main-effect model) ---
     cols = []
     active_terms = []
     for name in MODEL_TERMS:
@@ -146,27 +171,40 @@ def _sphere_rsa(voxel_indices, X_pw, cond_idx, fold_idx, n_cond,
             active_terms.append(name)
             cols.append(_z(v))
 
-    betas = {t: np.nan for t in MODEL_TERMS}
     if cols:
         design = np.column_stack([np.ones_like(y)] + cols)
         coef, *_ = np.linalg.lstsq(design, y, rcond=None)
         for i, name in enumerate(active_terms):
-            betas[name] = float(coef[i + 1])
+            out[name] = float(coef[i + 1])
 
-    return betas
+    # --- Interaction as a slope-difference, computed separately (see module
+    # docstring for why this can't be a 6th regressor in the same OLS) ---
+    dv2 = value_triu == 2
+    dv1 = value_triu == 1
+    if dv2.any() and dv1.any():
+        def slope(sel):
+            hi, lo = y[sel & dv2], y[sel & dv1]
+            return hi.mean() - lo.mean() if len(hi) and len(lo) else np.nan
+        same_slope = slope(same_freq_triu)
+        diff_slope = slope(~same_freq_triu)
+        if np.isfinite(same_slope) and np.isfinite(diff_slope):
+            out[INTERACTION_TERM] = same_slope - diff_slope
+
+    return out
 
 
 def _process_chunk(rows_chunk, chunk_indices, X_pw, cond_idx, fold_idx,
-                   n_cond, model_rdms_triu, keep, thread_id, total, verbose):
+                   n_cond, model_rdms_triu, keep, value_triu, same_freq_triu,
+                   thread_id, total, verbose):
     """Process a chunk of voxels (for joblib parallelism)."""
     n = len(rows_chunk)
-    results = np.full((n, len(MODEL_TERMS)), np.nan, dtype=np.float64)
+    results = np.full((n, len(ALL_OUTPUTS)), np.nan, dtype=np.float64)
     t0 = time.time()
 
     for i, row in enumerate(rows_chunk):
         betas = _sphere_rsa(row, X_pw, cond_idx, fold_idx, n_cond,
-                            model_rdms_triu, keep)
-        for j, term in enumerate(MODEL_TERMS):
+                            model_rdms_triu, keep, value_triu, same_freq_triu)
+        for j, term in enumerate(ALL_OUTPUTS):
             results[i, j] = betas[term]
 
         if verbose > 0 and i % 500 == 0 and i > 0:
@@ -186,9 +224,12 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir,
                 bbt_path, radius=6., n_jobs=1, overwrite=False):
 
     subject_output = output_dir / f"sub-{subject}"
-    # Check if all output files exist
+    # Check if all output files exist. Regression terms save as beta_<term>;
+    # the interaction (not a regression coefficient) saves under its own name.
     out_paths = {t: subject_output / f"sub-{subject}_rsa_searchlight_beta_{t}.nii.gz"
                  for t in MODEL_TERMS}
+    out_paths[INTERACTION_TERM] = (
+        subject_output / f"sub-{subject}_rsa_searchlight_{INTERACTION_TERM}.nii.gz")
     if all(p.exists() for p in out_paths.values()) and not overwrite:
         logging.info(f"sub-{subject}: outputs exist, skipping (pass --overwrite to rerun)")
         return
@@ -253,6 +294,12 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir,
     for name, mrdm in model_rdms_full.items():
         model_rdms_triu[name] = _triu(mrdm[sub])
 
+    # Interaction ingredients (see module docstring — computed as a
+    # slope-difference, not folded into the 5-term regression above).
+    value_triu = model_rdms_triu['value']   # unstandardised |Δvalue|, 1 or 2
+    same_freq_full = (frequency[:, None] == frequency[None, :])
+    same_freq_triu = _triu(same_freq_full[sub])
+
     # --- Brain mask ---
     sub_obj = Subject(base_dir=str(base_dir), subject_id=subject,
                       include_imaging=True, bids_dir=str(bids_dir))
@@ -291,11 +338,12 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir,
 
     if n_jobs == 1:
         # Single-threaded: simple loop
-        all_betas = np.full((n_seeds, len(MODEL_TERMS)), np.nan, dtype=np.float64)
+        all_betas = np.full((n_seeds, len(ALL_OUTPUTS)), np.nan, dtype=np.float64)
         for i, row in enumerate(A.rows):
             betas = _sphere_rsa(row, X_pw, cond_idx, fold_idx, n_cond,
-                                model_rdms_triu, non_figure)
-            for j, term in enumerate(MODEL_TERMS):
+                                model_rdms_triu, non_figure,
+                                value_triu, same_freq_triu)
+            for j, term in enumerate(ALL_OUTPUTS):
                 all_betas[i, j] = betas[term]
             if i % 2000 == 0 and i > 0:
                 elapsed = time.time() - t_start
@@ -313,13 +361,13 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir,
                 [A.rows[i] for i in chunk],
                 chunk,
                 X_pw, cond_idx, fold_idx, n_cond,
-                model_rdms_triu, non_figure,
+                model_rdms_triu, non_figure, value_triu, same_freq_triu,
                 thread_id + 1, n_seeds, 1,
             )
             for thread_id, chunk in enumerate(chunks)
         )
 
-        all_betas = np.full((n_seeds, len(MODEL_TERMS)), np.nan, dtype=np.float64)
+        all_betas = np.full((n_seeds, len(ALL_OUTPUTS)), np.nan, dtype=np.float64)
         for indices, chunk_results in results:
             all_betas[indices] = chunk_results
 
@@ -327,8 +375,8 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir,
     logging.info(f"sub-{subject}: searchlight done in {elapsed:.0f}s "
                  f"({elapsed/60:.1f} min)")
 
-    # --- Save beta maps ---
-    for j, term in enumerate(MODEL_TERMS):
+    # --- Save beta / interaction maps ---
+    for j, term in enumerate(ALL_OUTPUTS):
         out_img = masker.inverse_transform(all_betas[:, j:j+1].T)
         out_path = out_paths[term]
         out_img.to_filename(str(out_path))
