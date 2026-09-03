@@ -37,7 +37,23 @@ of the scope's trials (needs only >=2 trials total per condition, not >=1 per
 block/run), and (c) a per-stimulus minimum-trial-count gate (>=3 on the smaller
 side) that drops the stimulus (NaN) rather than including a degenerate estimate.
 
-Two numbers per stimulus:
+IMPORTANT construct-validity note (session-notes 2026-09-03, added after the first
+`test` run came back with LARGER partner_distance than `learning`, the opposite of
+the naive prediction): `learning`'s target/rest split isolates pure REPETITION
+FREQUENCY of an otherwise-arbitrary partner (same stimulus, same partner, just
+seen 3x more). `test`'s target/rest split isolates a VALUE TIE -- a same-value
+comparison is a qualitatively different decision problem (no objectively correct
+choice), not merely a more-repeated one. The two `partner_distance` numbers are
+therefore NOT measuring the same construct and should not be compared directly
+as "did pollution shrink in test" -- a large `test` value most plausibly reflects
+a genuine decision-conflict/tied-value signature, not repetition-driven context
+pollution. `find_floor_split`/`floor_distance` (test only) exists to give `test`
+a construct-matched null instead: an arbitrary partner-identity split among the
+6 DIFFERENT-value partners (no value tie, no repetition asymmetry -- nothing
+that should make them differ). Compare `learning`'s `partner_distance` against
+this floor, not against `test`'s same-value `partner_distance`.
+
+Numbers per stimulus:
   * partner_distance     = crossnobis distance between the SAME stimulus's
                            target-partner-trials pattern and rest-partner-trials
                            pattern. Crossnobis is unbiased around 0 when two
@@ -46,6 +62,10 @@ Two numbers per stimulus:
                            for "does partner context leave a residual signature
                            after conditioning on identity" -- no
                            permutation/null needed.
+  * floor_distance       = (`test` only) the same crossnobis test between an
+                           arbitrary partner-identity split of the 6
+                           different-value ("rest") partners -- the
+                           construct-matched null described above.
   * betweenstim_distance = the ordinary 8-condition (identity-only) crossnobis
                            RDM restricted to this scope's trials (2-fold
                            learning1-vs-learning2 for `learning`; interleaved
@@ -141,13 +161,40 @@ def find_target_partner(trial_info, second_stim, second_stim_value, stim_value, 
     return partners
 
 
-def per_stimulus_partner_distance(X, trial_order, p):
-    """Crossnobis distance between stimulus `s`'s target- and rest-partner-trial
-    patterns, cross-validated via an interleaved-trial-order 2-fold split pooling
-    all of the scope's trials (not a block/run split -- see module docstring for
-    why that fails on sparse partner counts)."""
-    sel = p['target_mask'] | p['rest_mask']
-    lab = p['rest_mask'][sel].astype(int)  # 0=target, 1=rest
+def find_floor_split(trial_info, second_stim, second_stim_value, stim_value, stim_names,
+                     scope_mask):
+    """`test`-only null-calibration split: among a stimulus's DIFFERENT-value
+    partner trials (all nominally equally sampled at 4x, no value-tie, no
+    repetition asymmetry -- i.e. no design reason for their patterns to differ
+    by partner), split the distinct partner ids in half (sorted, first half vs
+    second half -- arbitrary but fixed, not data-driven) and treat that as two
+    conditions. Under a true null ("no residual partner-identity signature among
+    interchangeable partners") this should be ~0, same unbiasedness argument as
+    `partner_distance` -- this is the floor `partner_distance` should be compared
+    against, not literal 0, in case the pipeline has any small-sample bias.
+    """
+    floors = {}
+    for s in stim_names:
+        sel = scope_mask & (trial_info['stim_name'].values == s) & (
+            second_stim_value != stim_value[s])
+        partner_ids = np.sort(pd.unique(second_stim[sel]))
+        half = len(partner_ids) // 2
+        group_a_ids, group_b_ids = partner_ids[:half], partner_ids[half:]
+        a_mask = sel & np.isin(second_stim, group_a_ids)
+        b_mask = sel & np.isin(second_stim, group_b_ids)
+        a_n, b_n = int(a_mask.sum()), int(b_mask.sum())
+        floors[s] = dict(a_mask=a_mask, b_mask=b_mask, a_n=a_n, b_n=b_n,
+                         usable=(a_n > 0 and b_n > 0 and min(a_n, b_n) >= MIN_MINOR_TRIALS))
+    return floors
+
+
+def per_stimulus_split_distance(X, trial_order, mask_a, mask_b):
+    """Crossnobis distance between two arbitrary (mutually exclusive) trial-mask
+    conditions for one stimulus, cross-validated via an interleaved-trial-order
+    2-fold split pooling all of the scope's trials (not a block/run split -- see
+    module docstring for why that fails on sparse partner counts)."""
+    sel = mask_a | mask_b
+    lab = mask_b[sel].astype(int)  # 0=a, 1=b
     order = trial_order[sel]
 
     fold = within_run_folds(lab, order, mode='interleaved')
@@ -210,6 +257,15 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path
         logging.warning(f"sub-{subject}: [{scope}] 0 usable stimuli, nothing to compute")
         return
 
+    floors = None
+    if scope == 'test':
+        floors = find_floor_split(trial_info, second_stim, second_stim_value, stim_value,
+                                  stim_names, scope_mask)
+        n_floor_usable = sum(f['usable'] for f in floors.values())
+        logging.info(f"sub-{subject}: [{scope}] floor split {n_floor_usable}/{len(stim_names)} "
+                     f"stimuli usable -- " +
+                     ", ".join(f"{s}:{f['a_n']}/{f['b_n']}" for s, f in floors.items()))
+
     X_wb, masks = build_masks(subject, base_dir, bids_dir, betas_img, roi_masks)
 
     per_stim_rows, summary_rows = [], []
@@ -219,11 +275,17 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path
         stim_rows = []
         for s in stim_names:
             p = partners[s]
-            d = (per_stimulus_partner_distance(X, trial_order, p)
+            d = (per_stimulus_split_distance(X, trial_order, p['target_mask'], p['rest_mask'])
                  if p['usable'] else float('nan'))
-            stim_rows.append(dict(stim_name=s, partner_distance=d,
-                                  target_n=p['target_n'], rest_n=p['rest_n'],
-                                  usable=p['usable']))
+            row = dict(stim_name=s, partner_distance=d,
+                      target_n=p['target_n'], rest_n=p['rest_n'], usable=p['usable'])
+            if floors is not None:
+                f = floors[s]
+                fd = (per_stimulus_split_distance(X, trial_order, f['a_mask'], f['b_mask'])
+                     if f['usable'] else float('nan'))
+                row.update(floor_distance=fd, floor_a_n=f['a_n'], floor_b_n=f['b_n'],
+                          floor_usable=f['usable'])
+            stim_rows.append(row)
         per_stim = pd.DataFrame(stim_rows)
         per_stim['mask'] = mask_name
         per_stim['subject'] = f'sub-{subject}'
@@ -238,10 +300,17 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path
                        partner_distance_mean=partner_mean,
                        betweenstim_distance=between,
                        ratio=(partner_mean / between) if between != 0 else float('nan'))
+        log_extra = ""
+        if floors is not None:
+            floor_mean = float(per_stim.loc[per_stim.floor_usable, 'floor_distance'].mean())
+            summary['floor_distance_mean'] = floor_mean
+            summary['n_floor_usable'] = int(per_stim.floor_usable.sum())
+            log_extra = f"  floor_distance_mean={floor_mean:+.4f} (n={summary['n_floor_usable']})"
         summary_rows.append(summary)
         logging.info(f"sub-{subject}: [{scope}] {mask_name} partner_distance_mean="
                      f"{partner_mean:+.4f} (n={summary['n_usable']})  "
-                     f"betweenstim_distance={between:+.4f}  ratio={summary['ratio']:+.3f}")
+                     f"betweenstim_distance={between:+.4f}  ratio={summary['ratio']:+.3f}"
+                     f"{log_extra}")
 
     pd.concat(per_stim_rows, ignore_index=True).to_csv(out_csv, index=False)
     pd.DataFrame(summary_rows).to_csv(out_summary_csv, index=False)
