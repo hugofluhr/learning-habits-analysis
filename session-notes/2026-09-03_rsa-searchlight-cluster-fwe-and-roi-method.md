@@ -1,4 +1,4 @@
-# Session log — cluster-level FWE + atlas localization for RSA searchlight; clarified the two ROI methods
+# Session log — cluster-level FWE, atlas/functional localization, and a visual-confound audit for RSA searchlight
 
 **Date:** 2026-09-03
 **Companion notes:**
@@ -117,6 +117,57 @@ decodes as parahippocampal/scene-selective (`parahippocampal`, `scenes`,
 `place`), closer to PPA than FFA. Derivation:
 `notebooks/roi/nimare_coordinates.ipynb`, new section, executed.
 
+### 8. Visual-category-confound audit, prompted by finding 7's FFA/PPA decoding — four checks, no evidence of a group-level confound
+
+Hugo asked whether the frequency effect is just visual category (face/house
+selectivity) leaking through. Checked four ways, all using data already on
+disk (no cluster rerun):
+- **VIF was stim1-category only** — confirmed from `run_rsa_roi.py`'s
+  `model_rdms['category']` (never included a stim2-category term); the
+  2026-08-30 VIF check doesn't speak to a second-stimulus-category leak at
+  all. Correction to an earlier answer in this same conversation.
+- **Signed group-level corr(category, frequency)**: face +0.02, hand −0.09,
+  house +0.07, all p>0.13 — no population-level directional tilt (would
+  need one for a coarse category control to leave a systematic group bias).
+  Derivation: `rsa_design_checks.ipynb` §6 (new, executed).
+- **Image→frequency rotation**: 8 distinct assignments across 62 subjects
+  (mirrors §2's 12 value assignments) — no single image is "the high-
+  frequency face" across the population. Same §6.
+- **Partial corr(frequency, second_stim_category | second_stim_value)**:
+  ≈0 for all 3 categories, all p>0.16 — `second_stim_category` (Hugo's
+  proposed addition) would be near-redundant given `second_stim_value`
+  already in the model; frequency is manipulated via value-based pairing,
+  not category-based. Derivation: `rsa_design_checks.ipynb` §7 (new,
+  executed). **Reasoning verdict: theoretically sound mechanism, empirically
+  low-value here — not implemented.**
+
+### 9. Literature check: reward/value history modulating visual cortex is an established, real phenomenon — not just a confound story
+
+Verified via Scite (not memory): Antono, Dang & Auksztulewicz (2023,
+preprint) show via multivariate fMRI that previously reward-associated
+cues enhance target representation in early visual areas; sits within the
+broader value-driven-attention literature (Anderson, 2017). So a
+choice-frequency (reward-history) effect in category-selective visual
+cortex is also what a genuine, literature-supported effect looks like —
+doesn't resolve the confound question either way, but the prior shouldn't
+default to "artifact."
+
+### 10. Targeted frequency-label permutation test — the sharp version of the confound check, and it's decisive
+
+The existing shuffled-label control (`run_rsa_roi.py`'s `shuffle_seed`) is
+blunter than it looks: it scrambles neural-pattern-to-identity
+correspondence entirely, destroying category/value/frequency structure
+simultaneously — a pipeline sanity check, not a targeted test. Built the
+targeted version: hold the real crossnobis RDM and real category/value/
+second_stim_value/choice_rate fixed, permute only the ±1 frequency label
+across the 6 non-figure stimuli (all C(6,3)=20 balanced relabelings
+enumerable per subject), draw one relabeling per subject per iteration to
+build a group-level null (50000 draws). **Wholebrain/VC/fusiform: perm
+p=0.00002 — the real label assignment is far outside the null of any
+balanced, category-correlated relabeling of the same real stimuli.**
+Striatum/parietal marginal (p=0.024/0.034); vmPFC/habit/putamen/premotor
+null. Derivation: `rsa_roi_results.ipynb` §9 (new, executed).
+
 ---
 
 ## Code shipped
@@ -127,7 +178,9 @@ decodes as parahippocampal/scene-selective (`parahippocampal`, `scenes`,
 | `multivariate/submit_rsa_group_stats.sh` | New: SLURM array-by-term submitter (not needed this session — ran locally instead, kept for future/heavier reruns e.g. `--tfce`) | `main` (`b34d11a`) |
 | `multivariate/rsa_searchlight_results.ipynb` | New §12 (cluster-FWE vs FDR) + §13 (atlas localization), both executed | `main` (`b34d11a`, `117e3d6`) |
 | `utils/atlas.py` | New: `label_coordinates()`, MNI coordinate -> Harvard-Oxford/AAL label lookup, offline-cached atlases | `main` (`117e3d6`) |
-| `notebooks/roi/nimare_coordinates.ipynb` | New section: Neurosynth decoding of the RSA searchlight primary peaks, executed | this checkpoint, uncommitted |
+| `notebooks/roi/nimare_coordinates.ipynb` | New section: Neurosynth decoding of the RSA searchlight primary peaks, executed | `main` (`1150298`) |
+| `multivariate/rsa_design_checks.ipynb` | New §6 (image→frequency rotation + signed category/frequency correlation) and §7 (second_stim_category partial correlation), both executed | this checkpoint, uncommitted |
+| `multivariate/rsa_roi_results.ipynb` | New §9: targeted frequency-label permutation test, executed | this checkpoint, uncommitted |
 
 ## Data produced
 
@@ -138,9 +191,10 @@ Local only, not synced anywhere else: `~/phd_local/data/LearningHabits/derivativ
 Working directly on `main` this session (not `rsa-roi` — the branch mentioned
 in prior companion notes belongs to earlier sessions; this session's git
 status at start showed `main` already checked out with the §12 changes
-pending). Two commits done mid-session (`b34d11a` §12 cluster-FWE, `117e3d6`
-§13 atlas localization + `utils/atlas.py`). This checkpoint's
-`nimare_coordinates.ipynb` update + this note's edits are staged, not yet
+pending). Three commits done mid-session (`b34d11a` §12 cluster-FWE,
+`117e3d6` §13 atlas localization + `utils/atlas.py`, `1150298` Neurosynth
+decoding). This checkpoint's `rsa_design_checks.ipynb` §6-7,
+`rsa_roi_results.ipynb` §9, and this note's edits are staged, not yet
 committed.
 
 ---
@@ -157,3 +211,5 @@ committed.
 3. **Run `category`, `second_stim_value`, `choice_rate` through `run_rsa_group_stats.py --term all`** for completeness — only the 3 headline terms were run this session.
 4. Consider running `--tfce` on `frequency` and `interaction_value_freq` for a third cluster-inference method, given it's cheap enough (~45-50 min/term) to not need the cluster.
 5. **Follow up on finding 7's subcallosal/ventral-striatum candidate**: check whether β(value) at that specific voxel/small neighborhood trends positive, even though it didn't survive the whole-brain value map — a small, targeted test (not another whole-brain correction pass).
+6. **The §9 permutation test currently only covers the ROI-level analysis** (`rsa_roi_results.ipynb`). Extending it to the searchlight (per-voxel or at least at the peak coordinates from §12/§13) would close the confound question at the resolution the FFA/PPA decoding finding was actually made at — not done this session, would need `run_rsa_searchlight.py`-level access to per-subject sphere data, more involved than the ROI version.
+7. The visual-confound audit (findings 8-10) doesn't rule out every possible finer-grained visual confound (e.g. low-level pixel statistics unrelated to category) — only category-driven and second-stimulus-pairing-driven ones. Not flagged as urgent given how decisively §9's permutation test came out.
