@@ -267,10 +267,17 @@ strong and test is null. Derivation: `rsa_roi_results.ipynb`, new cell
 | `multivariate/rsa_searchlight_results.ipynb` | §9/§10 prose corrected to match the pooled β(value) terminology fix (no new analysis) | this checkpoint, uncommitted |
 | `multivariate/presentation.md` | "What the interaction means?" slide + speaker notes corrected to the actual pooled β(value) numbers; removed a stray leftover "Not sure how to interpret this" line | this checkpoint, uncommitted |
 | `session-notes/2026-08-27_rsa-first-real-results.md` | Added a dated correction pointer to finding 5 (kept the original preliminary text as historical record, per checkpoint convention) | this checkpoint, uncommitted |
+| `multivariate/rsa_design_checks.ipynb` | New §8/§8b: learning/test pairing-structure design facts (finding 16) | `main` (`f060db4`) |
+| `multivariate/run_beta_crossrun_reliability.py`, `submit_beta_crossrun_reliability.sh` | New: finishes `glmsingle_qc.ipynb` §8 (finding 17) | `main` (`f060db4`) |
+| `multivariate/aggregate_crossrun_reliability.py` | New: aggregation script for the above | `main` (`653c017`) |
+| `multivariate/run_rsa_partner_context.py`, `submit_rsa_partner_context.sh` | New: partner-context/category-leak crossnobis test, `--scope {learning,test}` (findings 18-19) | `main` (`3f087ef`) |
+| `multivariate/rsa_partner_context_results.ipynb` | New: group results notebook for findings 18-19, executed | this checkpoint |
 
 ## Data produced
 
 Local only, not synced anywhere else: `~/phd_local/data/LearningHabits/derivatives/rsa_searchlight_group_stats/{value,frequency,interaction_value_freq}/` — t-map, logp_max_{t,size,mass} maps, mask, and `<term>_params.json` (full run parameters + subject list + runtime) for each of the 3 terms. `--tfce` was not run (would be ~45-50 min/term per the script docstring's extrapolation, not needed to answer this session's question).
+
+Cluster: `shares-hare/ds-learning-habits/derivatives/glmsingle_qc/sub-*/*_crossrun_reliability.csv` (job 5484108, all 59 subjects) and `shares-hare/ds-learning-habits/derivatives/rsa_partner_context/sub-*/` (jobs 5484596/5484846/5484905/5484906, all 59 subjects minus `sub-46`) — both mirrored locally to `~/phd_local/data/LearningHabits/dev_sample/bids_dataset/derivatives/{glmsingle_qc,rsa_partner_context}/` for notebook use.
 
 ## Git state
 
@@ -301,6 +308,12 @@ committed.
 7. The visual-confound audit (findings 8-10) doesn't rule out every possible finer-grained visual confound (e.g. low-level pixel statistics unrelated to category) — only category-driven and second-stimulus-pairing-driven ones. Not flagged as urgent given how decisively §9's permutation test came out.
 8. **What actually causes the `test`-phase collapse (findings 12-14)?** The "behavioural extinction of the frequency split" account is ruled out (finding 14's correction) — the behavioural habit effect is real and robust in `test`'s same-value trials, per Hugo. The "learning-scope collinearity" account is also ruled out (finding 15). **Still unexplained**: a robust *behavioral* habit effect in `test` with no corresponding *neural* signature there, while `learning1`/`learning2` show a strong neural signature. Candidate directions not yet tried: (a) a genuinely feedback/prediction-error-locked neural mechanism (behavior can be habit-driven without the *representational geometry* this RSA measures being the thing that drives it); (b) check the same-value trials specifically within `test` (the diagnostic subset) rather than the whole-`test` RDM used so far — the current `test`-scope RSA pools all trial types together, diluting exactly the trials where the behavioral effect is cleanest.
 9. **Propagate the same "does X collapse in test" check to the value×frequency interaction** — findings 12-14 only checked the two main effects (frequency, value) and the negative-control (category); the interaction itself (§9 of `rsa_searchlight_results.ipynb`, the headline searchlight finding) hasn't been checked for the same run-by-run pattern yet.
+
+### 16-19. RSA partner-context pollution: betas carry information about the co-present stimulus, not just the target stimulus (started from open thread 8, ended up bigger than that)
+
+Full derivation and executed figures: `multivariate/rsa_partner_context_results.ipynb`
+(new). Code: `multivariate/run_rsa_partner_context.py` + `submit_rsa_partner_context.sh`
+(new; module docstring has the complete design-decision trail).
 
 ### 16. Pairing structure: `learning` and `test` sample completely different sets of stimulus pairs — a new, untested candidate mechanism for the test-phase collapse (open thread 8)
 
@@ -340,4 +353,75 @@ sharpens rather than kills the hypothesis, and is the reason a coarse
 reliability check isn't sufficient; a partner-conditioned test targeted at that
 subspace is still needed. Derivation: `run_beta_crossrun_reliability.py` +
 `submit_beta_crossrun_reliability.sh` (new, run on cluster), aggregated locally
-(not yet in a notebook — see open threads).
+via `aggregate_crossrun_reliability.py` (new, committed).
+
+### 18. Targeted neural test: `learning`'s dominant partner leaves a large residual signature, comparable in size to the identity signal itself
+
+Hugo's sharper reframing of finding 16: it's not just fewer contexts in
+`learning` vs `test`, it's that every stimulus has one *dominant* partner
+(~75% of its own trials — the choice-frequency label's 6:18 ratio), so its
+condition mean is heavily weighted toward "this stimulus, with its majority
+partner." Built `run_rsa_roi.py`-style crossnobis test per stimulus: dominant-
+vs-minor-partner-trials distance, holding identity fixed (SLURM jobs 5484596/
+5484905, n=58). **Confirmed decisively**: `partner_distance` +0.030 (wholebrain)
+to +0.064 (fusiform), all p<1e-20 — comparable in magnitude to the ordinary
+between-stimulus identity-discrimination signal (`betweenstim_distance`
++0.009 to +0.073 in the same units/subjects). A dry run against `bbt.csv` before
+touching the cluster caught a design subtlety first: GLMsingle betas are locked
+to FIRST-stimulus onset only, so a stimulus's beta condition only sees the
+subset of its pair-level appearances where it happened to be shown first —
+realized dominant/minor counts range 1-11 (mean 6.0, sd 1.8) across 496
+subject×stimulus cells, not a clean 18:6 — handled via a per-stimulus
+independent test, an interleaved pooled-block 2-fold split, and a minimum-
+trial-count gate (≥3). Derivation: `multivariate/run_rsa_partner_context.py`
+(new) + `rsa_partner_context_results.ipynb` §1 (new, executed).
+
+### 19. Same test in `test`: the naive prediction failed, and the failure revealed a bigger, more general confound — partner CATEGORY leaks into the beta
+
+Naive prediction: `test` has no dominant partner, so if finding 18 is pure
+repetition-context pollution, this distance should shrink there. **It didn't —
+it's significantly LARGER** (+0.057 to +0.081, all p<1e-17; paired vs `learning`,
+p from 0.015 to 1e-10, all 3 masks). Traced to a construct mismatch, not a
+failed hypothesis: `test`'s only analog to a dominant partner is the same-value
+("habit-diagnostic") partner — a qualitatively different decision problem
+(tied value, no objectively correct choice), not a repetition-frequency analog.
+A first attempt at a construct-matched null (arbitrary partner-id split among
+the 6 different-value partners) backfired instructively: it came back the
+LARGEST number yet (~0.095-0.097) because an id-sorted split has no control
+over the CATEGORY composition of its two groups. Replaced with the direct,
+honest version — **hold first-stimulus identity fixed and split by the
+partner's CATEGORY** — and this is the headline result: `category_distance`
+in `test` is +0.12 to +0.17 (all p<1e-27), roughly **2x finding 19's own
+value-tie-specific effect and the largest, most significant number in the
+whole investigation**. (In `learning`, category_distance mostly reproduces
+finding 18, since only 2 partners exist per stimulus there — not new
+information.) **Confirms Hugo's original suspicion directly**: GLMsingle cue
+betas carry substantial information about the co-present stimulus — including
+at minimum its category — independent of the frequency/value/repetition
+structure this pipeline is meant to measure. **Not yet established**: whether
+this explains the specific β(frequency)/β(value) RSA results (`rsa_roi_results.
+ipynb`) — that needs a confound-regression test (open thread, below), not
+attempted this session. Derivation: `run_rsa_partner_context.py`
+(`find_category_split`/`category_distance`, new) + `rsa_partner_context_
+results.ipynb` §2-3 (new, executed), SLURM jobs 5484846/5484905/5484906.
+
+## Open threads (continued, findings 16-19)
+
+10. **Build the confound-regression test** (the natural next step after finding
+    19): construct a "second-stimulus category-profile similarity" model RDM
+    (design-level building blocks already exist in `rsa_design_checks.ipynb`
+    §7's `s2_tab`/`s2cat_*` proportions) and add it to `run_rsa_roi.py`'s
+    `fit_rdm_regression` alongside category/value/frequency/second_stim_value/
+    choice_rate. Check whether β(frequency)/β(value) survive. This is the test
+    that would actually confirm or rule out whether findings 18-19 explain the
+    original RSA results (headline finding of `rsa_roi_results.ipynb`) — not
+    attempted this session.
+11. Finding 19's category-leak result exists in BOTH `learning` and `test`
+    (strong in both), so it doesn't by itself explain why the frequency/value
+    RSA *collapses specifically in `test`* (open thread 8, findings 12-17) — if
+    anything it's a confound present throughout, not one that changes between
+    phases. Worth reconciling once thread 10 is done.
+12. Finding 19's category-leak test used only each stimulus's two most
+    numerous second-stimulus-category groups (up to 4 categories exist) — a
+    full multi-way category discriminability measure (not just top-2) was not
+    built.
