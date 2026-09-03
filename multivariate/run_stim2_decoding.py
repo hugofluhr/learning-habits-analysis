@@ -130,8 +130,15 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path
                   'chance': 1.0 / len(cats)}
 
         for variant, X_variant in [('raw', X_full), ('s1cat_demeaned', X_s1cat)]:
-            y_pred = cross_val_predict(LinearSVC(max_iter=10000, dual='auto'), X_variant, y,
-                                       cv=logo, groups=groups)
+            # tol=1e-3 (10x looser than sklearn's 1e-4 default): whole-brain (60k+ voxel)
+            # 4-class LinearSVC does one-vs-rest internally (~4x the binary fits of the
+            # binary-task decoders this pipeline otherwise uses, e.g. run_frequency_
+            # decoding.py) and was observed hitting max_iter=10000 without converging,
+            # burning the full iteration budget on every such fit. A looser tolerance lets
+            # genuinely-close-to-converged fits stop early instead of always paying the
+            # full 10k-iteration cost; max_iter kept as a hard cap for the rest.
+            y_pred = cross_val_predict(LinearSVC(max_iter=10000, tol=1e-3, dual='auto'),
+                                       X_variant, y, cv=logo, groups=groups)
             acc = float((y_pred == y).mean())
             key = 'accuracy' if variant == 'raw' else f'accuracy_{variant}'
             result[key] = acc
