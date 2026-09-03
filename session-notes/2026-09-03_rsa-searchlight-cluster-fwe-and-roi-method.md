@@ -98,6 +98,25 @@ Also resolved the two interaction small-cluster labels: (45,3,34) is
 Precentral Gyrus (not IFG, as previously guessed by proximity), (−39,−57,13)
 is Angular Gyrus. Derivation: `rsa_searchlight_results.ipynb` §13, executed.
 
+### 7. Neurosynth functional decoding (existing tool, not new) surfaces two notable functional profiles
+
+Reused `notebooks/roi/nimare_coordinates.ipynb` (Neurosynth v7 term
+association, already built + data cached locally) on the same 7 frequency +
+4 interaction primary peaks. Two standouts beyond the anatomical labels:
+**frequency c2 (R fusiform, 42,−54,−18.5) decodes as literally the fusiform
+face area** (`face` z=23.1, `fusiform`, `ffa`) — notable since face is one
+of the four stimulus categories; **frequency c5 (Subcallosal cortex,
+−3,9,−1) decodes as classic reward/valuation territory** (`striatum`
+z=19.4, `reward`, `ventral striatum`, `nucleus accumbens`) despite only
+reaching significance for **frequency**, not value, in the searchlight —
+flagged as a candidate follow-up (check whether this voxel's β(value)
+trends the same direction). Also: the interaction's two large clusters are
+**not functionally homogeneous** despite both being anatomically
+"fusiform" — c1 (R) decodes as generic visual/occipitotemporal, c2 (L)
+decodes as parahippocampal/scene-selective (`parahippocampal`, `scenes`,
+`place`), closer to PPA than FFA. Derivation:
+`notebooks/roi/nimare_coordinates.ipynb`, new section, executed.
+
 ---
 
 ## Code shipped
@@ -106,8 +125,9 @@ is Angular Gyrus. Derivation: `rsa_searchlight_results.ipynb` §13, executed.
 |------|--------|-----------|
 | `multivariate/run_rsa_group_stats.py` | New: permutation cluster-FWE (size/mass/TFCE) for any RSA searchlight term, one term at a time or `--term all` | `main` (`b34d11a`), pushed-pending |
 | `multivariate/submit_rsa_group_stats.sh` | New: SLURM array-by-term submitter (not needed this session — ran locally instead, kept for future/heavier reruns e.g. `--tfce`) | `main` (`b34d11a`) |
-| `multivariate/rsa_searchlight_results.ipynb` | New §12 (cluster-FWE vs FDR) + §13 (atlas localization), both executed | §12 in `main` (`b34d11a`); §13 this checkpoint, uncommitted |
-| `utils/atlas.py` | New: `label_coordinates()`, MNI coordinate -> Harvard-Oxford/AAL label lookup, offline-cached atlases | uncommitted, this checkpoint |
+| `multivariate/rsa_searchlight_results.ipynb` | New §12 (cluster-FWE vs FDR) + §13 (atlas localization), both executed | `main` (`b34d11a`, `117e3d6`) |
+| `utils/atlas.py` | New: `label_coordinates()`, MNI coordinate -> Harvard-Oxford/AAL label lookup, offline-cached atlases | `main` (`117e3d6`) |
+| `notebooks/roi/nimare_coordinates.ipynb` | New section: Neurosynth decoding of the RSA searchlight primary peaks, executed | this checkpoint, uncommitted |
 
 ## Data produced
 
@@ -118,8 +138,10 @@ Local only, not synced anywhere else: `~/phd_local/data/LearningHabits/derivativ
 Working directly on `main` this session (not `rsa-roi` — the branch mentioned
 in prior companion notes belongs to earlier sessions; this session's git
 status at start showed `main` already checked out with the §12 changes
-pending). §12 commit (`b34d11a`) done mid-session; §13 + `utils/atlas.py` +
-this note's updates are staged as this checkpoint, not yet committed.
+pending). Two commits done mid-session (`b34d11a` §12 cluster-FWE, `117e3d6`
+§13 atlas localization + `utils/atlas.py`). This checkpoint's
+`nimare_coordinates.ipynb` update + this note's edits are staged, not yet
+committed.
 
 ---
 
@@ -134,3 +156,4 @@ this note's updates are staged as this checkpoint, not yet committed.
 2. **Persist `labeled_tables` to disk** (e.g. CSV under `rsa_searchlight_group_stats/`) rather than leaving it as in-notebook-only kernel state — anyone rerunning the notebook reproduces it, but it's not currently exported for reuse elsewhere (e.g. the presentation deck).
 3. **Run `category`, `second_stim_value`, `choice_rate` through `run_rsa_group_stats.py --term all`** for completeness — only the 3 headline terms were run this session.
 4. Consider running `--tfce` on `frequency` and `interaction_value_freq` for a third cluster-inference method, given it's cheap enough (~45-50 min/term) to not need the cluster.
+5. **Follow up on finding 7's subcallosal/ventral-striatum candidate**: check whether β(value) at that specific voxel/small neighborhood trends positive, even though it didn't survive the whole-brain value map — a small, targeted test (not another whole-brain correction pass).
