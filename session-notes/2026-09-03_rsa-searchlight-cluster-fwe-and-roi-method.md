@@ -272,6 +272,13 @@ strong and test is null. Derivation: `rsa_roi_results.ipynb`, new cell
 | `multivariate/aggregate_crossrun_reliability.py` | New: aggregation script for the above | `main` (`653c017`) |
 | `multivariate/run_rsa_partner_context.py`, `submit_rsa_partner_context.sh` | New: partner-context/category-leak crossnobis test, `--scope {learning,test}` (findings 18-19) | `main` (`3f087ef`) |
 | `multivariate/rsa_partner_context_results.ipynb` | New: group results notebook for findings 18-19, executed | this checkpoint |
+| `multivariate/run_rsa_roi.py` | Added `--symmetric` flag: `profile_dist_rdm()` helper + s2_category/s2_frequency/s2_identity predictors (finding 20) | `stim2-contamination-tests` (`b43d27c`) |
+| `multivariate/check_symmetric_vif.py` | New: pre-flight VIF check for the symmetric model, BBT-only | `stim2-contamination-tests` (`b43d27c`) |
+| `multivariate/submit_rsa_roi.sh` | Added `SYMMETRIC=1` env var with separate-output-tree guardrail | `stim2-contamination-tests` (`b43d27c`) |
+| `multivariate/run_stim2_decoding.py`, `submit_stim2_decoding.sh` | New: stim-2 category decoding test (finding 21, results pending) | `stim2-contamination-tests` (`b43d27c`) |
+| `utils/data.py` | Moved `load_string_target_from_bbt` here from `run_rsa_partner_context.py` (avoids a circular import with `run_rsa_roi.py`) | `stim2-contamination-tests` (`b43d27c`) |
+| `multivariate/rsa_roi_results.ipynb` | New §10 (symmetric-model comparison, finding 20) + "9." addition to top-level Findings, both executed | this checkpoint |
+| `multivariate/stim2_decoding_results.ipynb` | New: group results notebook for finding 21, built but not yet executed (job 5495879 still running) | this checkpoint |
 
 ## Data produced
 
@@ -407,21 +414,66 @@ results.ipynb` §2-3 (new, executed), SLURM jobs 5484846/5484905/5484906.
 
 ## Open threads (continued, findings 16-19)
 
-10. **Build the confound-regression test** (the natural next step after finding
-    19): construct a "second-stimulus category-profile similarity" model RDM
-    (design-level building blocks already exist in `rsa_design_checks.ipynb`
-    §7's `s2_tab`/`s2cat_*` proportions) and add it to `run_rsa_roi.py`'s
-    `fit_rdm_regression` alongside category/value/frequency/second_stim_value/
-    choice_rate. Check whether β(frequency)/β(value) survive. This is the test
-    that would actually confirm or rule out whether findings 18-19 explain the
-    original RSA results (headline finding of `rsa_roi_results.ipynb`) — not
-    attempted this session.
+10. ~~**Build the confound-regression test**~~ → **DONE** (new session,
+    2026-09-03, `rsa_roi_results.ipynb` §10 — finding 20 below). Both β(value)
+    and β(frequency) survive; findings 18-19 do NOT explain the headline RSA
+    results.
 11. Finding 19's category-leak result exists in BOTH `learning` and `test`
     (strong in both), so it doesn't by itself explain why the frequency/value
     RSA *collapses specifically in `test`* (open thread 8, findings 12-17) — if
     anything it's a confound present throughout, not one that changes between
-    phases. Worth reconciling once thread 10 is done.
+    phases. **Now moot as an account of the collapse** — finding 20 shows the
+    leakage doesn't drive β(frequency)/β(value) at all, so it isn't a candidate
+    explanation for why they collapse in `test` either.
 12. Finding 19's category-leak test used only each stimulus's two most
     numerous second-stimulus-category groups (up to 4 categories exist) — a
     full multi-way category discriminability measure (not just top-2) was not
     built.
+
+## 20-21. Two independent tests of whether the stim-2 contamination (findings 18-19) explains the headline RSA findings — it doesn't
+
+Plan: `/Users/hugofluhr/.claude/plans/sparkling-rolling-sparkle.md`. Branch
+`stim2-contamination-tests`, commit `b43d27c`. Two tests per the plan:
+
+### 20. Symmetric RSA regression (`run_rsa_roi.py --symmetric`) — β(value)/β(frequency) survive unchanged, stim-2 leakage is a separate additive signal
+
+Added `s2_category`/`s2_frequency`/`s2_identity` predictors to the RDM
+regression (new `profile_dist_rdm()` — stim-2 properties are per-condition
+proportion PROFILES since each stim-1 condition pools multiple different
+partners, unlike stim-1's per-condition scalars). Pre-flight VIF check
+(`check_symmetric_vif.py`, BBT-only, no betas) found plausible VIFs (median
+1.5-4) before submitting. Cluster job 5495880, n=58, ~1 min.
+
+**β(frequency) survives essentially unchanged, even strengthens slightly**:
+fusiform +0.373→+0.383 (both p<0.001), visual cortex +0.337→+0.358, wholebrain
++0.203→+0.272 — all still ***. **β(value) survives and strengthens (more
+negative)**: fusiform −0.118→−0.194, visual cortex −0.080→−0.124 (both
+p<0.001/<0.01). **s2_frequency is itself a real, independent, FDR-significant
+predictor** in the same visual/fusiform territory (fusiform −0.214***, visual
+cortex −0.223***, wholebrain −0.172**) — confirms the partner-context leakage
+from findings 18-19 reaches the RDM-regression level, but it acts as a
+*separate additive* signal, not an inflator/explainer of the headline effects.
+s2_category weaker (significant only in fusiform, −0.199, FDR q=0.039);
+s2_identity null everywhere after FDR. Derivation: `rsa_roi_results.ipynb`
+§10 (new, executed) + its "9." addition to the top-level Findings summary.
+
+### 21. Stim-2 category decoding (`run_stim2_decoding.py`) — existence-proof test, cluster job 5495879 still running at session-note-update time
+
+4-class (face/hand/house/figure) LinearSVC, LOGO-CV, chance=0.25, with a
+`run_s1cat_demeaned` control variant to rule out stim-1-pattern leakage as the
+explanation. Results notebook (`stim2_decoding_results.ipynb`) built and ready
+to execute; not yet run — job was at 8/59 subjects when this note was last
+updated. **Not yet a finding** — see open thread 13 below.
+
+## Open threads (continued, findings 20-21)
+
+13. **Run `stim2_decoding_results.ipynb` once cluster job 5495879 finishes**
+    (`stim2_decode`, sub-46 expected to fail as usual — 58/59 target), sync
+    `derivatives/stim2_decoding/` locally, execute the notebook, and fold the
+    actual numbers into finding 21 above. Existence-proof framing predicts
+    raw accuracy well above chance in visual/fusiform masks; the decisive part
+    is whether `s1cat_demeaned` accuracy stays well above chance too.
+14. Commit the `stim2-contamination-tests` branch work still staged/uncommitted
+    at session end (§10/§10-findings additions to `rsa_roi_results.ipynb`,
+    `stim2_decoding_results.ipynb`, this note) and consider whether to merge
+    into `main` or open a PR, once finding 21 is filled in.
