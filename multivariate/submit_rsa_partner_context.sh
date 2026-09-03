@@ -5,13 +5,14 @@
 # 4D betas once; the per-stimulus 2-condition crossnobis calls are trivial).
 #
 # Usage (from repo root):
-#   bash multivariate/submit_rsa_partner_context.sh                # all subjects in PARTICIPANTS_TSV
-#   bash multivariate/submit_rsa_partner_context.sh 01              # single-subject pilot
-#   NPROC=8 bash multivariate/submit_rsa_partner_context.sh         # override concurrency
-#   OVERWRITE=1 bash multivariate/submit_rsa_partner_context.sh     # force rerun
+#   bash multivariate/submit_rsa_partner_context.sh                     # all subjects, scope=learning
+#   SCOPE=test bash multivariate/submit_rsa_partner_context.sh          # all subjects, scope=test
+#   SCOPE=test bash multivariate/submit_rsa_partner_context.sh 01       # single-subject pilot
+#   NPROC=8 bash multivariate/submit_rsa_partner_context.sh             # override concurrency
+#   OVERWRITE=1 bash multivariate/submit_rsa_partner_context.sh         # force rerun
 #
-# run_rsa_partner_context.py skips subjects that already have a results CSV, so
-# this is resumable.
+# run_rsa_partner_context.py skips subjects that already have a results CSV (per
+# scope), so this is resumable.
 
 set -euo pipefail
 
@@ -33,6 +34,7 @@ MASK_DIR="${BASE_DIR}/masks/MNI152NLin2009cAsym"
 VIS_MASK="${VIS_MASK:-${DECODING_DIR}/visual_cortex_mask.nii.gz}"
 FUSIFORM_MASK="${FUSIFORM_MASK:-${MASK_DIR}/fusiform_mask_MNI152NLin2009cAsym.nii}"
 
+SCOPE="${SCOPE:-learning}"
 NPROC="${NPROC:-8}"
 
 OVERWRITE="${OVERWRITE:-0}"
@@ -43,7 +45,7 @@ OVERWRITE_FLAG=""
 # Build subject list
 # ---------------------------------------------------------------------------
 mkdir -p "$LOG_DIR"
-SUBJECTS_FILE="${LOG_DIR}/subjects_partner_context.txt"
+SUBJECTS_FILE="${LOG_DIR}/subjects_partner_context_${SCOPE}.txt"
 
 if [ "$#" -gt 0 ]; then
     printf "%s\n" "$@" > "$SUBJECTS_FILE"
@@ -69,7 +71,7 @@ for mask_var in VIS_MASK FUSIFORM_MASK; do
     fi
 done
 
-echo "Submitting 1 job for ${N} subjects (NPROC=${NPROC} concurrent):"
+echo "Submitting 1 job for ${N} subjects, scope=${SCOPE} (NPROC=${NPROC} concurrent):"
 cat "$SUBJECTS_FILE"
 echo
 
@@ -78,9 +80,9 @@ echo
 # ---------------------------------------------------------------------------
 sbatch <<EOF
 #!/bin/bash -l
-#SBATCH --job-name=rsa_partner
-#SBATCH --output=${LOG_DIR}/rsa_partner_%j.out
-#SBATCH --error=${LOG_DIR}/rsa_partner_%j.err
+#SBATCH --job-name=rsa_partner_${SCOPE}
+#SBATCH --output=${LOG_DIR}/rsa_partner_${SCOPE}_%j.out
+#SBATCH --error=${LOG_DIR}/rsa_partner_${SCOPE}_%j.err
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=${NPROC}
 #SBATCH --mem=16G
@@ -99,6 +101,7 @@ run_one() {
     local s="\$1"
     /home/hfluhr/data/conda/envs/learning-habits/bin/python -u "${REPO}/multivariate/run_rsa_partner_context.py" \\
         --subject "\$s" \\
+        --scope "${SCOPE}" \\
         --base-dir "${BASE_DIR}" \\
         --bids-dir "${BIDS_DIR}" \\
         --glmsingle-dir "${GLMSINGLE_DIR}" \\
