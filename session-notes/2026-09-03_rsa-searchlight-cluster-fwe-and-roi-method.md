@@ -218,11 +218,38 @@ directional shift, only a mild SEM increase (~15-20%) consistent with
 somewhat more noise in `test`, nowhere near enough to explain frequency's
 collapse or value's sign flip. Read as: the effect is not simply "test is
 noisier for everything" — frequency and value specifically depend on the
-active-learning/feedback context in a way category doesn't. **Not yet
-resolved which specific mechanism** (feedback-locked signal vs. behavioural
-extinction of the choice-frequency split vs. something else) — open
-thread. Derivation: `rsa_roi_results.ipynb`, new cell (unnamed, right
-after §5b).
+active-learning/feedback context in a way category doesn't. Derivation:
+`rsa_roi_results.ipynb`, new cell (unnamed, right after §5b).
+
+**Design correction from Hugo, changes how finding 14 should be read:**
+`test` is not "no manipulation" — it presents *all* pairwise stimulus
+combinations, including same-value pairs that never occur in
+`learning1`/`learning2` by design. This is the paradigm's habit-diagnostic
+phase (does choice-frequency bias choice when value can't explain a
+preference), and Hugo confirms the behavioural habit effect **is** present
+there, small but robust. So "behavioural extinction of the frequency
+split" (the second candidate mechanism floated below) is ruled out as
+stated — behavior doesn't extinguish. The live question becomes why a
+robust *behavioral* habit effect in `test` has no corresponding *neural*
+signature there, given the same-frequency-signature is strong in
+`learning1`/`learning2`.
+
+### 15. Ruled out: learning-scope collinearity between frequency and second_stim_value does not explain the collapse
+
+Hugo's mechanism: the pairing manipulation structurally couples frequency
+and second_stim_value *specifically during learning* (by construction), and
+the 2026-08-30 VIF check (run on *pooled* scope, which mixes in `test`'s
+unbiased all-pairs design) could have diluted/masked much worse
+learning-only collinearity — making the learning-phase β(frequency)
+estimates less separable/trustworthy than the headline diagnostic
+suggested. **Checked directly, per scope: not supported.** VIF(frequency)
+is low (~1.2-1.6) and essentially identical across `learning1` (median
+1.26), `learning2` (1.34), `test` (1.32), and `pooled` (1.24); raw
+corr(frequency, second_stim_value) is modest (~−0.11) in all scopes. If
+anything `test` has the one elevated-VIF outlier subject (max 7.72), not
+learning. This specific confound channel doesn't explain why learning is
+strong and test is null. Derivation: `rsa_roi_results.ipynb`, new cell
+(unnamed, right after the category negative control).
 
 ---
 
@@ -236,7 +263,7 @@ after §5b).
 | `utils/atlas.py` | New: `label_coordinates()`, MNI coordinate -> Harvard-Oxford/AAL label lookup, offline-cached atlases | `main` (`117e3d6`) |
 | `notebooks/roi/nimare_coordinates.ipynb` | New section: Neurosynth decoding of the RSA searchlight primary peaks, executed | `main` (`1150298`) |
 | `multivariate/rsa_design_checks.ipynb` | New §6 (image→frequency rotation + signed category/frequency correlation) and §7 (second_stim_category partial correlation), both executed | `main` (`8a71250`) |
-| `multivariate/rsa_roi_results.ipynb` | New §9 (targeted frequency-label permutation test), §5b (frequency per-run dynamics + blocked-split robustness check), category per-run control, and an Addendum correcting the pooled β(value) terminology — all executed | `8a71250` (§9) + this checkpoint (§5b, category control, Addendum) |
+| `multivariate/rsa_roi_results.ipynb` | New §9 (targeted frequency-label permutation test), §5b (frequency per-run dynamics + blocked-split robustness check), category per-run control, per-scope VIF/collinearity check (ruled out), and an Addendum correcting the pooled β(value) terminology — all executed | `8a71250` (§9) + this checkpoint (§5b, category control, VIF check, Addendum) |
 | `multivariate/rsa_searchlight_results.ipynb` | §9/§10 prose corrected to match the pooled β(value) terminology fix (no new analysis) | this checkpoint, uncommitted |
 | `multivariate/presentation.md` | "What the interaction means?" slide + speaker notes corrected to the actual pooled β(value) numbers; removed a stray leftover "Not sure how to interpret this" line | this checkpoint, uncommitted |
 | `session-notes/2026-08-27_rsa-first-real-results.md` | Added a dated correction pointer to finding 5 (kept the original preliminary text as historical record, per checkpoint convention) | this checkpoint, uncommitted |
@@ -272,5 +299,5 @@ committed.
 5. **Follow up on finding 7's subcallosal/ventral-striatum candidate**: check whether β(value) at that specific voxel/small neighborhood trends positive, even though it didn't survive the whole-brain value map — a small, targeted test (not another whole-brain correction pass).
 6. **The §9 permutation test currently only covers the ROI-level analysis** (`rsa_roi_results.ipynb`). Extending it to the searchlight (per-voxel or at least at the peak coordinates from §12/§13) would close the confound question at the resolution the FFA/PPA decoding finding was actually made at — not done this session, would need `run_rsa_searchlight.py`-level access to per-subject sphere data, more involved than the ROI version.
 7. The visual-confound audit (findings 8-10) doesn't rule out every possible finer-grained visual confound (e.g. low-level pixel statistics unrelated to category) — only category-driven and second-stimulus-pairing-driven ones. Not flagged as urgent given how decisively §9's permutation test came out.
-8. **What actually causes the `test`-phase collapse (findings 12-14)?** Two live hypotheses, not distinguished yet: (a) the neural signature is feedback/prediction-error-locked and genuinely requires trial-by-trial reward delivery to appear, or (b) subjects' *actual* choice behaviour stops tracking the historical frequency label once feedback stops (an extinction-like account), so the label itself becomes the wrong regressor for `test` trials specifically. (b) is checkable now, no new data needed: does `n_chosen`/realized choice rate for each stimulus, computed from `test`-phase trials only, still correlate with the frequency label the way it does in learning? If not, that would favor (b) over (a).
+8. **What actually causes the `test`-phase collapse (findings 12-14)?** The "behavioural extinction of the frequency split" account is ruled out (finding 14's correction) — the behavioural habit effect is real and robust in `test`'s same-value trials, per Hugo. The "learning-scope collinearity" account is also ruled out (finding 15). **Still unexplained**: a robust *behavioral* habit effect in `test` with no corresponding *neural* signature there, while `learning1`/`learning2` show a strong neural signature. Candidate directions not yet tried: (a) a genuinely feedback/prediction-error-locked neural mechanism (behavior can be habit-driven without the *representational geometry* this RSA measures being the thing that drives it); (b) check the same-value trials specifically within `test` (the diagnostic subset) rather than the whole-`test` RDM used so far — the current `test`-scope RSA pools all trial types together, diluting exactly the trials where the behavioral effect is cleanest.
 9. **Propagate the same "does X collapse in test" check to the value×frequency interaction** — findings 12-14 only checked the two main effects (frequency, value) and the negative-control (category); the interaction itself (§9 of `rsa_searchlight_results.ipynb`, the headline searchlight finding) hasn't been checked for the same run-by-run pattern yet.
