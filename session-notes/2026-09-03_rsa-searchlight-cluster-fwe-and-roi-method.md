@@ -1,4 +1,4 @@
-# Session log — cluster-level FWE for RSA searchlight; clarified the two ROI methods
+# Session log — cluster-level FWE + atlas localization for RSA searchlight; clarified the two ROI methods
 
 **Date:** 2026-09-03
 **Companion notes:**
@@ -80,15 +80,34 @@ eyeballed). Neither is atlas-verified — same open item as the frequency
 map's small clusters from 2026-08-31. Derivation: `rsa_searchlight_results.ipynb`
 §12 cluster table.
 
+### 6. Atlas localization confirms fusiform/occipital convergence and corrects one prior eyeballed label
+
+Built `utils/atlas.py` (`label_coordinates`: Harvard-Oxford cortical+subcortical
+maxprob-thr25-2mm primary, AAL SPM12 cross-check; both atlases already cached
+locally from `notebooks/roi/ROI_masks.ipynb`, no network fetch needed —
+`fetch_atlas_aal()` without `version='SPM12'` fails offline, confirmed).
+Applied to §12's frequency (14 peaks) and interaction (10 peaks) cluster-FWE
+tables. Every peak in both dominant bilateral clusters lands in Harvard-Oxford
+"Temporal Occipital Fusiform Cortex"/"Occipital Fusiform Gyrus"/"Lateral
+Occipital Cortex", matching AAL `Fusiform_L/R`/`Occipital_Mid/Inf_L/R` at 0mm
+— formal confirmation, not eyeballing, that the fusiform/VC result is real
+anatomical convergence independent of the ROI list. **Caught one wrong label
+from §10**: (42, 12, −18.5) was called "right orbitofrontal" — atlas says
+Temporal Pole (`Temporal_Pole_Sup_R`), not OFC; §10's prose needs correcting.
+Also resolved the two interaction small-cluster labels: (45,3,34) is
+Precentral Gyrus (not IFG, as previously guessed by proximity), (−39,−57,13)
+is Angular Gyrus. Derivation: `rsa_searchlight_results.ipynb` §13, executed.
+
 ---
 
 ## Code shipped
 
 | File | Change | Git state |
 |------|--------|-----------|
-| `multivariate/run_rsa_group_stats.py` | New: permutation cluster-FWE (size/mass/TFCE) for any RSA searchlight term, one term at a time or `--term all` | uncommitted, this checkpoint |
-| `multivariate/submit_rsa_group_stats.sh` | New: SLURM array-by-term submitter (not needed this session — ran locally instead, kept for future/heavier reruns e.g. `--tfce`) | uncommitted, this checkpoint |
-| `multivariate/rsa_searchlight_results.ipynb` | New §12: cluster-FWE vs FDR comparison table + peak tables + findings, executed | uncommitted, this checkpoint |
+| `multivariate/run_rsa_group_stats.py` | New: permutation cluster-FWE (size/mass/TFCE) for any RSA searchlight term, one term at a time or `--term all` | `main` (`b34d11a`), pushed-pending |
+| `multivariate/submit_rsa_group_stats.sh` | New: SLURM array-by-term submitter (not needed this session — ran locally instead, kept for future/heavier reruns e.g. `--tfce`) | `main` (`b34d11a`) |
+| `multivariate/rsa_searchlight_results.ipynb` | New §12 (cluster-FWE vs FDR) + §13 (atlas localization), both executed | §12 in `main` (`b34d11a`); §13 this checkpoint, uncommitted |
+| `utils/atlas.py` | New: `label_coordinates()`, MNI coordinate -> Harvard-Oxford/AAL label lookup, offline-cached atlases | uncommitted, this checkpoint |
 
 ## Data produced
 
@@ -96,13 +115,22 @@ Local only, not synced anywhere else: `~/phd_local/data/LearningHabits/derivativ
 
 ## Git state
 
-Branch `rsa-roi` (unchanged from prior sessions — still not merged to `main`). This checkpoint's 3 files are staged, not committed.
+Working directly on `main` this session (not `rsa-roi` — the branch mentioned
+in prior companion notes belongs to earlier sessions; this session's git
+status at start showed `main` already checked out with the §12 changes
+pending). §12 commit (`b34d11a`) done mid-session; §13 + `utils/atlas.py` +
+this note's updates are staged as this checkpoint, not yet committed.
 
 ---
 
 ## Open threads
 
-1. **Atlas-label all cluster peaks** (frequency's 14 + interaction's 10) instead of eyeballing MNI coordinates — the actual, most concrete carry-over from 2026-08-31 open thread #2, now with a cluster-FWE-confirmed peak list to label.
-2. **Run `category`, `second_stim_value`, `choice_rate` through `run_rsa_group_stats.py --term all`** for completeness — only the 3 headline terms were run this session.
-3. Consider running `--tfce` on `frequency` and `interaction_value_freq` for a third cluster-inference method, given it's cheap enough (~45-50 min/term) to not need the cluster.
-4. `rsa-roi` branch still not merged to `main`.
+1. **Correct §10 finding 2's "right orbitofrontal" label to Temporal Pole**
+   in `rsa_searchlight_results.ipynb` — §13 finding 2 caught this but §10's
+   prose itself wasn't edited in place (kept as a historical record of the
+   original eyeballed pass, with §13 as the correction layer instead).
+   Worth deciding whether to fix §10 directly or leave the correction
+   pointer as-is.
+2. **Persist `labeled_tables` to disk** (e.g. CSV under `rsa_searchlight_group_stats/`) rather than leaving it as in-notebook-only kernel state — anyone rerunning the notebook reproduces it, but it's not currently exported for reuse elsewhere (e.g. the presentation deck).
+3. **Run `category`, `second_stim_value`, `choice_rate` through `run_rsa_group_stats.py --term all`** for completeness — only the 3 headline terms were run this session.
+4. Consider running `--tfce` on `frequency` and `interaction_value_freq` for a third cluster-inference method, given it's cheap enough (~45-50 min/term) to not need the cluster.
