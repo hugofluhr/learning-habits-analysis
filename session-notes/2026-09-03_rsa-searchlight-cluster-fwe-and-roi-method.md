@@ -301,3 +301,20 @@ committed.
 7. The visual-confound audit (findings 8-10) doesn't rule out every possible finer-grained visual confound (e.g. low-level pixel statistics unrelated to category) — only category-driven and second-stimulus-pairing-driven ones. Not flagged as urgent given how decisively §9's permutation test came out.
 8. **What actually causes the `test`-phase collapse (findings 12-14)?** The "behavioural extinction of the frequency split" account is ruled out (finding 14's correction) — the behavioural habit effect is real and robust in `test`'s same-value trials, per Hugo. The "learning-scope collinearity" account is also ruled out (finding 15). **Still unexplained**: a robust *behavioral* habit effect in `test` with no corresponding *neural* signature there, while `learning1`/`learning2` show a strong neural signature. Candidate directions not yet tried: (a) a genuinely feedback/prediction-error-locked neural mechanism (behavior can be habit-driven without the *representational geometry* this RSA measures being the thing that drives it); (b) check the same-value trials specifically within `test` (the diagnostic subset) rather than the whole-`test` RDM used so far — the current `test`-scope RSA pools all trial types together, diluting exactly the trials where the behavioral effect is cleanest.
 9. **Propagate the same "does X collapse in test" check to the value×frequency interaction** — findings 12-14 only checked the two main effects (frequency, value) and the negative-control (category); the interaction itself (§9 of `rsa_searchlight_results.ipynb`, the headline searchlight finding) hasn't been checked for the same run-by-run pattern yet.
+
+### 16. Pairing structure: `learning` and `test` sample completely different sets of stimulus pairs — a new, untested candidate mechanism for the test-phase collapse (open thread 8)
+
+Directly inspected `bbt.csv`'s pairing structure (`left_stim`/`right_stim`/`block`), since
+`run_rsa_roi.py` conditions are per-stimulus means over trials (`cond_idx` from
+`stim_name`), so what those trials *are* depends on pairing. **`learning1`/`learning2`:
+every subject samples only 8 of the 28 possible pairs** (a fixed adjacent-value chain —
+each stimulus has 1-2 fixed partners for the whole phase), each pair repeated either 6 or
+18 times, split exactly 4-vs-4 pairs/subject/block, no exceptions across all 62 subjects
+— the choice-frequency label *is* this repetition ratio. **`test`: every subject samples
+all 28/28 pairs**, 25 shown 4x each and exactly the 3 same-value ("habit-diagnostic")
+pairs shown 12x, again 62/62 subjects with zero exceptions. So each stimulus's RSA
+condition mean is built from a nearly homogeneous 1-2-partner trial pool in `learning`
+but a heterogeneous ~7-partner pool in `test` — a within-condition context-diversity
+change between phases, distinct from the mean-level confound accounts already ruled out
+(findings 8-10, 15). Not yet tested against neural data — a candidate mechanism, not a
+result. Derivation: `rsa_design_checks.ipynb` §8 (new, executed).
