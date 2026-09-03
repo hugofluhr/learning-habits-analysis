@@ -326,12 +326,11 @@ SPEAKER NOTES:
 
 <style scoped>section { justify-content: center; }</style>
 
-Value β ≈ 0 in the joint model does **not** mean "no value coding" — it means two real effects cancel:
+The joint-model value effect is small and **significantly negative** (fusiform β=−0.118, p=0.0007; visual cortex β=−0.080, p=0.023) — not the naively-expected positive "similar value → similar pattern," and not zero either. It means two real effects of unequal size combine:
 
 - **Within a frequency group** (both high-choice or both low-choice): value *differentiates* — higher Δvalue → more distinct patterns. The brain tells apart stimuli that share a habit level but differ in reward.
 - **Across frequency groups** (one high, one low): value *compresses* — higher Δvalue → more similar patterns. The frequency-driven representation change overrides or inverts the value signal.
-
-Not sure how to interpret this
+- There are more different-frequency pairs per subject (9) than same-frequency pairs (6), so the joint (non-partitioned) regression is numerically dominated by the compressing effect — that's why the net is negative rather than zero.
 
 <!--
 SPEAKER NOTES:
@@ -339,10 +338,15 @@ SPEAKER NOTES:
   Within each cluster, value spreads stimuli apart. But the between-cluster axis
   dominates, and value differences across clusters don't add further separation —
   they slightly reduce it.
-- This is why the joint model shows β(value)≈0: the positive within-group slope
-  and negative between-group slope average to zero when pooled.
+- The joint model's small negative β(value) is the weighted combination of the
+  positive within-group slope and the negative between-group slope, weighted by
+  each group's pair count (6 vs 9) — not a simple average to zero.
 - The interaction (+1.36) is large, validated, and can't be an artifact of
   amplitude, CV structure, or grand mean.
+- 2026-09-03 update: the pooled negative value effect is itself driven by
+  learning1/learning2 (fusiform -0.17***/-0.19***) and disappears in `test`
+  (+0.12, ns, fusiform) — see rsa_roi_results.ipynb §5 (per-run dynamics
+  cells) and session-notes/2026-09-03_rsa-searchlight-cluster-fwe-and-roi-method.md.
 -->
 
 ---

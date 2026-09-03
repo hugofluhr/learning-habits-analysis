@@ -16,6 +16,12 @@ too" — built a permutation-based cluster-FWE script, since the parametric
 on request, the difference between the two "ROI" methods already in the repo
 (`rsa_roi_results.ipynb`'s direct ROI-pattern RSA vs.
 `rsa_searchlight_results.ipynb`'s searchlight-then-average-within-ROI).
+Checking Hugo's hypothesis that frequency should build up gradually across
+runs instead surfaced the opposite pattern (strong from run 1, collapsing
+in `test`) and — while investigating whether that was frequency-specific —
+an outright terminology error carried across several session notes and
+notebooks: the "β(value)≈0" framing was wrong (it's small and
+significantly negative), which then got corrected everywhere it appeared.
 
 ---
 
@@ -168,6 +174,56 @@ balanced, category-correlated relabeling of the same real stimuli.**
 Striatum/parietal marginal (p=0.024/0.034); vmPFC/habit/putamen/premotor
 null. Derivation: `rsa_roi_results.ipynb` §9 (new, executed).
 
+### 12. β(frequency) does NOT grow across runs as hypothesized — strong from run 1, collapses in `test`
+
+Hugo's hypothesis was that choice-frequency accumulates from 0 over the
+session, so β(frequency) should be smaller in `learning1` than later runs.
+**Opposite pattern**: already strong in `learning1` (VC +0.212\*\*\*, fusiform
++0.364\*\*\*), not smaller than `learning2` (VC +0.180\*\*\*, fusiform
++0.278\*\*\*), then **collapses toward 0 in `test`** (VC −0.018 ns, fusiform
+−0.054 ns; both significantly below `learning1`, paired p<0.0001).
+**Replicates under the blocked within-run split** (test: VC +0.105\* weak,
+fusiform +0.023 ns — still significantly below `learning1`) — not the
+interleaved-split fragility flagged in 2026-08-27's note. Derivation:
+`rsa_roi_results.ipynb` §5b (new, executed) + blocked-split check (new,
+executed).
+
+### 13. The same test-phase collapse also hits β(value) — and reveals it was never actually ≈0
+
+Checking whether this is frequency-specific: **value shows the identical**
+**qualitative pattern.** Pooled β(value) (non-figure, objective model) is
+small and **significantly negative** (fusiform β=−0.118 p=0.0007, VC
+β=−0.080 p=0.023) — not ≈0 as several session notes and this notebook's own
+Findings had described it. Per-run: fusiform −0.175\*\*\* (learning1),
+−0.194\*\*\* (learning2), **+0.120 ns (test)** — a sign flip. VC parallels
+this. The pooled negative effect is explained by the already-established
+interaction (different-frequency pairs, 9/subject, negative slope;
+same-frequency pairs, 6/subject, positive slope — the larger group
+dominates the non-partitioned regression) but the run-by-run breakdown
+shows this negative effect is itself driven entirely by the two learning
+runs and vanishes/flips in `test`. **Terminology corrected across
+`rsa_roi_results.ipynb`, `rsa_searchlight_results.ipynb`,
+`presentation.md`, and `session-notes/2026-08-27_rsa-first-real-results.md`
+this session** — "β(value)≈0" replaced with the actual signed, significant
+number everywhere it appeared. Derivation: `rsa_roi_results.ipynb`
+Addendum (new, executed).
+
+### 14. Category (reward-independent) does NOT show the same test-phase pattern — argues against a pure generic-noise account
+
+Decisive check for whether findings 12-13 are "test phase is just noisier"
+vs. something specific to reward-history-linked variables: β(category) is
+already weak everywhere (consistent with prior findings) and stays flat
+across all three runs (VC/fusiform test-vs-learning1: p=0.88/0.64) — no
+directional shift, only a mild SEM increase (~15-20%) consistent with
+somewhat more noise in `test`, nowhere near enough to explain frequency's
+collapse or value's sign flip. Read as: the effect is not simply "test is
+noisier for everything" — frequency and value specifically depend on the
+active-learning/feedback context in a way category doesn't. **Not yet
+resolved which specific mechanism** (feedback-locked signal vs. behavioural
+extinction of the choice-frequency split vs. something else) — open
+thread. Derivation: `rsa_roi_results.ipynb`, new cell (unnamed, right
+after §5b).
+
 ---
 
 ## Code shipped
@@ -179,8 +235,11 @@ null. Derivation: `rsa_roi_results.ipynb` §9 (new, executed).
 | `multivariate/rsa_searchlight_results.ipynb` | New §12 (cluster-FWE vs FDR) + §13 (atlas localization), both executed | `main` (`b34d11a`, `117e3d6`) |
 | `utils/atlas.py` | New: `label_coordinates()`, MNI coordinate -> Harvard-Oxford/AAL label lookup, offline-cached atlases | `main` (`117e3d6`) |
 | `notebooks/roi/nimare_coordinates.ipynb` | New section: Neurosynth decoding of the RSA searchlight primary peaks, executed | `main` (`1150298`) |
-| `multivariate/rsa_design_checks.ipynb` | New §6 (image→frequency rotation + signed category/frequency correlation) and §7 (second_stim_category partial correlation), both executed | this checkpoint, uncommitted |
-| `multivariate/rsa_roi_results.ipynb` | New §9: targeted frequency-label permutation test, executed | this checkpoint, uncommitted |
+| `multivariate/rsa_design_checks.ipynb` | New §6 (image→frequency rotation + signed category/frequency correlation) and §7 (second_stim_category partial correlation), both executed | `main` (`8a71250`) |
+| `multivariate/rsa_roi_results.ipynb` | New §9 (targeted frequency-label permutation test), §5b (frequency per-run dynamics + blocked-split robustness check), category per-run control, and an Addendum correcting the pooled β(value) terminology — all executed | `8a71250` (§9) + this checkpoint (§5b, category control, Addendum) |
+| `multivariate/rsa_searchlight_results.ipynb` | §9/§10 prose corrected to match the pooled β(value) terminology fix (no new analysis) | this checkpoint, uncommitted |
+| `multivariate/presentation.md` | "What the interaction means?" slide + speaker notes corrected to the actual pooled β(value) numbers; removed a stray leftover "Not sure how to interpret this" line | this checkpoint, uncommitted |
+| `session-notes/2026-08-27_rsa-first-real-results.md` | Added a dated correction pointer to finding 5 (kept the original preliminary text as historical record, per checkpoint convention) | this checkpoint, uncommitted |
 
 ## Data produced
 
@@ -213,3 +272,5 @@ committed.
 5. **Follow up on finding 7's subcallosal/ventral-striatum candidate**: check whether β(value) at that specific voxel/small neighborhood trends positive, even though it didn't survive the whole-brain value map — a small, targeted test (not another whole-brain correction pass).
 6. **The §9 permutation test currently only covers the ROI-level analysis** (`rsa_roi_results.ipynb`). Extending it to the searchlight (per-voxel or at least at the peak coordinates from §12/§13) would close the confound question at the resolution the FFA/PPA decoding finding was actually made at — not done this session, would need `run_rsa_searchlight.py`-level access to per-subject sphere data, more involved than the ROI version.
 7. The visual-confound audit (findings 8-10) doesn't rule out every possible finer-grained visual confound (e.g. low-level pixel statistics unrelated to category) — only category-driven and second-stimulus-pairing-driven ones. Not flagged as urgent given how decisively §9's permutation test came out.
+8. **What actually causes the `test`-phase collapse (findings 12-14)?** Two live hypotheses, not distinguished yet: (a) the neural signature is feedback/prediction-error-locked and genuinely requires trial-by-trial reward delivery to appear, or (b) subjects' *actual* choice behaviour stops tracking the historical frequency label once feedback stops (an extinction-like account), so the label itself becomes the wrong regressor for `test` trials specifically. (b) is checkable now, no new data needed: does `n_chosen`/realized choice rate for each stimulus, computed from `test`-phase trials only, still correlate with the frequency label the way it does in learning? If not, that would favor (b) over (a).
+9. **Propagate the same "does X collapse in test" check to the value×frequency interaction** — findings 12-14 only checked the two main effects (frequency, value) and the negative-control (category); the interaction itself (§9 of `rsa_searchlight_results.ipynb`, the headline searchlight finding) hasn't been checked for the same run-by-run pattern yet.

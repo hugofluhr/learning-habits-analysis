@@ -60,6 +60,14 @@ Derivation: `rsa_roi_results.ipynb` §8a.
 
 ### 5. ⚠️ PRELIMINARY — value predicts distance, with opposite signs depending on choice-frequency match
 
+**Terminology correction (2026-09-03):** "β(value)≈0" below is imprecise — the pooled
+joint-model value effect is actually small and **significantly negative**, not zero
+(ROI-level, non-figure, pooled: fusiform β=−0.118 p=0.0007, visual cortex β=−0.080
+p=0.023). It's negative rather than exactly zero because different-frequency pairs
+(9/subject, negative slope) outnumber same-frequency pairs (6/subject, positive slope) in
+the non-partitioned regression. See
+`session-notes/2026-09-03_rsa-searchlight-cluster-fwe-and-roi-method.md`.
+
 Restricting to non-figure pairs that share the same choice-frequency label (frequency
 held exactly constant, not regressed): value predicts distance **positively**
 (wholebrain +0.426\*\*\*, visual cortex +0.651\*\*\*, fusiform +0.869\*\*\*, n=58, §8b).
