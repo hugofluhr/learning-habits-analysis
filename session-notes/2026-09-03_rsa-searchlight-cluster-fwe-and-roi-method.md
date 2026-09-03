@@ -318,3 +318,26 @@ but a heterogeneous ~7-partner pool in `test` — a within-condition context-div
 change between phases, distinct from the mean-level confound accounts already ruled out
 (findings 8-10, 15). Not yet tested against neural data — a candidate mechanism, not a
 result. Derivation: `rsa_design_checks.ipynb` §8 (new, executed).
+
+### 17. Cross-run per-stimulus pattern reliability does NOT drop from `learning` to `test` — rules out the "test is just noisier overall" version of finding 16
+
+Direct neural check, prompted by Hugo asking whether this was already covered by
+`glmsingle_qc.ipynb` §8 (it wasn't — written but never run to completion or
+persisted anywhere, locally or on the cluster: no `qc_group_summary.csv` existed).
+Finished it as `run_beta_crossrun_reliability.py` (SLURM job 5484108, all 59
+subjects, <1 min): per-stimulus Pearson r between mean beta patterns across each
+pair of runs. **Wholebrain**: `learning`↔`test` reliability (0.331) is actually
+*higher* than `learning1`↔`learning2` (0.276, paired t=-2.10, p=0.04).
+**Visualcortex**: no difference (0.705 vs 0.709, p=0.78). **Fusiform**:
+`test` marginally *lower* (0.797 vs 0.821) but the effect is tiny (Δ=0.024,
+p=0.007) — nowhere near large enough to explain the RSA collapse from
+strongly-significant to null. **Consequence**: finding 16's pairing-structure
+account can't be "test patterns are broadly noisier" — overall per-stimulus
+pattern reliability is essentially preserved. Whatever finding 16 predicts must
+be specific to the frequency/value-relevant subspace of the pattern, not the
+whole pattern (consistent with finding 14: category doesn't collapse either) —
+sharpens rather than kills the hypothesis, and is the reason a coarse
+reliability check isn't sufficient; a partner-conditioned test targeted at that
+subspace is still needed. Derivation: `run_beta_crossrun_reliability.py` +
+`submit_beta_crossrun_reliability.sh` (new, run on cluster), aggregated locally
+(not yet in a notebook — see open threads).
