@@ -465,15 +465,102 @@ explanation. Results notebook (`stim2_decoding_results.ipynb`) built and ready
 to execute; not yet run — job was at 8/59 subjects when this note was last
 updated. **Not yet a finding** — see open thread 13 below.
 
-## Open threads (continued, findings 20-21)
+## 22. Early/late within-run split: β(frequency) is already at full strength in the first half of `learning1` and does NOT grow with exposure — argues against a reinforcement-accumulation account
 
-13. **Run `stim2_decoding_results.ipynb` once cluster job 5495879 finishes**
-    (`stim2_decode`, sub-46 expected to fail as usual — 58/59 target), sync
-    `derivatives/stim2_decoding/` locally, execute the notebook, and fold the
-    actual numbers into finding 21 above. Existence-proof framing predicts
-    raw accuracy well above chance in visual/fusiform masks; the decisive part
-    is whether `s1cat_demeaned` accuracy stays well above chance too.
-14. Commit the `stim2-contamination-tests` branch work still staged/uncommitted
-    at session end (§10/§10-findings additions to `rsa_roi_results.ipynb`,
-    `stim2_decoding_results.ipynb`, this note) and consider whether to merge
-    into `main` or open a PR, once finding 21 is filled in.
+Direct test of Hugo's objection to finding 12 (flat β(frequency) learning1≈learning2,
+collapse in test): if the effect reflects genuine habit accumulation from repeated
+reward-linked choice, it should be weaker early and grow with exposure, including
+*within* a run. Built `run_rsa_learning_dynamics.py` (new; splits each of
+learning1/learning2 at the chronological median into early/late halves, each with
+its own interleaved-CV crossnobis RDM; thin per-stimulus counts ~3-9/half handled
+with a minimum-fold-count gate, same pattern as `run_rsa_partner_context.py`).
+Cluster job 5518508, n=56 usable after the gate.
+
+**β(frequency) is already significant in the FIRST HALF of `learning1`** — fusiform
++0.244\*\*\* (~first 12-24 trials of the whole experiment) — **and does not grow**:
+fusiform +0.244\*\*\*→+0.186\*\*(1-late)→+0.252\*\*\*(2-early)→+0.169\*\*(2-late); visual
+cortex +0.153\*\*→+0.096\*→+0.078(ns)→+0.072(ns), actually *weakening* over exposure —
+the opposite of what habit accumulation predicts. β(value) shows the same flat
+pattern. Reconciles with finding 8a (graded H-value already failed to beat the flat
+design label) and finding 16 (pairing assignment fixed for the whole learning
+phase, not revealed gradually): the geometry looks like it tracks something
+established quickly (perceptual/associative registration of the fixed pairing
+structure), not something built by repeated reinforcement. Doesn't resolve *why*
+it then collapses in `test` (open thread 8 still open) but rules out "test
+collapses because habit strength hadn't finished building" — it was already at
+full early-`learning1` strength well before `test`. Derivation:
+`rsa_roi_results.ipynb` §11 (new, executed).
+
+## 23. Methodological detour: `stim2_decode`'s slowness was NOT a convergence problem — corrected mid-session, real bottleneck still under investigation
+
+`stim2_decoding`'s first cluster attempt (job 5495879, NPROC=8) showed 0/59 subjects
+complete after 15+ min; `.err` log had `ConvergenceWarning`s, initially (wrongly)
+diagnosed as the cause and "fixed" via `tol=1e-3` + bumping NPROC to 24. A follow-up
+isolated diagnostic (single dedicated CPU, sub-01, wholebrain) overturned that: timing
+was IDENTICAL (~6s) across `max_iter` 200→2000, meaning the fit converges cleanly well
+under 200 iterations — no real convergence problem. Checking history confirmed
+`ConvergenceWarning` is pervasive in `run_decoding.py`'s and `run_frequency_decoding.py`'s
+existing logs too (up to 409 warnings in one `frequency_decoding` job) without causing
+comparable slowness there — a red herring. NPROC reverted to 8 (the established
+convention; 24 concurrent heavy fits per node likely worsens contention, not helps).
+Real bottleneck most likely node-level contention, not yet confirmed — a small
+8-subject real-batch test (job 5518511) is running to establish actual throughput
+before committing all 59 subjects again.
+
+## Open threads (continued, findings 20-23)
+
+13. **Run `stim2_decoding_results.ipynb` once the full 59-subject `stim2_decode` job
+    completes** (superseded job IDs: 5495879 cancelled, 5518511 is an 8-subject
+    throughput test only — resubmit all 59 once §23's throughput question is
+    settled), sync `derivatives/stim2_decoding/` locally, execute the notebook, and
+    fold the actual numbers into finding 21. Existence-proof framing predicts raw
+    accuracy well above chance in visual/fusiform masks; the decisive part is
+    whether `s1cat_demeaned` accuracy stays well above chance too.
+14. **Diagnose the actual stim2_decode throughput bottleneck** (finding 23) — the
+    8-subject test (job 5518511) will show real per-subject wall time; if still
+    much slower than the ~30-60s/subject the isolated diagnostic implies, the next
+    candidate is node-level contention (shared-node xargs-P fan-out vs. e.g. an
+    array job spreading subjects across nodes) rather than anything in the code.
+15. Commit the `stim2-contamination-tests` branch work still staged/uncommitted
+    at session end (§10/§11 additions to `rsa_roi_results.ipynb`,
+    `stim2_decoding_results.ipynb`, `run_rsa_learning_dynamics.py` +
+    `submit_rsa_learning_dynamics.sh`, this note) and consider whether to merge
+    into `main` or open a PR, once findings 14/21 above are resolved.
+
+## 24. Stress-tested §9's permutation null against a design-constant confound it could have missed — survives, ruling out one more rival account
+
+Prompted by "what the hell can the frequency effect actually be" after finding 22:
+checked whether §9's permutation null (all C(6,3)=20 3-vs-3 relabelings) could be
+secretly biased by a within-category EXEMPLAR-DISCRIMINABILITY constant — if every
+subject's true label always put one +1/one -1 per category, the true label would
+always get full credit for pure visual exemplar discriminability (present from
+trial 1, no learning needed) while random permutations sometimes lose that
+within-category contrast, producing significance for a reason having nothing to do
+with reward/choice.
+
+**Checked directly: not a constant.** Only 16/58 subjects have the literal
+one-per-category split (counterbalancing rotation varies it, like the
+image-frequency-assignment check). On exactly this n=16 subset — where the
+exemplar-discriminability account could in principle explain everything — built the
+sharpest possible test: a null restricted to the 8 category-preserving relabelings
+(7 impostors), which share the identical within-category term and differ only in
+cross-category structure. **Still rejects decisively: wholebrain p=0.0025, visual
+cortex p=0.00006, fusiform p=0.00002.** A genuine attempt to break the strongest
+existing evidence for "real frequency information," using the most conservative
+null constructible from the data — it survived. Derivation: `rsa_roi_results.ipynb`
+§9b (new, executed).
+
+### Current best-supported account for the frequency effect (as of this session)
+
+Ruled out: stim-2 leakage (finding 20), generic test-noise/category-general artifact
+(finding 14, 17), learning-scope collinearity (finding 15), design-constant exemplar
+discriminability (finding 24), gradual habit/reinforcement accumulation (finding 22,
+8a). Leading remaining candidate: a **fast, non-accumulating tagging of each
+stimulus by its structural role** in the pairing schedule (usually-chosen vs.
+usually-passed-over), consistent with established value-driven-attention literature
+(finding 9) — forms within a handful of trials, doesn't need or benefit from
+repetition, sits specifically in visual/fusiform cortex (attentional prioritization
+territory, not vmPFC/striatum reward-magnitude territory), and disappears in `test`
+because the discriminating role-context (a dominant partner) is absent there. Still
+unexplained: why the neural signature vanishes rather than merely weakens in `test`,
+given the behavioral habit effect Hugo confirms is still present there (open thread 8).
