@@ -41,10 +41,15 @@ PUTAMEN_MASK="${PUTAMEN_MASK:-${MASK_DIR}/putamen_AAL_MNI152NLin2009cAsym.nii}"
 PREMOTOR_MASK="${PREMOTOR_MASK:-${MASK_DIR}/premotor_HMAT_MNI152NLin2009cAsym.nii}"
 PARIETAL_MASK="${PARIETAL_MASK:-${MASK_DIR}/parietal_AAL_MNI152NLin2009cAsym.nii}"
 
-# Concurrent subjects within the single job allocation. Whole-brain 4-class LinearSVC
-# x 9 masks x 2 variants is heavy (observed: 0/59 subjects finished after 15+ min at
-# NPROC=8, standard nodes have 48 cores) -- default bumped up accordingly.
-NPROC="${NPROC:-24}"
+# Concurrent subjects within the single job allocation. NOTE: an isolated diagnostic
+# (single dedicated CPU, one subject, wholebrain mask) found the LinearSVC fit itself
+# fast and clean (~6s, converges well under max_iter=200) -- the 0/59-in-15min
+# slowness observed at NPROC=8 was NOT a convergence problem (ConvergenceWarnings
+# are pervasive in run_decoding.py/run_frequency_decoding.py's logs too, without
+# causing comparable slowness there), most likely node-level contention from packing
+# concurrent heavy fits onto one shared node. Kept at the same NPROC=8 convention as
+# submit_decoding.sh/submit_frequency_decoding.sh rather than guessing higher.
+NPROC="${NPROC:-8}"
 
 # Set OVERWRITE=1 to force a rerun of subjects that already have a decoding CSV.
 OVERWRITE="${OVERWRITE:-0}"
