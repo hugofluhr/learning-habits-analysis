@@ -80,6 +80,14 @@ MODEL_TERMS = ['category', 'value', 'frequency', 'second_stim_value', 'choice_ra
 # the stim-2 analog of `value`, already exists above). See module docstring "Symmetric
 # stim-2 model" section.
 SYMMETRIC_TERMS = ['s2_category', 's2_frequency', 's2_identity']
+# --condition-on chosen model terms — see run_subject_chosen() docstring.
+CHOSEN_MODEL_TERMS = ['category', 'value', 'frequency', 'unchosen_value', 'role_fraction']
+# Minimum trials a chosen-identity condition needs to support the 2-fold CV split
+# (>=2 per fold). Fixed at the nonfigure (value {2,3,4}) universe specifically because
+# that keeps every subject well above this floor -- see session-notes entry for the
+# dev_sample precondition check (all-8-stimuli version has 33/62 subjects under 4;
+# nonfigure-only has 0/62, p5=7 median=11 for the stricter stim2-only scope).
+MIN_TRIALS_PER_COND = 4
 
 
 # ---------------------------------------------------------------------------
@@ -353,6 +361,11 @@ def load_stimuli(subject, glmsingle_dir, bbt_path, shuffle_seed=None):
                              'first_stim_value_rl', 'first_stim_value_ck',
                              'second_stim_value', 'second_stim_frequ',
                              'first_stim', 'chosen_stim']}
+    # Raw validity of chosen_stim, BEFORE the NaN->0 coercion below — no-response
+    # trials have no chosen identity at all, needed by --condition-on chosen to
+    # exclude them (as opposed to `first_stim_chosen`, which folds "chose the
+    # second stimulus" and "no response" into the same 0).
+    per_trial['chosen_valid'] = ~np.isnan(per_trial['chosen_stim'])
     # Per-trial indicator: did the subject choose the first stimulus?
     # action is coded as left/right, not first/second; `chosen_stim` resolves that.
     # NaN chosen_stim (no-response trials) → 0 (unchosen).
@@ -401,7 +414,8 @@ def load_stimuli(subject, glmsingle_dir, bbt_path, shuffle_seed=None):
             per_trial['first_stim_value_rl'], per_trial['first_stim_value_ck'],
             per_trial['second_stim_value'], per_trial['first_stim_chosen'],
             per_trial['second_stim_frequ'], per_trial['second_stim_cat'],
-            per_trial['second_stim_name'])
+            per_trial['second_stim_name'],
+            per_trial['chosen_valid'], per_trial['first_stim_value'])
 
 
 def build_masks(subject, base_dir, bids_dir, betas_img, roi_masks):
@@ -473,7 +487,8 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path
     (betas_img, trial_info, cond_idx, run_labels, props,
      rl_per_trial, ck_per_trial,
      s2v_per_trial, chosen_per_trial,
-     s2f_per_trial, s2cat_per_trial, s2name_per_trial) = load_stimuli(
+     s2f_per_trial, s2cat_per_trial, s2name_per_trial,
+     _chosen_valid, _first_stim_value) = load_stimuli(
         subject, glmsingle_dir, bbt_path, shuffle_seed)
     stim_names, n_cond = props['names'], len(props['names'])
 
@@ -638,6 +653,221 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path
     logging.info(f"sub-{subject}: done — {len(rows)} rows -> {done_flag}")
 
 
+def run_subject_chosen(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path,
+                       roi_masks=None, chosen_scope='all', shuffle_seed=None,
+                       remove_mean=False, validate_rsatoolbox=False, overwrite=False):
+    """RSA on CHOSEN-stimulus identity conditions instead of stim1/cue identity.
+
+    Conditions relabel each trial by which stimulus was actually CHOSEN
+    (`chosen_stim`), not which was cued first. Tests whether the whole-trial-
+    contaminated cue-locked beta (session-notes 2026-09-03 findings 18-19) encodes
+    the value of the eventually-chosen item -- the standard univariate "chosen
+    value" signal -- rather than just the cued image's value.
+
+    `chosen_scope='stim2'` restricts to trials where the chosen item was NOT the
+    cue (its beta is locked to a *different* image's onset entirely) -- the
+    cleanest test, since any structure found can't be a repackaged visual/cue-value
+    confound. `chosen_scope='all'` pools both roles with a `role_fraction` nuisance
+    regressor (fraction of a condition's retained trials where the chosen item was
+    also the cue); it is exactly 0 for every condition under 'stim2' and so is
+    auto-dropped by `fit_rdm_regression`'s constant-predictor check.
+
+    Condition universe is fixed to the NON-FIGURE stimuli (values {2,3,4}, 6
+    identities) -- not dynamic per-subject dropping. Chosen-conditions are not
+    presentation-balanced across value the way stim1-conditions are (high-value
+    stimuli get chosen far more often), so trial-count-per-condition necessarily
+    correlates with value; crossnobis is unbiased regardless of N per condition
+    (crossnobis_validation.ipynb), so this adds sampling noise, not a systematic
+    bias, but some subjects have near-zero trials for extreme-value identities in
+    the all-8-stimuli universe (dev_sample precondition check: 33/62 subjects
+    under MIN_TRIALS_PER_COND). Restricting to nonfigure fixes this for every
+    dev_sample subject (0/62 short, p5=7 median=11 trials under the stricter
+    'stim2' scope) while reusing the design's existing figure-confound boundary
+    (session-notes 2026-08-26 finding 2) rather than inventing a new one.
+
+    Scopes: 'pooled_chosen' (global 2-way interleaved CV split over all retained
+    trials, run boundaries ignored) is always computed. For `chosen_scope='all'`,
+    per-run scopes (learning1/learning2/test) are also attempted -- viable for most
+    subjects (dev_sample: 2-10/62 short depending on run) -- so that
+    learning-vs-test differences can be compared directly, as with stim1-mode; a
+    subject/run whose per-condition counts fall below MIN_TRIALS_PER_COND is
+    skipped (logged) rather than failing the whole subject. `chosen_scope='stim2'`
+    only computes 'pooled_chosen' -- per-run stim2-only counts are too sparse
+    (32-57/62 subjects short per run) to be worth attempting.
+
+    Noise normalisation SD is estimated from the STIM1-conditioned cell structure
+    (`compute_noise_sd` on the original cue-identity cond_idx over all trials, not
+    the sparser chosen-identity cells) for a more stable per-voxel estimate, then
+    applied before subsetting to the chosen-conditioned trials/conditions -- valid
+    because the noise term is a property of the measurement, not of how trials are
+    grouped into conditions.
+
+    Only the 'objective' value/frequency variant is computed (no rl/ck graded
+    analogs yet -- `chosen_value_rl`/`chosen_value_ck` already exist in the BBT for
+    a future extension).
+    """
+    subject_output = output_dir / f"sub-{subject}"
+    done_flag = subject_output / f"sub-{subject}_rsa_chosen_results.csv"
+    if done_flag.exists() and not overwrite:
+        logging.info(f"sub-{subject}: chosen outputs exist, skipping (pass --overwrite to rerun)")
+        return
+    subject_output.mkdir(parents=True, exist_ok=True)
+
+    (betas_img, trial_info, stim1_cond_idx, run_labels, props,
+     _rl_per_trial, _ck_per_trial,
+     s2v_per_trial, first_stim_chosen,
+     _s2f_per_trial, _s2cat_per_trial, s2name_per_trial,
+     chosen_valid, first_stim_value_per_trial) = load_stimuli(
+        subject, glmsingle_dir, bbt_path, shuffle_seed)
+    stim_names = props['names']
+
+    nonfigure = props['cat'] != FIGURE_CAT
+    universe_names = np.array(sorted(stim_names[nonfigure]))
+    logging.info(f"sub-{subject}: chosen-condition universe (nonfigure) = "
+                f"{list(universe_names)}")
+
+    first_stim_names = trial_info['stim_name'].values
+    chosen_name = np.where(first_stim_chosen == 1, first_stim_names, s2name_per_trial)
+
+    trial_keep = chosen_valid & np.isin(chosen_name, universe_names)
+    if chosen_scope == 'stim2':
+        trial_keep &= (first_stim_chosen == 0)
+    elif chosen_scope != 'all':
+        raise ValueError(f"unknown chosen_scope: {chosen_scope!r}")
+
+    counts = pd.Series(chosen_name[trial_keep]).value_counts().reindex(universe_names, fill_value=0)
+    logging.info(f"sub-{subject}: chosen-condition trial counts ({chosen_scope}) — "
+                f"{counts.to_dict()}")
+    if (counts < MIN_TRIALS_PER_COND).any():
+        raise ValueError(
+            f"sub-{subject}: chosen-condition trial counts fall below "
+            f"MIN_TRIALS_PER_COND={MIN_TRIALS_PER_COND} under scope={chosen_scope!r}: "
+            f"{counts[counts < MIN_TRIALS_PER_COND].to_dict()} — this should not "
+            f"happen given the dev_sample precondition check; inspect this subject "
+            f"directly before trusting its output.")
+
+    n_cond = len(universe_names)
+    cond_idx = np.searchsorted(universe_names, np.where(trial_keep, chosen_name, universe_names[0]))
+
+    map_idx = np.searchsorted(stim_names, universe_names)
+    cat = props['cat'][map_idx]
+    value = props['value'][map_idx]
+    frequency = props['frequency'][map_idx]
+
+    base_model_rdms = {'category': different_rdm(cat),
+                       'value': abs_diff_rdm(value),
+                       'frequency': abs_diff_rdm(frequency)}
+
+    unchosen_value_per_trial = np.where(first_stim_chosen == 1, s2v_per_trial,
+                                        first_stim_value_per_trial)
+
+    trial_order = np.asarray(trial_info.index.values, dtype=float)
+
+    # Scopes: 'pooled_chosen' (global 2-fold split, always). For chosen_scope='all'
+    # only, also try each run individually -- per-run stim2-only counts are too thin
+    # (dev_sample precondition check: 32-57/62 subjects under MIN_TRIALS_PER_COND per
+    # run), but per-run pooled-role counts are largely viable (2-10/62 short
+    # depending on run), so we attempt each run and skip (log, don't fail) any run
+    # where a condition falls short -- this is what lets learning1/learning2/test be
+    # compared directly, same as the stim1-mode per-run scopes.
+    scopes = {}
+    folds_pooled = np.full(len(trial_keep), -1, dtype=int)
+    folds_pooled[trial_keep] = within_run_folds(cond_idx[trial_keep], trial_order[trial_keep],
+                                                mode='interleaved')
+    scopes['pooled_chosen'] = (trial_keep.copy(), folds_pooled)
+
+    if chosen_scope == 'all':
+        for r in RUNS:
+            obs = trial_keep & (run_labels == r)
+            run_counts = pd.Series(chosen_name[obs]).value_counts().reindex(
+                universe_names, fill_value=0)
+            if (run_counts < MIN_TRIALS_PER_COND).any():
+                logging.warning(
+                    f"sub-{subject}: skipping chosen-condition scope '{r}' — "
+                    f"below MIN_TRIALS_PER_COND={MIN_TRIALS_PER_COND}: "
+                    f"{run_counts[run_counts < MIN_TRIALS_PER_COND].to_dict()}")
+                continue
+            folds_r = np.full(len(trial_keep), -1, dtype=int)
+            folds_r[obs] = within_run_folds(cond_idx[obs], trial_order[obs], mode='interleaved')
+            scopes[r] = (obs, folds_r)
+    else:
+        logging.info(f"sub-{subject}: chosen_scope='stim2' — per-run scopes not "
+                    "attempted (too sparse), only 'pooled_chosen' computed. See "
+                    "run_subject_chosen docstring.")
+
+    # Confound-control RDMs are scope-specific (pairing/choice behaviour differs
+    # across runs), same pattern as run_subject's s2v_rdms/cr_rdms.
+    unchosen_value_rdms, role_fraction_rdms = {}, {}
+    for scope, (obs, _folds) in scopes.items():
+        unchosen_value_rdms[scope] = abs_diff_rdm(
+            pd.Series(unchosen_value_per_trial[obs]).groupby(cond_idx[obs])
+            .mean().reindex(range(n_cond)).values)
+        role_fraction_rdms[scope] = abs_diff_rdm(
+            pd.Series(first_stim_chosen[obs]).groupby(cond_idx[obs])
+            .mean().reindex(range(n_cond)).values)
+
+    X_wb, masks = build_masks(subject, base_dir, bids_dir, betas_img, roi_masks or [])
+    smallest_mask = min(masks, key=lambda m: m[1].sum())[0]
+
+    rows = []
+    for mask_name, vox in masks:
+        X = X_wb[:, vox]
+        # Noise SD from the (denser) stim1-conditioned cells, not the sparser
+        # chosen-conditioned ones — see docstring.
+        sd = compute_noise_sd(X, stim1_cond_idx, run_labels)
+        good = sd > 0
+        if not good.all():
+            logging.warning(f"sub-{subject}/{mask_name}: dropping {(~good).sum():,} "
+                            "voxels with zero residual SD")
+        Xw = X[:, good] / sd[good]
+        n_voxels = int(good.sum())
+
+        if remove_mean:
+            Xw = Xw - Xw.mean(axis=1, keepdims=True)
+
+        for scope, (obs, folds) in scopes.items():
+            rdm = _crossnobis_loo(Xw[obs], cond_idx[obs], folds[obs], n_cond)
+            np.save(subject_output / f"sub-{subject}_rsa_chosen_rdm_{mask_name}_{scope}.npy", rdm)
+
+            if validate_rsatoolbox and mask_name == smallest_mask and scope == 'pooled_chosen':
+                _validate_against_rsatoolbox(Xw[obs], cond_idx[obs], folds[obs],
+                                             universe_names, rdm)
+
+            keep = np.ones(n_cond, dtype=bool)
+            contrast, n_same, n_diff = value_contrast(rdm, keep, cat, value)
+            cells = _triu(rdm)
+            models = {**base_model_rdms,
+                     'unchosen_value': unchosen_value_rdms[scope],
+                     'role_fraction': role_fraction_rdms[scope]}
+            betas, corrs, n_pairs = fit_rdm_regression(rdm, models, keep)
+            rows.append({
+                'subject': f"sub-{subject}", 'mask': mask_name, 'n_voxels': n_voxels,
+                'scope': scope, 'chosen_scope': chosen_scope, 'subset': 'nonfigure',
+                'model': 'objective', 'n_stim': n_cond, 'n_pairs': n_pairs,
+                'n_trials': int(obs.sum()),
+                **{f'beta_{k}': v for k, v in betas.items()},
+                **{f'r_{k}': corrs.get(k, float('nan')) for k in CHOSEN_MODEL_TERMS},
+                'contrast_value': contrast,
+                'n_same_value_pairs': n_same, 'n_diff_value_pairs': n_diff,
+                'rdm_mean': float(cells.mean()), 'rdm_sd': float(cells.std()),
+                'remove_mean': bool(remove_mean),
+                'shuffle_seed': -1 if shuffle_seed is None else shuffle_seed,
+            })
+            logging.info(f"  {mask_name}/{scope}: beta_val={betas['value']:+.3f} "
+                        f"beta_cat={betas['category']:+.3f} "
+                        f"beta_frq={betas['frequency']:+.3f} contrast={contrast:+.3f}")
+
+    np.savez(subject_output / f"sub-{subject}_rsa_chosen_model_rdms.npz",
+             stim_names=universe_names, stim_cat=cat, stim_value=value,
+             stim_frequency=frequency, trial_counts=counts.values,
+             **base_model_rdms,
+             **{f'unchosen_value_{k}': v for k, v in unchosen_value_rdms.items()},
+             **{f'role_fraction_{k}': v for k, v in role_fraction_rdms.items()})
+    pd.DataFrame(rows).to_csv(done_flag, index=False)
+    logging.info(f"sub-{subject}: chosen-condition RSA done — {len(rows)} rows, "
+                f"scopes {list(scopes)} -> {done_flag}")
+
+
 def _validate_against_rsatoolbox(patterns, cond_idx, fold_idx, stim_names, rdm_ours):
     """Assert `_crossnobis_loo` matches rsatoolbox's crossnobis on this ROI."""
     from rsatoolbox.data import Dataset
@@ -695,8 +925,22 @@ def main():
                              "choice_rate confound controls — see module docstring's "
                              "'Symmetric stim-2 model' section. Write to a separate "
                              "--output-dir (row count / columns differ from the default).")
+    parser.add_argument("--condition-on", choices=['stim1', 'chosen'], default='stim1',
+                        help="Condition definition: 'stim1' (default) is the original "
+                             "cue-identity design. 'chosen' relabels trials by which "
+                             "identity was actually chosen -- see run_subject_chosen() "
+                             "docstring. Incompatible with --symmetric. Write to a "
+                             "separate --output-dir.")
+    parser.add_argument("--chosen-scope", choices=['all', 'stim2'], default='all',
+                        help="Only used with --condition-on chosen. 'stim2' restricts "
+                             "to trials where the chosen item was the second stimulus "
+                             "(cleanest test, no cue-locked confound). 'all' (default) "
+                             "pools both roles with a role_fraction nuisance regressor.")
     parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args()
+
+    if args.condition_on == 'chosen' and args.symmetric:
+        parser.error("--condition-on chosen is incompatible with --symmetric")
 
     if args.dry_run:
         logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -722,21 +966,37 @@ def main():
                   logging.FileHandler(subject_output / f"rsa_roi_sub-{args.subject}.log")],
     )
 
-    run_subject(
-        subject             = args.subject,
-        base_dir            = Path(args.base_dir),
-        bids_dir            = Path(args.bids_dir),
-        glmsingle_dir       = Path(args.glmsingle_dir),
-        output_dir          = output_dir,
-        bbt_path            = args.bbt,
-        roi_masks           = args.roi_mask,
-        within_run_split    = args.within_run_split,
-        shuffle_seed        = args.shuffle_seed,
-        remove_mean         = args.remove_mean,
-        validate_rsatoolbox = args.validate_against_rsatoolbox,
-        symmetric           = args.symmetric,
-        overwrite           = args.overwrite,
-    )
+    if args.condition_on == 'chosen':
+        run_subject_chosen(
+            subject             = args.subject,
+            base_dir            = Path(args.base_dir),
+            bids_dir            = Path(args.bids_dir),
+            glmsingle_dir       = Path(args.glmsingle_dir),
+            output_dir          = output_dir,
+            bbt_path            = args.bbt,
+            roi_masks           = args.roi_mask,
+            chosen_scope        = args.chosen_scope,
+            shuffle_seed        = args.shuffle_seed,
+            remove_mean         = args.remove_mean,
+            validate_rsatoolbox = args.validate_against_rsatoolbox,
+            overwrite           = args.overwrite,
+        )
+    else:
+        run_subject(
+            subject             = args.subject,
+            base_dir            = Path(args.base_dir),
+            bids_dir            = Path(args.bids_dir),
+            glmsingle_dir       = Path(args.glmsingle_dir),
+            output_dir          = output_dir,
+            bbt_path            = args.bbt,
+            roi_masks           = args.roi_mask,
+            within_run_split    = args.within_run_split,
+            shuffle_seed        = args.shuffle_seed,
+            remove_mean         = args.remove_mean,
+            validate_rsatoolbox = args.validate_against_rsatoolbox,
+            symmetric           = args.symmetric,
+            overwrite           = args.overwrite,
+        )
 
 
 if __name__ == "__main__":
