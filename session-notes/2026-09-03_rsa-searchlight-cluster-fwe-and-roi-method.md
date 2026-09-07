@@ -457,13 +457,26 @@ s2_category weaker (significant only in fusiform, −0.199, FDR q=0.039);
 s2_identity null everywhere after FDR. Derivation: `rsa_roi_results.ipynb`
 §10 (new, executed) + its "9." addition to the top-level Findings summary.
 
-### 21. Stim-2 category decoding (`run_stim2_decoding.py`) — existence-proof test, cluster job 5495879 still running at session-note-update time
+### 21. Stim-2 category decoding (`run_stim2_decoding.py`) — existence proof CONFIRMED, and stronger than the plan anticipated
 
-4-class (face/hand/house/figure) LinearSVC, LOGO-CV, chance=0.25, with a
-`run_s1cat_demeaned` control variant to rule out stim-1-pattern leakage as the
-explanation. Results notebook (`stim2_decoding_results.ipynb`) built and ready
-to execute; not yet run — job was at 8/59 subjects when this note was last
-updated. **Not yet a finding** — see open thread 13 below.
+4-class (face/hand/house/figure) LinearSVC, LOGO-CV, chance=0.25, `s1cat_demeaned`
+control variant. Cluster job 5518567 (n=58, `sub-46` excluded as usual; two
+earlier attempts — 5495879, 5518511 — were superseded by throughput fixes, see
+finding 23). Second-stimulus category decodes well above chance: wholebrain
+29.5%\*\*\*, visual cortex 33.8%\*\*\*, fusiform 29.0%\*\*\* (FDR q<0.001), confirming
+finding 19 at the raw-decoding level.
+
+**Stronger than anticipated**: the `s1cat_demeaned` control doesn't just fail to
+kill the signal, it significantly INCREASES it in visual cortex (33.8%→37.2%,
+p<0.001) and fusiform (29.0%→32.6%, p<0.001) — removing stim-1-category variance
+makes the stim-2 signal *easier* to decode, decisively ruling out "this is just
+stim-1 pattern leakage relabeled." Magnitude relative to stim-1 category decoding
+(48.3% in VC) is substantial, not negligible: stim-2 reaches roughly 35-50% the
+size of the intended stim-1 signal in visual cortex. Same 4 ROIs significant as
+the frequency/RSA work (VC, fusiform, premotor, parietal) — same general visual/
+perceptual topography, though findings 20/24 already directly ruled out this
+leakage as an *explanation* for β(frequency)/β(value). Derivation:
+`stim2_decoding_results.ipynb` §5, executed.
 
 ## 22. Early/late within-run split: β(frequency) is already at full strength in the first half of `learning1` and does NOT grow with exposure — argues against a reinforcement-accumulation account
 
@@ -507,25 +520,35 @@ Real bottleneck most likely node-level contention, not yet confirmed — a small
 8-subject real-batch test (job 5518511) is running to establish actual throughput
 before committing all 59 subjects again.
 
-## Open threads (continued, findings 20-23)
+## Open threads (continued, findings 20-24)
 
-13. **Run `stim2_decoding_results.ipynb` once the full 59-subject `stim2_decode` job
-    completes** (superseded job IDs: 5495879 cancelled, 5518511 is an 8-subject
-    throughput test only — resubmit all 59 once §23's throughput question is
-    settled), sync `derivatives/stim2_decoding/` locally, execute the notebook, and
-    fold the actual numbers into finding 21. Existence-proof framing predicts raw
-    accuracy well above chance in visual/fusiform masks; the decisive part is
-    whether `s1cat_demeaned` accuracy stays well above chance too.
-14. **Diagnose the actual stim2_decode throughput bottleneck** (finding 23) — the
-    8-subject test (job 5518511) will show real per-subject wall time; if still
-    much slower than the ~30-60s/subject the isolated diagnostic implies, the next
-    candidate is node-level contention (shared-node xargs-P fan-out vs. e.g. an
-    array job spreading subjects across nodes) rather than anything in the code.
-15. Commit the `stim2-contamination-tests` branch work still staged/uncommitted
-    at session end (§10/§11 additions to `rsa_roi_results.ipynb`,
+13. ~~Run `stim2_decoding_results.ipynb`~~ → **DONE** (job 5518567, NPROC=16,
+    n=58; see finding 21 above, and finding 25 below for the throughput
+    resolution).
+14. ~~Diagnose the actual stim2_decode throughput bottleneck~~ → **DONE**, see
+    finding 25.
+15. **Commit the `stim2-contamination-tests` branch work** — everything is
+    staged (§9b/§10/§11 additions to `rsa_roi_results.ipynb`,
     `stim2_decoding_results.ipynb`, `run_rsa_learning_dynamics.py` +
-    `submit_rsa_learning_dynamics.sh`, this note) and consider whether to merge
-    into `main` or open a PR, once findings 14/21 above are resolved.
+    `submit_rsa_learning_dynamics.sh`, this note) but not committed, per
+    session convention (checkpoint stages, doesn't commit). All findings this
+    branch set out to establish (18-21, 24) are now resolved — ready for
+    Hugo to review and decide commit/merge/PR.
+16. Open thread 8 (why the neural signature *vanishes* rather than merely
+    weakens in `test`, given the behavioral habit effect Hugo confirms
+    persists there) remains the single biggest unresolved question from this
+    whole investigation — see finding 22's closing note.
+
+## 25. stim2_decode throughput resolved: NPROC=16 completed cleanly in 2h23m — no code fix needed beyond the NPROC bump
+
+Full 59-subject job (5518567) finished in 2:23:05 (SLURM reported it as
+"FAILED" with exit code 123 — that's just xargs propagating the expected
+`sub-46` failure, not a real problem; 58/59 CSVs present, matching every other
+job in this pipeline). The `tol=1e-3` LinearSVC change from earlier in this
+thread turned out not to matter much either way — the real lever was simply
+NPROC (8→16, bounded by node core count and walltime), not the convergence
+tolerance. Confirms finding 23's conclusion: there never was a convergence
+problem, just ordinary per-node throughput to size correctly.
 
 ## 24. Stress-tested §9's permutation null against a design-constant confound it could have missed — survives, ruling out one more rival account
 
