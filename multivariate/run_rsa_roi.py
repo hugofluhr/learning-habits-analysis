@@ -23,6 +23,22 @@ Notes that live nowhere else:
   * The noise-normalisation term is estimated once on all trials and reused for every
     scope, so per-run RDMs stay on a common scale and are comparable across runs.
 
+Symmetric stim-2 model (`--symmetric`), added following session-notes 2026-09-03
+findings 18-19 (GLMsingle cue betas carry second-stimulus information): adds
+`s2_category`, `s2_frequency`, `s2_identity` on top of the existing 5 predictors
+(`second_stim_value` already covers the stim-2 value analog). Stim-1 properties
+(`category`, `value`, `frequency`) are per-condition SCALARS — each stimulus has
+exactly one category/value/frequency, so `different_rdm`/`abs_diff_rdm` apply
+directly. Stim-2 properties are per-condition DISTRIBUTIONS — each stimulus is
+paired with several different partners across its trials, so there is no single
+"the stim-2 category" for a condition, only a proportion PROFILE over partner
+categories (or identities). `profile_dist_rdm` builds that profile per condition
+and returns pairwise Euclidean distance between profiles — the natural distance
+for a proportion vector, as opposed to the scalar `abs_diff_rdm`/`different_rdm`
+used for stim-1. `s2_frequency` (`second_stim_frequ`, a per-trial scalar like
+`second_stim_value`) still uses `abs_diff_rdm` on the per-condition mean, same
+pattern as the existing `second_stim_value` regressor.
+
 Usage
 -----
 # Precondition check only — needs just --bbt, no NIfTI/cluster access:
@@ -55,11 +71,15 @@ from nilearn.image import index_img, resample_to_img, math_img
 from nilearn.maskers import NiftiMasker
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from utils.data import Subject, load_target_from_bbt
+from utils.data import Subject, load_target_from_bbt, load_string_target_from_bbt
 
 RUNS = ['learning1', 'learning2', 'test']
 FIGURE_CAT = 'figure'
 MODEL_TERMS = ['category', 'value', 'frequency', 'second_stim_value', 'choice_rate']
+# --symmetric adds these 3 stim-2 predictors on top of MODEL_TERMS (second_stim_value,
+# the stim-2 analog of `value`, already exists above). See module docstring "Symmetric
+# stim-2 model" section.
+SYMMETRIC_TERMS = ['s2_category', 's2_frequency', 's2_identity']
 
 
 # ---------------------------------------------------------------------------
@@ -153,6 +173,35 @@ def different_rdm(labels):
     return (lab[:, None] != lab[None, :]).astype(float)
 
 
+def profile_dist_rdm(trial_property, cond_idx, obs_mask, n_cond, categories):
+    """Per-condition proportion PROFILE over `categories`, then pairwise Euclidean
+    distance between profiles.
+
+    Used for stim-2 category/identity RDMs: unlike stim-1 category/value (one scalar
+    per condition -> `different_rdm`/`abs_diff_rdm`), each stim-1 condition pools many
+    different stim-2 partners across its trials, so its stim-2 "value" is a
+    distribution, not a scalar. `trial_property` is a per-trial array (already
+    subset-aligned to `cond_idx`'s full length); `obs_mask` selects the trials in
+    scope. A condition with zero observations under `obs_mask` gets an all-zero
+    profile row (distance 0 to everything) — such a condition should be excluded via
+    the caller's `keep` subset, same as any other degenerate-scope stimulus.
+    """
+    props = np.asarray(trial_property)[obs_mask]
+    conds = cond_idx[obs_mask]
+    cats = list(categories)
+    profile = np.zeros((n_cond, len(cats)), dtype=float)
+    for c in range(n_cond):
+        sel = conds == c
+        n = int(sel.sum())
+        if n == 0:
+            continue
+        counts = pd.Series(props[sel]).value_counts()
+        for j, cat in enumerate(cats):
+            profile[c, j] = counts.get(cat, 0) / n
+    diff = profile[:, None, :] - profile[None, :, :]
+    return np.sqrt((diff ** 2).sum(axis=-1))
+
+
 def _triu(mat):
     return mat[np.triu_indices(mat.shape[0], 1)]
 
@@ -186,6 +235,39 @@ def fit_rdm_regression(rdm, model_rdms, keep):
         coef, *_ = np.linalg.lstsq(np.column_stack([np.ones_like(y)] + cols), y, rcond=None)
         betas.update(dict(zip(names, (float(b) for b in coef[1:]))))
     return betas, corrs, len(y)
+
+
+def compute_vif(model_rdms, keep):
+    """Variance inflation factor per predictor, on the z-scored triu vectors over the
+    `keep` stimuli — same standardisation `fit_rdm_regression` uses. Regresses each
+    predictor on all the others (plus intercept); VIF = 1/(1-R^2). A predictor
+    constant over `keep` gets NaN (mirrors `fit_rdm_regression`'s treatment of a
+    constant model). Pre-flight diagnostic for `--symmetric`'s 8 predictors — see
+    `check_symmetric_vif.py`.
+    """
+    sub = np.ix_(keep, keep)
+    names, cols = [], {}
+    for name, mrdm in model_rdms.items():
+        v = _triu(mrdm[sub])
+        if np.ptp(v) > 0:
+            names.append(name)
+            cols[name] = _z(v)
+
+    vifs = {}
+    for name in names:
+        y = cols[name]
+        others = [cols[n] for n in names if n != name]
+        if not others:
+            vifs[name] = 1.0
+            continue
+        X = np.column_stack([np.ones_like(y)] + others)
+        coef, *_ = np.linalg.lstsq(X, y, rcond=None)
+        resid = y - X @ coef
+        ss_res = float((resid ** 2).sum())
+        ss_tot = float(((y - y.mean()) ** 2).sum())
+        r2 = 1.0 - ss_res / ss_tot if ss_tot > 0 else 0.0
+        vifs[name] = float('inf') if r2 >= 1.0 else 1.0 / (1.0 - r2)
+    return {n: vifs.get(n, float('nan')) for n in model_rdms}
 
 
 def value_contrast(rdm, keep, cat, value):
@@ -225,7 +307,9 @@ def check_bbt_only(subject, bbt_path):
     sub_id = f"sub-{subject}"
     bbt = pd.read_csv(bbt_path, usecols=['sub_id', 'block', 'first_stim_name',
                                          'first_stim_cat', 'first_stim_value',
-                                         'first_stim_frequ', 'first_stim_value_rl'])
+                                         'first_stim_frequ', 'first_stim_value_rl',
+                                         'second_stim_cat', 'second_stim_name',
+                                         'second_stim_frequ'])
     sub_bbt = bbt[bbt['sub_id'] == sub_id]
     if sub_bbt.empty:
         return False, f"{sub_id}: absent from BBT ({bbt_path})"
@@ -267,12 +351,20 @@ def load_stimuli(subject, glmsingle_dir, bbt_path, shuffle_seed=None):
     per_trial = {col: load_target_from_bbt(subject, bbt_path, trial_info, target_col=col)
                  for col in ['first_stim_value', 'first_stim_frequ',
                              'first_stim_value_rl', 'first_stim_value_ck',
-                             'second_stim_value', 'first_stim', 'chosen_stim']}
+                             'second_stim_value', 'second_stim_frequ',
+                             'first_stim', 'chosen_stim']}
     # Per-trial indicator: did the subject choose the first stimulus?
     # action is coded as left/right, not first/second; `chosen_stim` resolves that.
     # NaN chosen_stim (no-response trials) → 0 (unchosen).
     per_trial['first_stim_chosen'] = (
         per_trial['first_stim'] == per_trial['chosen_stim']).astype(float)
+    # Second-stimulus category/identity: string BBT columns, used only by --symmetric's
+    # profile_dist_rdm predictors (s2_category, s2_identity). Always loaded here (cheap)
+    # so load_stimuli's return signature doesn't depend on --symmetric.
+    per_trial['second_stim_cat'] = load_string_target_from_bbt(
+        subject, bbt_path, trial_info, target_col='second_stim_cat')
+    per_trial['second_stim_name'] = load_string_target_from_bbt(
+        subject, bbt_path, trial_info, target_col='second_stim_name')
 
     stim_labels = trial_info['stim_name'].values
     run_labels = trial_info['run'].values
@@ -307,7 +399,9 @@ def load_stimuli(subject, glmsingle_dir, bbt_path, shuffle_seed=None):
 
     return (betas_img, trial_info, cond_idx, run_labels, props,
             per_trial['first_stim_value_rl'], per_trial['first_stim_value_ck'],
-            per_trial['second_stim_value'], per_trial['first_stim_chosen'])
+            per_trial['second_stim_value'], per_trial['first_stim_chosen'],
+            per_trial['second_stim_frequ'], per_trial['second_stim_cat'],
+            per_trial['second_stim_name'])
 
 
 def build_masks(subject, base_dir, bids_dir, betas_img, roi_masks):
@@ -366,7 +460,8 @@ def build_scopes(subject, cond_idx, run_labels, trial_order, within_run_split):
 # ---------------------------------------------------------------------------
 def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path,
                 roi_masks=None, within_run_split='interleaved', shuffle_seed=None,
-                remove_mean=False, validate_rsatoolbox=False, overwrite=False):
+                remove_mean=False, validate_rsatoolbox=False, symmetric=False,
+                overwrite=False):
 
     subject_output = output_dir / f"sub-{subject}"
     done_flag = subject_output / f"sub-{subject}_rsa_results.csv"
@@ -377,7 +472,8 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path
 
     (betas_img, trial_info, cond_idx, run_labels, props,
      rl_per_trial, ck_per_trial,
-     s2v_per_trial, chosen_per_trial) = load_stimuli(
+     s2v_per_trial, chosen_per_trial,
+     s2f_per_trial, s2cat_per_trial, s2name_per_trial) = load_stimuli(
         subject, glmsingle_dir, bbt_path, shuffle_seed)
     stim_names, n_cond = props['names'], len(props['names'])
 
@@ -414,6 +510,23 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path
     cr_rdms = {scope: abs_diff_rdm(pd.Series(chosen_per_trial[obs]).groupby(cond_idx[obs])
                                    .mean().reindex(range(n_cond)).values)
                for scope, (obs, _) in scopes.items()}
+
+    # --symmetric: stim-2 category/frequency/identity RDMs, scope-specific like the
+    # confound controls above (pairing structure differs across runs). s2_category and
+    # s2_identity are proportion PROFILES (multiple partners per condition), not
+    # scalars — see profile_dist_rdm and the module docstring's "Symmetric stim-2
+    # model" section. s2_frequency mirrors second_stim_value's abs_diff_rdm pattern.
+    if symmetric:
+        s2f_rdms = {scope: abs_diff_rdm(pd.Series(s2f_per_trial[obs]).groupby(cond_idx[obs])
+                                        .mean().reindex(range(n_cond)).values)
+                    for scope, (obs, _) in scopes.items()}
+        s2cat_categories = sorted(pd.unique(s2cat_per_trial))
+        s2_cat_profile_rdms = {
+            scope: profile_dist_rdm(s2cat_per_trial, cond_idx, obs, n_cond, s2cat_categories)
+            for scope, (obs, _) in scopes.items()}
+        s2_id_profile_rdms = {
+            scope: profile_dist_rdm(s2name_per_trial, cond_idx, obs, n_cond, stim_names)
+            for scope, (obs, _) in scopes.items()}
 
     rows, amp_rows = [], []
     for mask_name, vox in masks:
@@ -472,6 +585,13 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path
                               'frequency': freq_rdm,
                               'second_stim_value': s2v_rdms[scope],
                               'choice_rate': cr_rdms[scope]}
+                    if symmetric:
+                        models.update({
+                            's2_category': s2_cat_profile_rdms[scope],
+                            's2_frequency': s2f_rdms[scope],
+                            's2_identity': s2_id_profile_rdms[scope],
+                        })
+                    reported_terms = MODEL_TERMS + (SYMMETRIC_TERMS if symmetric else [])
                     betas, corrs, n_pairs = fit_rdm_regression(rdm, models, keep)
                     rows.append({
                         'subject': f"sub-{subject}", 'mask': mask_name,
@@ -479,12 +599,13 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path
                         'model': model_name, 'n_stim': int(keep.sum()),
                         'n_pairs': n_pairs, 'n_trials': int(obs.sum()),
                         **{f'beta_{k}': v for k, v in betas.items()},
-                        **{f'r_{k}': corrs.get(k, float('nan')) for k in MODEL_TERMS},
+                        **{f'r_{k}': corrs.get(k, float('nan')) for k in reported_terms},
                         'contrast_value': contrast,
                         'n_same_value_pairs': n_same, 'n_diff_value_pairs': n_diff,
                         'rdm_mean': float(cells.mean()), 'rdm_sd': float(cells.std()),
                         'within_run_split': within_run_split,
                         'remove_mean': bool(remove_mean),
+                        'symmetric': bool(symmetric),
                         'shuffle_seed': -1 if shuffle_seed is None else shuffle_seed,
                     })
                     if subset == 'all' and model_name == 'objective':
@@ -495,13 +616,21 @@ def run_subject(subject, base_dir, bids_dir, glmsingle_dir, output_dir, bbt_path
                             f"beta_frq={betas['frequency']:+.3f} "
                             f"contrast={contrast:+.3f}")
 
+    symmetric_npz = {}
+    if symmetric:
+        symmetric_npz = {
+            **{f's2f_{k}': v for k, v in s2f_rdms.items()},
+            **{f's2cat_profile_{k}': v for k, v in s2_cat_profile_rdms.items()},
+            **{f's2id_profile_{k}': v for k, v in s2_id_profile_rdms.items()},
+        }
     np.savez(subject_output / f"sub-{subject}_rsa_model_rdms.npz",
              stim_names=stim_names, stim_cat=props['cat'], stim_value=props['value'],
              stim_frequency=props['frequency'], non_figure=non_figure,
              **model_rdms, **{f'rl_value_{k}': v for k, v in rl_rdms.items()},
              **{f'ck_value_{k}': v for k, v in ck_rdms.items()},
              **{f's2v_{k}': v for k, v in s2v_rdms.items()},
-             **{f'cr_{k}': v for k, v in cr_rdms.items()})
+             **{f'cr_{k}': v for k, v in cr_rdms.items()},
+             **symmetric_npz)
 
     pd.DataFrame(amp_rows).to_csv(
         subject_output / f"sub-{subject}_rsa_amplitude.csv", index=False)
@@ -559,6 +688,13 @@ def main():
     parser.add_argument("--validate-against-rsatoolbox", action="store_true",
                         help="Assert the local crossnobis matches rsatoolbox on the "
                              "smallest ROI (needs rsatoolbox installed)")
+    parser.add_argument("--symmetric", action="store_true",
+                        help="Add stim-2 predictors (s2_category, s2_frequency, "
+                             "s2_identity) to the regression alongside the existing "
+                             "stim-1 category/value/frequency + second_stim_value/"
+                             "choice_rate confound controls — see module docstring's "
+                             "'Symmetric stim-2 model' section. Write to a separate "
+                             "--output-dir (row count / columns differ from the default).")
     parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args()
 
@@ -598,6 +734,7 @@ def main():
         shuffle_seed        = args.shuffle_seed,
         remove_mean         = args.remove_mean,
         validate_rsatoolbox = args.validate_against_rsatoolbox,
+        symmetric           = args.symmetric,
         overwrite           = args.overwrite,
     )
 

@@ -126,6 +126,25 @@ def load_target_from_bbt(subject, bbt_path, trial_info, target_col='first_stim_v
     )
     return np.asarray(vals, dtype=float)
 
+
+def load_string_target_from_bbt(subject, bbt_path, trial_info, target_col):
+    """Like `load_target_from_bbt`, but for a non-numeric (string) BBT column -- that
+    helper hard-casts to float, which breaks on e.g. `second_stim_cat`/`second_stim_name`.
+    Same chronological-reconstruction/alignment-assert logic, kept in sync by hand."""
+    sub_id = str(subject) if str(subject).startswith('sub-') else f'sub-{subject}'
+    bbt = pd.read_csv(bbt_path)
+    sub_bbt = bbt[bbt['sub_id'] == sub_id]
+    vals, names = [], []
+    for run in ['learning1', 'learning2', 'test']:
+        block = sub_bbt[sub_bbt['block'] == run].sort_values('t_first_stim')
+        vals += block[target_col].tolist()
+        names += block['first_stim_name'].tolist()
+    assert list(trial_info['stim_name']) == names, (
+        f"{sub_id}: BBT/info misaligned reconstructing '{target_col}'"
+    )
+    return np.asarray(vals, dtype=object)
+
+
 class StimuliInfo:
     def __init__(self, assignment, values, frequencies, names):
         self.assignment = assignment

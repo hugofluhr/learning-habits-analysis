@@ -267,10 +267,24 @@ strong and test is null. Derivation: `rsa_roi_results.ipynb`, new cell
 | `multivariate/rsa_searchlight_results.ipynb` | §9/§10 prose corrected to match the pooled β(value) terminology fix (no new analysis) | this checkpoint, uncommitted |
 | `multivariate/presentation.md` | "What the interaction means?" slide + speaker notes corrected to the actual pooled β(value) numbers; removed a stray leftover "Not sure how to interpret this" line | this checkpoint, uncommitted |
 | `session-notes/2026-08-27_rsa-first-real-results.md` | Added a dated correction pointer to finding 5 (kept the original preliminary text as historical record, per checkpoint convention) | this checkpoint, uncommitted |
+| `multivariate/rsa_design_checks.ipynb` | New §8/§8b: learning/test pairing-structure design facts (finding 16) | `main` (`f060db4`) |
+| `multivariate/run_beta_crossrun_reliability.py`, `submit_beta_crossrun_reliability.sh` | New: finishes `glmsingle_qc.ipynb` §8 (finding 17) | `main` (`f060db4`) |
+| `multivariate/aggregate_crossrun_reliability.py` | New: aggregation script for the above | `main` (`653c017`) |
+| `multivariate/run_rsa_partner_context.py`, `submit_rsa_partner_context.sh` | New: partner-context/category-leak crossnobis test, `--scope {learning,test}` (findings 18-19) | `main` (`3f087ef`) |
+| `multivariate/rsa_partner_context_results.ipynb` | New: group results notebook for findings 18-19, executed | this checkpoint |
+| `multivariate/run_rsa_roi.py` | Added `--symmetric` flag: `profile_dist_rdm()` helper + s2_category/s2_frequency/s2_identity predictors (finding 20) | `stim2-contamination-tests` (`b43d27c`) |
+| `multivariate/check_symmetric_vif.py` | New: pre-flight VIF check for the symmetric model, BBT-only | `stim2-contamination-tests` (`b43d27c`) |
+| `multivariate/submit_rsa_roi.sh` | Added `SYMMETRIC=1` env var with separate-output-tree guardrail | `stim2-contamination-tests` (`b43d27c`) |
+| `multivariate/run_stim2_decoding.py`, `submit_stim2_decoding.sh` | New: stim-2 category decoding test (finding 21, results pending) | `stim2-contamination-tests` (`b43d27c`) |
+| `utils/data.py` | Moved `load_string_target_from_bbt` here from `run_rsa_partner_context.py` (avoids a circular import with `run_rsa_roi.py`) | `stim2-contamination-tests` (`b43d27c`) |
+| `multivariate/rsa_roi_results.ipynb` | New §10 (symmetric-model comparison, finding 20) + "9." addition to top-level Findings, both executed | this checkpoint |
+| `multivariate/stim2_decoding_results.ipynb` | New: group results notebook for finding 21, built but not yet executed (job 5495879 still running) | this checkpoint |
 
 ## Data produced
 
 Local only, not synced anywhere else: `~/phd_local/data/LearningHabits/derivatives/rsa_searchlight_group_stats/{value,frequency,interaction_value_freq}/` — t-map, logp_max_{t,size,mass} maps, mask, and `<term>_params.json` (full run parameters + subject list + runtime) for each of the 3 terms. `--tfce` was not run (would be ~45-50 min/term per the script docstring's extrapolation, not needed to answer this session's question).
+
+Cluster: `shares-hare/ds-learning-habits/derivatives/glmsingle_qc/sub-*/*_crossrun_reliability.csv` (job 5484108, all 59 subjects) and `shares-hare/ds-learning-habits/derivatives/rsa_partner_context/sub-*/` (jobs 5484596/5484846/5484905/5484906, all 59 subjects minus `sub-46`) — both mirrored locally to `~/phd_local/data/LearningHabits/dev_sample/bids_dataset/derivatives/{glmsingle_qc,rsa_partner_context}/` for notebook use.
 
 ## Git state
 
@@ -301,6 +315,12 @@ committed.
 7. The visual-confound audit (findings 8-10) doesn't rule out every possible finer-grained visual confound (e.g. low-level pixel statistics unrelated to category) — only category-driven and second-stimulus-pairing-driven ones. Not flagged as urgent given how decisively §9's permutation test came out.
 8. **What actually causes the `test`-phase collapse (findings 12-14)?** The "behavioural extinction of the frequency split" account is ruled out (finding 14's correction) — the behavioural habit effect is real and robust in `test`'s same-value trials, per Hugo. The "learning-scope collinearity" account is also ruled out (finding 15). **Still unexplained**: a robust *behavioral* habit effect in `test` with no corresponding *neural* signature there, while `learning1`/`learning2` show a strong neural signature. Candidate directions not yet tried: (a) a genuinely feedback/prediction-error-locked neural mechanism (behavior can be habit-driven without the *representational geometry* this RSA measures being the thing that drives it); (b) check the same-value trials specifically within `test` (the diagnostic subset) rather than the whole-`test` RDM used so far — the current `test`-scope RSA pools all trial types together, diluting exactly the trials where the behavioral effect is cleanest.
 9. **Propagate the same "does X collapse in test" check to the value×frequency interaction** — findings 12-14 only checked the two main effects (frequency, value) and the negative-control (category); the interaction itself (§9 of `rsa_searchlight_results.ipynb`, the headline searchlight finding) hasn't been checked for the same run-by-run pattern yet.
+
+### 16-19. RSA partner-context pollution: betas carry information about the co-present stimulus, not just the target stimulus (started from open thread 8, ended up bigger than that)
+
+Full derivation and executed figures: `multivariate/rsa_partner_context_results.ipynb`
+(new). Code: `multivariate/run_rsa_partner_context.py` + `submit_rsa_partner_context.sh`
+(new; module docstring has the complete design-decision trail).
 
 ### 16. Pairing structure: `learning` and `test` sample completely different sets of stimulus pairs — a new, untested candidate mechanism for the test-phase collapse (open thread 8)
 
@@ -340,4 +360,230 @@ sharpens rather than kills the hypothesis, and is the reason a coarse
 reliability check isn't sufficient; a partner-conditioned test targeted at that
 subspace is still needed. Derivation: `run_beta_crossrun_reliability.py` +
 `submit_beta_crossrun_reliability.sh` (new, run on cluster), aggregated locally
-(not yet in a notebook — see open threads).
+via `aggregate_crossrun_reliability.py` (new, committed).
+
+### 18. Targeted neural test: `learning`'s dominant partner leaves a large residual signature, comparable in size to the identity signal itself
+
+Hugo's sharper reframing of finding 16: it's not just fewer contexts in
+`learning` vs `test`, it's that every stimulus has one *dominant* partner
+(~75% of its own trials — the choice-frequency label's 6:18 ratio), so its
+condition mean is heavily weighted toward "this stimulus, with its majority
+partner." Built `run_rsa_roi.py`-style crossnobis test per stimulus: dominant-
+vs-minor-partner-trials distance, holding identity fixed (SLURM jobs 5484596/
+5484905, n=58). **Confirmed decisively**: `partner_distance` +0.030 (wholebrain)
+to +0.064 (fusiform), all p<1e-20 — comparable in magnitude to the ordinary
+between-stimulus identity-discrimination signal (`betweenstim_distance`
++0.009 to +0.073 in the same units/subjects). A dry run against `bbt.csv` before
+touching the cluster caught a design subtlety first: GLMsingle betas are locked
+to FIRST-stimulus onset only, so a stimulus's beta condition only sees the
+subset of its pair-level appearances where it happened to be shown first —
+realized dominant/minor counts range 1-11 (mean 6.0, sd 1.8) across 496
+subject×stimulus cells, not a clean 18:6 — handled via a per-stimulus
+independent test, an interleaved pooled-block 2-fold split, and a minimum-
+trial-count gate (≥3). Derivation: `multivariate/run_rsa_partner_context.py`
+(new) + `rsa_partner_context_results.ipynb` §1 (new, executed).
+
+### 19. Same test in `test`: the naive prediction failed, and the failure revealed a bigger, more general confound — partner CATEGORY leaks into the beta
+
+Naive prediction: `test` has no dominant partner, so if finding 18 is pure
+repetition-context pollution, this distance should shrink there. **It didn't —
+it's significantly LARGER** (+0.057 to +0.081, all p<1e-17; paired vs `learning`,
+p from 0.015 to 1e-10, all 3 masks). Traced to a construct mismatch, not a
+failed hypothesis: `test`'s only analog to a dominant partner is the same-value
+("habit-diagnostic") partner — a qualitatively different decision problem
+(tied value, no objectively correct choice), not a repetition-frequency analog.
+A first attempt at a construct-matched null (arbitrary partner-id split among
+the 6 different-value partners) backfired instructively: it came back the
+LARGEST number yet (~0.095-0.097) because an id-sorted split has no control
+over the CATEGORY composition of its two groups. Replaced with the direct,
+honest version — **hold first-stimulus identity fixed and split by the
+partner's CATEGORY** — and this is the headline result: `category_distance`
+in `test` is +0.12 to +0.17 (all p<1e-27), roughly **2x finding 19's own
+value-tie-specific effect and the largest, most significant number in the
+whole investigation**. (In `learning`, category_distance mostly reproduces
+finding 18, since only 2 partners exist per stimulus there — not new
+information.) **Confirms Hugo's original suspicion directly**: GLMsingle cue
+betas carry substantial information about the co-present stimulus — including
+at minimum its category — independent of the frequency/value/repetition
+structure this pipeline is meant to measure. **Not yet established**: whether
+this explains the specific β(frequency)/β(value) RSA results (`rsa_roi_results.
+ipynb`) — that needs a confound-regression test (open thread, below), not
+attempted this session. Derivation: `run_rsa_partner_context.py`
+(`find_category_split`/`category_distance`, new) + `rsa_partner_context_
+results.ipynb` §2-3 (new, executed), SLURM jobs 5484846/5484905/5484906.
+
+## Open threads (continued, findings 16-19)
+
+10. ~~**Build the confound-regression test**~~ → **DONE** (new session,
+    2026-09-03, `rsa_roi_results.ipynb` §10 — finding 20 below). Both β(value)
+    and β(frequency) survive; findings 18-19 do NOT explain the headline RSA
+    results.
+11. Finding 19's category-leak result exists in BOTH `learning` and `test`
+    (strong in both), so it doesn't by itself explain why the frequency/value
+    RSA *collapses specifically in `test`* (open thread 8, findings 12-17) — if
+    anything it's a confound present throughout, not one that changes between
+    phases. **Now moot as an account of the collapse** — finding 20 shows the
+    leakage doesn't drive β(frequency)/β(value) at all, so it isn't a candidate
+    explanation for why they collapse in `test` either.
+12. Finding 19's category-leak test used only each stimulus's two most
+    numerous second-stimulus-category groups (up to 4 categories exist) — a
+    full multi-way category discriminability measure (not just top-2) was not
+    built.
+
+## 20-21. Two independent tests of whether the stim-2 contamination (findings 18-19) explains the headline RSA findings — it doesn't
+
+Plan: `/Users/hugofluhr/.claude/plans/sparkling-rolling-sparkle.md`. Branch
+`stim2-contamination-tests`, commit `b43d27c`. Two tests per the plan:
+
+### 20. Symmetric RSA regression (`run_rsa_roi.py --symmetric`) — β(value)/β(frequency) survive unchanged, stim-2 leakage is a separate additive signal
+
+Added `s2_category`/`s2_frequency`/`s2_identity` predictors to the RDM
+regression (new `profile_dist_rdm()` — stim-2 properties are per-condition
+proportion PROFILES since each stim-1 condition pools multiple different
+partners, unlike stim-1's per-condition scalars). Pre-flight VIF check
+(`check_symmetric_vif.py`, BBT-only, no betas) found plausible VIFs (median
+1.5-4) before submitting. Cluster job 5495880, n=58, ~1 min.
+
+**β(frequency) survives essentially unchanged, even strengthens slightly**:
+fusiform +0.373→+0.383 (both p<0.001), visual cortex +0.337→+0.358, wholebrain
++0.203→+0.272 — all still ***. **β(value) survives and strengthens (more
+negative)**: fusiform −0.118→−0.194, visual cortex −0.080→−0.124 (both
+p<0.001/<0.01). **s2_frequency is itself a real, independent, FDR-significant
+predictor** in the same visual/fusiform territory (fusiform −0.214***, visual
+cortex −0.223***, wholebrain −0.172**) — confirms the partner-context leakage
+from findings 18-19 reaches the RDM-regression level, but it acts as a
+*separate additive* signal, not an inflator/explainer of the headline effects.
+s2_category weaker (significant only in fusiform, −0.199, FDR q=0.039);
+s2_identity null everywhere after FDR. Derivation: `rsa_roi_results.ipynb`
+§10 (new, executed) + its "9." addition to the top-level Findings summary.
+
+### 21. Stim-2 category decoding (`run_stim2_decoding.py`) — existence proof CONFIRMED, and stronger than the plan anticipated
+
+4-class (face/hand/house/figure) LinearSVC, LOGO-CV, chance=0.25, `s1cat_demeaned`
+control variant. Cluster job 5518567 (n=58, `sub-46` excluded as usual; two
+earlier attempts — 5495879, 5518511 — were superseded by throughput fixes, see
+finding 23). Second-stimulus category decodes well above chance: wholebrain
+29.5%\*\*\*, visual cortex 33.8%\*\*\*, fusiform 29.0%\*\*\* (FDR q<0.001), confirming
+finding 19 at the raw-decoding level.
+
+**Stronger than anticipated**: the `s1cat_demeaned` control doesn't just fail to
+kill the signal, it significantly INCREASES it in visual cortex (33.8%→37.2%,
+p<0.001) and fusiform (29.0%→32.6%, p<0.001) — removing stim-1-category variance
+makes the stim-2 signal *easier* to decode, decisively ruling out "this is just
+stim-1 pattern leakage relabeled." Magnitude relative to stim-1 category decoding
+(48.3% in VC) is substantial, not negligible: stim-2 reaches roughly 35-50% the
+size of the intended stim-1 signal in visual cortex. Same 4 ROIs significant as
+the frequency/RSA work (VC, fusiform, premotor, parietal) — same general visual/
+perceptual topography, though findings 20/24 already directly ruled out this
+leakage as an *explanation* for β(frequency)/β(value). Derivation:
+`stim2_decoding_results.ipynb` §5, executed.
+
+## 22. Early/late within-run split: β(frequency) is already at full strength in the first half of `learning1` and does NOT grow with exposure — argues against a reinforcement-accumulation account
+
+Direct test of Hugo's objection to finding 12 (flat β(frequency) learning1≈learning2,
+collapse in test): if the effect reflects genuine habit accumulation from repeated
+reward-linked choice, it should be weaker early and grow with exposure, including
+*within* a run. Built `run_rsa_learning_dynamics.py` (new; splits each of
+learning1/learning2 at the chronological median into early/late halves, each with
+its own interleaved-CV crossnobis RDM; thin per-stimulus counts ~3-9/half handled
+with a minimum-fold-count gate, same pattern as `run_rsa_partner_context.py`).
+Cluster job 5518508, n=56 usable after the gate.
+
+**β(frequency) is already significant in the FIRST HALF of `learning1`** — fusiform
++0.244\*\*\* (~first 12-24 trials of the whole experiment) — **and does not grow**:
+fusiform +0.244\*\*\*→+0.186\*\*(1-late)→+0.252\*\*\*(2-early)→+0.169\*\*(2-late); visual
+cortex +0.153\*\*→+0.096\*→+0.078(ns)→+0.072(ns), actually *weakening* over exposure —
+the opposite of what habit accumulation predicts. β(value) shows the same flat
+pattern. Reconciles with finding 8a (graded H-value already failed to beat the flat
+design label) and finding 16 (pairing assignment fixed for the whole learning
+phase, not revealed gradually): the geometry looks like it tracks something
+established quickly (perceptual/associative registration of the fixed pairing
+structure), not something built by repeated reinforcement. Doesn't resolve *why*
+it then collapses in `test` (open thread 8 still open) but rules out "test
+collapses because habit strength hadn't finished building" — it was already at
+full early-`learning1` strength well before `test`. Derivation:
+`rsa_roi_results.ipynb` §11 (new, executed).
+
+## 23. Methodological detour: `stim2_decode`'s slowness was NOT a convergence problem — corrected mid-session, real bottleneck still under investigation
+
+`stim2_decoding`'s first cluster attempt (job 5495879, NPROC=8) showed 0/59 subjects
+complete after 15+ min; `.err` log had `ConvergenceWarning`s, initially (wrongly)
+diagnosed as the cause and "fixed" via `tol=1e-3` + bumping NPROC to 24. A follow-up
+isolated diagnostic (single dedicated CPU, sub-01, wholebrain) overturned that: timing
+was IDENTICAL (~6s) across `max_iter` 200→2000, meaning the fit converges cleanly well
+under 200 iterations — no real convergence problem. Checking history confirmed
+`ConvergenceWarning` is pervasive in `run_decoding.py`'s and `run_frequency_decoding.py`'s
+existing logs too (up to 409 warnings in one `frequency_decoding` job) without causing
+comparable slowness there — a red herring. NPROC reverted to 8 (the established
+convention; 24 concurrent heavy fits per node likely worsens contention, not helps).
+Real bottleneck most likely node-level contention, not yet confirmed — a small
+8-subject real-batch test (job 5518511) is running to establish actual throughput
+before committing all 59 subjects again.
+
+## Open threads (continued, findings 20-24)
+
+13. ~~Run `stim2_decoding_results.ipynb`~~ → **DONE** (job 5518567, NPROC=16,
+    n=58; see finding 21 above, and finding 25 below for the throughput
+    resolution).
+14. ~~Diagnose the actual stim2_decode throughput bottleneck~~ → **DONE**, see
+    finding 25.
+15. **Commit the `stim2-contamination-tests` branch work** — everything is
+    staged (§9b/§10/§11 additions to `rsa_roi_results.ipynb`,
+    `stim2_decoding_results.ipynb`, `run_rsa_learning_dynamics.py` +
+    `submit_rsa_learning_dynamics.sh`, this note) but not committed, per
+    session convention (checkpoint stages, doesn't commit). All findings this
+    branch set out to establish (18-21, 24) are now resolved — ready for
+    Hugo to review and decide commit/merge/PR.
+16. Open thread 8 (why the neural signature *vanishes* rather than merely
+    weakens in `test`, given the behavioral habit effect Hugo confirms
+    persists there) remains the single biggest unresolved question from this
+    whole investigation — see finding 22's closing note.
+
+## 25. stim2_decode throughput resolved: NPROC=16 completed cleanly in 2h23m — no code fix needed beyond the NPROC bump
+
+Full 59-subject job (5518567) finished in 2:23:05 (SLURM reported it as
+"FAILED" with exit code 123 — that's just xargs propagating the expected
+`sub-46` failure, not a real problem; 58/59 CSVs present, matching every other
+job in this pipeline). The `tol=1e-3` LinearSVC change from earlier in this
+thread turned out not to matter much either way — the real lever was simply
+NPROC (8→16, bounded by node core count and walltime), not the convergence
+tolerance. Confirms finding 23's conclusion: there never was a convergence
+problem, just ordinary per-node throughput to size correctly.
+
+## 24. Stress-tested §9's permutation null against a design-constant confound it could have missed — survives, ruling out one more rival account
+
+Prompted by "what the hell can the frequency effect actually be" after finding 22:
+checked whether §9's permutation null (all C(6,3)=20 3-vs-3 relabelings) could be
+secretly biased by a within-category EXEMPLAR-DISCRIMINABILITY constant — if every
+subject's true label always put one +1/one -1 per category, the true label would
+always get full credit for pure visual exemplar discriminability (present from
+trial 1, no learning needed) while random permutations sometimes lose that
+within-category contrast, producing significance for a reason having nothing to do
+with reward/choice.
+
+**Checked directly: not a constant.** Only 16/58 subjects have the literal
+one-per-category split (counterbalancing rotation varies it, like the
+image-frequency-assignment check). On exactly this n=16 subset — where the
+exemplar-discriminability account could in principle explain everything — built the
+sharpest possible test: a null restricted to the 8 category-preserving relabelings
+(7 impostors), which share the identical within-category term and differ only in
+cross-category structure. **Still rejects decisively: wholebrain p=0.0025, visual
+cortex p=0.00006, fusiform p=0.00002.** A genuine attempt to break the strongest
+existing evidence for "real frequency information," using the most conservative
+null constructible from the data — it survived. Derivation: `rsa_roi_results.ipynb`
+§9b (new, executed).
+
+### Current best-supported account for the frequency effect (as of this session)
+
+Ruled out: stim-2 leakage (finding 20), generic test-noise/category-general artifact
+(finding 14, 17), learning-scope collinearity (finding 15), design-constant exemplar
+discriminability (finding 24), gradual habit/reinforcement accumulation (finding 22,
+8a). Leading remaining candidate: a **fast, non-accumulating tagging of each
+stimulus by its structural role** in the pairing schedule (usually-chosen vs.
+usually-passed-over), consistent with established value-driven-attention literature
+(finding 9) — forms within a handful of trials, doesn't need or benefit from
+repetition, sits specifically in visual/fusiform cortex (attentional prioritization
+territory, not vmPFC/striatum reward-magnitude territory), and disappears in `test`
+because the discriminating role-context (a dominant partner) is absent there. Still
+unexplained: why the neural signature vanishes rather than merely weakens in `test`,
+given the behavioral habit effect Hugo confirms is still present there (open thread 8).

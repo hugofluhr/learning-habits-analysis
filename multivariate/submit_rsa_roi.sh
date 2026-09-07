@@ -15,6 +15,10 @@
 # real thing — run_rsa_roi.py permutes stimulus labels within run):
 #   SHUFFLE_SEED=1 OUTPUT_DIR=.../derivatives/rsa_shuffled bash multivariate/submit_rsa_roi.sh
 #
+# Symmetric stim-2 model (adds s2_category/s2_frequency/s2_identity — see
+# run_rsa_roi.py --symmetric docstring). Separate output tree, same as SHUFFLE/REMOVE_MEAN:
+#   SYMMETRIC=1 OUTPUT_DIR=.../derivatives/rsa_symmetric bash multivariate/submit_rsa_roi.sh
+#
 # Prerequisites: visual_cortex_mask.nii.gz in the decoding output dir (shared with the
 # category decoder); the Bartra vmPFC/striatum masks and the fusiform mask under the
 # shared masks/ directory; rsatoolbox in the conda env only if you pass
@@ -79,6 +83,19 @@ if [ "${REMOVE_MEAN:-0}" = "1" ]; then
     esac
 fi
 
+# SYMMETRIC=1: adds stim-2 predictors (see run_rsa_roi.py --symmetric). Same
+# guardrail idea: never write a variant into the main rsa tree.
+SYMMETRIC_FLAG=""
+if [ "${SYMMETRIC:-0}" = "1" ]; then
+    SYMMETRIC_FLAG="--symmetric"
+    case "$OUTPUT_DIR" in
+        *symmetric*) ;;
+        *) echo "ERROR: SYMMETRIC=1 but OUTPUT_DIR ('${OUTPUT_DIR}') does not look" >&2
+           echo "       like a symmetric-model tree. Refusing to overwrite real results." >&2
+           exit 1 ;;
+    esac
+fi
+
 # ---------------------------------------------------------------------------
 # Build subject list
 # ---------------------------------------------------------------------------
@@ -116,7 +133,7 @@ done
 echo "Submitting 1 job for ${N} subjects (NPROC=${NPROC} concurrent)"
 echo "  output    : ${OUTPUT_DIR}"
 echo "  bbt       : ${BBT}"
-echo "  split     : ${SPLIT}${SHUFFLE_FLAG:+   [SHUFFLE CONTROL: seed ${SHUFFLE_SEED}]}${REMOVE_MEAN_FLAG:+   [REMOVE-MEAN control]}"
+echo "  split     : ${SPLIT}${SHUFFLE_FLAG:+   [SHUFFLE CONTROL: seed ${SHUFFLE_SEED}]}${REMOVE_MEAN_FLAG:+   [REMOVE-MEAN control]}${SYMMETRIC_FLAG:+   [SYMMETRIC stim-2 model]}"
 cat "$SUBJECTS_FILE"
 echo
 
@@ -160,7 +177,7 @@ run_one() {
         --roi-mask putamen "${PUTAMEN_MASK}" \
         --roi-mask premotor "${PREMOTOR_MASK}" \
         --roi-mask parietal "${PARIETAL_MASK}" \
-        ${SHUFFLE_FLAG} ${REMOVE_MEAN_FLAG} ${OVERWRITE_FLAG}
+        ${SHUFFLE_FLAG} ${REMOVE_MEAN_FLAG} ${SYMMETRIC_FLAG} ${OVERWRITE_FLAG}
 }
 export -f run_one
 
