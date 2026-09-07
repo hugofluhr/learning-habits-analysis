@@ -22,6 +22,28 @@ August 31, 2026
 
 ---
 
+## ⚠️ 2026-09-07 update — the "frequency" results below are NOT habit/learning evidence
+
+<style scoped>section { justify-content: center; }</style>
+
+- β(frequency) is present at **full strength in the first half of `learning1`**,
+  before differential reinforcement could plausibly have accrued, and does **not
+  grow** with exposure across `learning1`→`learning2` — this rules out the
+  learning/habit-accumulation reading used throughout this deck, independent of
+  mechanism.
+- An extensive confound/bug sweep (presentation count, partner value/category/
+  identity profile, learning-scope collinearity, exemplar discriminability,
+  temporal placement, screen side, stimulus assignment, pipeline indexing) found
+  **nothing** that explains the early presence — real, but not what this deck says
+  it is.
+- Read every "frequency = habit" claim below with that caveat.
+
+<!-- SOURCE: session-notes/2026-09-07_frequency-confound-sweep-and-verdict.md
+     (decision); session-notes/2026-09-03_rsa-searchlight-cluster-fwe-and-roi-method.md
+     findings 22-27 (the full trail). -->
+
+---
+
 ## Pipeline overview
 
 1. **GLMsingle** — single-trial beta estimation (4 beta types A–D)
@@ -235,6 +257,8 @@ One example subject, 8×8 stimulus dissimilarity predictions (darker = predicted
 
 ## RSA results — frequency robust, value weakly negative
 
+> ⚠️ **2026-09-07: "frequency" ≠ habit/learning — see caveat slide after the title.**
+
 ![w:1000](presentation_assets/19-rsa-5term-bar.png)
 
 <div class="small">
@@ -267,6 +291,8 @@ One example subject, 8×8 stimulus dissimilarity predictions (darker = predicted
 ---
 
 ## What the frequency effect means
+
+> ⚠️ **2026-09-07: this "means" is superseded — the effect is NOT habit/choice-history. See caveat slide after the title.**
 
 <style scoped>section { justify-content: center; }</style>
 
@@ -353,6 +379,8 @@ SPEAKER NOTES:
 
 ## Interim summary — RSA
 
+> ⚠️ **2026-09-07: "Frequency (habit)" below is wrong — see caveat slide after the title.**
+
 <style scoped>section { justify-content: center; }</style>
 
 - **Frequency (habit) is the dominant signal** — repeated choice reshapes visual representations, making high- and low-frequency stimuli more separable
@@ -362,6 +390,8 @@ SPEAKER NOTES:
 ---
 
 ## Frequency decoding — ROI classification
+
+> ⚠️ **2026-09-07: "frequency" ≠ habit/learning — see caveat slide after the title.**
 
 ![w:700](presentation_assets/23-freq-decoding-roi.png)
 
@@ -392,6 +422,8 @@ SPEAKER NOTES:
 ---
 
 ## Frequency searchlight — voxel-level localization
+
+> ⚠️ **2026-09-07: "frequency" ≠ habit/learning — see caveat slide after the title.**
 
 ![w:780](presentation_assets/24-freq-searchlight-tmap.png)
 
@@ -457,6 +489,8 @@ SPEAKER NOTES:
 ---
 
 ## RSA searchlight — extending the regression to every voxel
+
+> ⚠️ **2026-09-07: "frequency" ≠ habit/learning throughout this section — see caveat slide after the title.**
 
 - Same 5-term regression as the ROI-level RSA (category, value, frequency, second_stim_value, choice_rate), run in a 6mm-radius sphere around every voxel, n=58
 - Plus the value×frequency **interaction**, computed as a same-vs-different-frequency slope difference (not a 6th joint regressor — that version was severely collinear with frequency)
@@ -548,9 +582,11 @@ FDR q<0.05: **3,643 voxels** (2.2% of brain, +3,596/−47) — stronger than the
 
 ## Bottom line
 
+> ⚠️ **2026-09-07: the "habit manipulation" line below is superseded — see caveat slide after the title.**
+
 - **Category decoding is robust and validated** — survives label-shuffle, CV-scheme, and per-run checks
 - **Reward-value decoding is blocked** by a deterministic identity confound — not solvable by demeaning in this design
-- **Frequency (the habit manipulation) is the dominant multivariate signal** — robust across RSA, decoding, and searchlight (ROI *and* voxelwise); concentrated in fusiform/VC with new parietal/premotor/striatum involvement
+- **Frequency (the habit manipulation) is the dominant multivariate signal** — robust across RSA, decoding, and searchlight (ROI *and* voxelwise); concentrated in fusiform/VC with new parietal/premotor/striatum involvement — **NOT actually a habit/learning signature (2026-09-07)**
 - **Value coding appears context-dependent** — positive within same-frequency pairs, negative across; reproduces voxelwise, validated against controls
 
 ---
