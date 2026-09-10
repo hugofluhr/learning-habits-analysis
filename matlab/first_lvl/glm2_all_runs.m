@@ -3,11 +3,23 @@ clear;
 % Which confounds to use
 confound_pattern = '_.*_motion_with_dummies.txt$';
 
-% Paths
-spmpath = '/home/ubuntu/repos/spm12';
-data_dir = '/home/ubuntu/data/learning-habits/spm_format_noSDC';
-analysis_dir = '/home/ubuntu/data/learning-habits/spm_format_noSDC';
-bbt_path = '/home/ubuntu/data/learning-habits/bbt.csv';
+% Paths - wrapped so runner scripts can inject values via
+% -r "data_dir='...'; run('script.m')"
+if ~exist('spmpath', 'var') || isempty(spmpath)
+    spmpath = '/home/hfluhr/repos/spm12';
+end
+if ~exist('data_dir', 'var') || isempty(data_dir)
+    data_dir = '/home/hfluhr/data/learninghabits/spm_format_noSDC';
+end
+if ~exist('analysis_dir', 'var') || isempty(analysis_dir)
+    analysis_dir = '/home/hfluhr/data/learninghabits/spm_format_noSDC';
+end
+if ~exist('bbt_path', 'var') || isempty(bbt_path)
+    bbt_path = '/home/hfluhr/data/learninghabits/bbt.csv';
+end
+if ~exist('subjects_override', 'var')
+    subjects_override = {};
+end
 addpath(spmpath);
 
 current_date = char(datetime('now', 'Format', 'yyyy-MM-dd-hh-mm'));
@@ -24,6 +36,9 @@ diary on;
 % Load behavioral data
 bbt = readtable(bbt_path);
 subjects = unique(bbt.sub_id);
+if ~isempty(subjects_override)
+    subjects = subjects_override;
+end
 block_names = {'learning1', 'learning2', 'test'};
 
 % Parameters
