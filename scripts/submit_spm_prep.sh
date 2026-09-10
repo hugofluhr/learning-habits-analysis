@@ -37,6 +37,7 @@ sbatch <<EOF
 #SBATCH --partition=standard
 
 set -eo pipefail
+module load miniforge3
 source "\$(conda info --base)/etc/profile.d/conda.sh"
 conda activate learning-habits
 export PYTHONUNBUFFERED=1
