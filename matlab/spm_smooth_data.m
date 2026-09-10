@@ -1,10 +1,15 @@
-addpath('/Users/hugofluhr/code/spm12');
+% Paths - wrapped so runner scripts can inject values via
+% -r "spmpath='...'; base_dir='...'; run('script.m')"
+if ~exist('spmpath', 'var') || isempty(spmpath)
+    spmpath = '/home/hfluhr/repos/spm12';
+end
+if ~exist('base_dir', 'var') || isempty(base_dir)
+    base_dir = '/home/hfluhr/data/learninghabits/spm_format_noSDC';
+end
+addpath(spmpath);
 
 spm('Defaults', 'fMRI');
 spm_jobman('initcfg');
-
-% Directory paths
-base_dir = '/home/ubuntu/data/learning-habits/spm_format';
 
 % Parameters
 smoothing_fwhm = 5; % Smoothing kernel
