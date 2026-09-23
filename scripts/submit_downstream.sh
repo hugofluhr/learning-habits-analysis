@@ -134,4 +134,5 @@ if [ "$STEP" = "all" ]; then
 else
     id=$(run_step "$STEP")
     echo "${STEP}: job ${id}" >&2
+    echo "$id"   # stdout, so callers can chain: DEPENDENCY=$(bash submit_downstream.sh contrasts <glm>)
 fi
