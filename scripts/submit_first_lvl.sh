@@ -38,6 +38,10 @@ CURRENT_DATE="${CURRENT_DATE:-$(date +%Y-%m-%d-%H-%M)}"
 THROTTLE="${THROTTLE:-20}"
 TIME="${TIME:-02:00:00}"
 MEM="${MEM:-16G}"
+# MATLAB runs in an Apptainer container, which fails on the L4 GPU nodes u24-cva0ls0-[509-516]
+# ("Failed to create user namespace: Permission denied", seen 2026-09-23). Exclude them;
+# override with EXCLUDE="" or another node list.
+EXCLUDE="${EXCLUDE-u24-cva0ls0-[509-516]}"
 LOG_DIR="${DATA_DIR}/logs"
 mkdir -p "$LOG_DIR"
 
@@ -74,6 +78,7 @@ JOB=$(cat <<EOF
 #SBATCH --mem=${MEM}
 #SBATCH --time=${TIME}
 #SBATCH --partition=standard
+${EXCLUDE:+#SBATCH --exclude=${EXCLUDE}}
 
 set -eo pipefail
 SUB=\$(sed -n "\$((SLURM_ARRAY_TASK_ID + 1))p" "${SUBJECTS_FILE}")

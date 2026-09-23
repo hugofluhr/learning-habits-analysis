@@ -14,6 +14,10 @@ BASE_DIR="/home/hfluhr/data/learninghabits/spm_format"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 LOG_DIR="${BASE_DIR}/logs"
 mkdir -p "$LOG_DIR"
+# MATLAB runs in an Apptainer container, which fails on the L4 GPU nodes u24-cva0ls0-[509-516]
+# ("Failed to create user namespace: Permission denied", seen 2026-09-23). Exclude them;
+# override with EXCLUDE="" or another node list.
+EXCLUDE="${EXCLUDE-u24-cva0ls0-[509-516]}"
 
 sbatch <<EOF
 #!/bin/bash -l
@@ -25,6 +29,7 @@ sbatch <<EOF
 #SBATCH --mem=16G
 #SBATCH --time=04:00:00
 #SBATCH --partition=standard
+${EXCLUDE:+#SBATCH --exclude=${EXCLUDE}}
 
 set -eo pipefail
 module load matlab

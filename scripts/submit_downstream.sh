@@ -32,6 +32,10 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 SPM_PATH="${SPM_PATH:-/home/hfluhr/repos/spm12}"
 OUTPUTS_DIR="${OUTPUTS_DIR:-/home/hfluhr/data/learninghabits/spm_format/outputs}"
 EXPORTS_DIR="${EXPORTS_DIR:-/home/hfluhr/data/learninghabits/spm_outputs}"
+# MATLAB runs in an Apptainer container, which fails on the L4 GPU nodes u24-cva0ls0-[509-516]
+# ("Failed to create user namespace: Permission denied", seen 2026-09-23). Exclude them;
+# override with EXCLUDE="" or another node list.
+EXCLUDE="${EXCLUDE-u24-cva0ls0-[509-516]}"
 
 if [[ "$GLM" == */* ]]; then GLM_ROOT="$GLM"; else GLM_ROOT="${OUTPUTS_DIR}/${GLM}"; fi
 GLM_NAME="$(basename "$GLM_ROOT")"
@@ -60,6 +64,7 @@ submit_job() {
 #SBATCH --mem=16G
 #SBATCH --time=${time}
 #SBATCH --partition=standard
+${EXCLUDE:+#SBATCH --exclude=${EXCLUDE}}
 
 set -eo pipefail
 EXPORT_ROOT="${EXPORT_ROOT}"
