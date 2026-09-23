@@ -19,8 +19,8 @@
 set -euo pipefail
 
 SPM_PATH="/home/hfluhr/repos/spm12"
-DATA_DIR="/home/hfluhr/data/learninghabits/spm_format_noSDC"
-BBT_PATH="/home/hfluhr/data/learninghabits/bbt.csv"
+DATA_DIR="/home/hfluhr/data/learninghabits/spm_format"
+BBT_PATH="/home/hfluhr/data/learninghabits/bbt_062026_mf_cols.csv"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 LOG_DIR="${DATA_DIR}/logs"
 mkdir -p "$LOG_DIR"

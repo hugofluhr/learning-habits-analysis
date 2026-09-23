@@ -10,7 +10,7 @@
 set -euo pipefail
 
 SPM_PATH="/home/hfluhr/repos/spm12"
-BASE_DIR="/home/hfluhr/data/learninghabits/spm_format_noSDC"
+BASE_DIR="/home/hfluhr/data/learninghabits/spm_format"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 LOG_DIR="${BASE_DIR}/logs"
 mkdir -p "$LOG_DIR"

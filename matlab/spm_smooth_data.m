@@ -4,7 +4,7 @@ if ~exist('spmpath', 'var') || isempty(spmpath)
     spmpath = '/home/hfluhr/repos/spm12';
 end
 if ~exist('base_dir', 'var') || isempty(base_dir)
-    base_dir = '/home/hfluhr/data/learninghabits/spm_format_noSDC';
+    base_dir = '/home/hfluhr/data/learninghabits/spm_format';
 end
 addpath(spmpath);
 

@@ -9,13 +9,13 @@ if ~exist('spmpath', 'var') || isempty(spmpath)
     spmpath = '/home/hfluhr/repos/spm12';
 end
 if ~exist('data_dir', 'var') || isempty(data_dir)
-    data_dir = '/home/hfluhr/data/learninghabits/spm_format_noSDC';
+    data_dir = '/home/hfluhr/data/learninghabits/spm_format';
 end
 if ~exist('analysis_dir', 'var') || isempty(analysis_dir)
-    analysis_dir = '/home/hfluhr/data/learninghabits/spm_format_noSDC';
+    analysis_dir = '/home/hfluhr/data/learninghabits/spm_format';
 end
 if ~exist('bbt_path', 'var') || isempty(bbt_path)
-    bbt_path = '/home/hfluhr/data/learninghabits/bbt.csv';
+    bbt_path = '/home/hfluhr/data/learninghabits/bbt_062026_mf_cols.csv';
 end
 if ~exist('subjects_override', 'var')
     subjects_override = {};

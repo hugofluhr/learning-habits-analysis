@@ -15,7 +15,7 @@ set -euo pipefail
 
 BASE_DIR="/home/hfluhr/data/learninghabits"
 BIDS_DIR="/home/hfluhr/shares-hare/ds-learning-habits/derivatives/fmriprep-24.0.1-noSDC"
-OUTPUT_DIR="${BASE_DIR}/spm_format_noSDC"
+OUTPUT_DIR="${BASE_DIR}/spm_format"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 LOG_DIR="${OUTPUT_DIR}/logs"
 mkdir -p "$LOG_DIR"
