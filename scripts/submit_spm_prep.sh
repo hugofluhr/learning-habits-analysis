@@ -1,31 +1,48 @@
 #!/bin/bash
-# Prep BIDS data for SPM on the cluster: unzip BOLD/mask into a flat
-# sub-XX/func/ layout, write basic motion/events files, then add the
-# scrubbing-aware *_motion_with_dummies.txt confound file GLM scripts use.
+# Prep BIDS data for SPM on the cluster: unzip BOLD/mask into a flat sub-XX/func/ layout,
+# write basic motion/events files, then add the scrubbing-aware *_motion_with_dummies.txt
+# confound file the GLMs use. One job loops over all subjects (about 16 s per subject).
 #
-# Usage (from repo root):
-#   bash scripts/submit_spm_prep.sh            # all subjects in participants_mvpa.tsv
-#   bash scripts/submit_spm_prep.sh 01          # smoke test on sub-01 only
-#   bash scripts/submit_spm_prep.sh 01 05 12    # specific subjects
+# Usage (from the repo root, on the cluster):
+#   bash scripts/submit_spm_prep.sh                  # every sub_id in the bbt
+#   bash scripts/submit_spm_prep.sh 01 15            # specific subjects ("15" or "sub-15")
+#   DRY_RUN=1 bash scripts/submit_spm_prep.sh 15     # print the job, sbatch --test-only
 #
-# Prerequisite: run this before spm_smooth_data.m / glm2_all_runs_diff_timing.m,
-# which read the flat sub-XX/func/ layout this produces.
+# Overridable via environment: BBT_PATH, OUTPUT_DIR.
+# The subject list defaults to the bbt, not participants_mvpa.tsv: first levels run on every
+# subject with behavioural data (sub-46 is in the MVPA list but has no bbt row).
+#
+# Run this before submit_spm_smooth.sh and the first-level GLMs.
 
 set -euo pipefail
 
 BASE_DIR="/home/hfluhr/data/learninghabits"
 BIDS_DIR="/home/hfluhr/shares-hare/ds-learning-habits/derivatives/fmriprep-24.0.1-noSDC"
-OUTPUT_DIR="${BASE_DIR}/spm_format"
+OUTPUT_DIR="${OUTPUT_DIR:-${BASE_DIR}/spm_format}"
+BBT_PATH="${BBT_PATH:-${BASE_DIR}/bbt_062026_mf_cols.csv}"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 LOG_DIR="${OUTPUT_DIR}/logs"
 mkdir -p "$LOG_DIR"
 
-SUBJECTS_ARGS=""
+# Subject list as bare IDs ("01"): the prep scripts build the "sub-" folder names themselves
 if [ "$#" -gt 0 ]; then
-    SUBJECTS_ARGS="--subjects $*"
+    SUBJECTS=$(printf "%s\n" "$@" | sed 's/^sub-//' | tr '\n' ' ')
+else
+    SUBJECTS=$(awk -F, 'NR==1 {for (i = 1; i <= NF; i++) if ($i == "sub_id") c = i; next} {print $c}' "$BBT_PATH" \
+        | sort -u | sed 's/^sub-//' | tr '\n' ' ')
 fi
+N=$(echo "$SUBJECTS" | wc -w)
+if [ "$N" -eq 0 ]; then
+    echo "ERROR: empty subject list" >&2
+    exit 1
+fi
+echo "Subjects: ${N}"
+echo "Output:   ${OUTPUT_DIR}"
 
-sbatch <<EOF
+SBATCH_ARGS=()
+[ "${DRY_RUN:-0}" = "1" ] && SBATCH_ARGS+=(--test-only)
+
+JOB=$(cat <<EOF
 #!/bin/bash -l
 #SBATCH --job-name=spm_prep
 #SBATCH --output=${LOG_DIR}/spm_prep_%j.out
@@ -41,18 +58,21 @@ module load miniforge3
 source "\$(conda info --base)/etc/profile.d/conda.sh"
 conda activate learning-habits
 export PYTHONUNBUFFERED=1
-
 cd "${REPO}"
 
-python -u scripts/prepare_bids_spm.py \
-    --base-dir "${BASE_DIR}" \
-    --bids-dir "${BIDS_DIR}" \
-    --output-dir "${OUTPUT_DIR}" \
-    ${SUBJECTS_ARGS}
+python -u scripts/prepare_bids_spm.py \\
+    --base-dir "${BASE_DIR}" --bids-dir "${BIDS_DIR}" --output-dir "${OUTPUT_DIR}" \\
+    --subjects ${SUBJECTS}
 
-python -u scripts/prepare_bids_spm_add_dummies.py \
-    --base-dir "${BASE_DIR}" \
-    --bids-dir "${BIDS_DIR}" \
-    --output-dir "${OUTPUT_DIR}" \
-    ${SUBJECTS_ARGS}
+python -u scripts/prepare_bids_spm_add_dummies.py \\
+    --base-dir "${BASE_DIR}" --bids-dir "${BIDS_DIR}" --output-dir "${OUTPUT_DIR}" \\
+    --subjects ${SUBJECTS}
 EOF
+)
+
+if [ "${DRY_RUN:-0}" = "1" ]; then
+    echo "----- job script -----"
+    echo "$JOB"
+    echo "----------------------"
+fi
+echo "$JOB" | sbatch ${SBATCH_ARGS[@]+"${SBATCH_ARGS[@]}"}

@@ -28,7 +28,15 @@ def prepare_bids_for_spm(base_dir, bids_dir, output_dir, participants_file='part
     os.makedirs(output_dir, exist_ok=True)
 
     # Setup log file with datestamp
-    log_file = os.path.join(output_dir, f"prepare_bids_for_spm_log_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.txt")
+    log_dir = os.path.join(output_dir, 'logs')
+    os.makedirs(log_dir, exist_ok=True)
+    if not subjects:
+        sub_tag = ''
+    elif len(subjects) <= 5:
+        sub_tag = '_' + '_'.join(subjects)
+    else:
+        sub_tag = f'_{len(subjects)}subjects'
+    log_file = os.path.join(log_dir, f"prepare_bids_spm{sub_tag}_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.txt")
     log_f = open(log_file, 'a')
     def log(message):
         print(message)

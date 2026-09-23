@@ -23,15 +23,11 @@ sbatch <<EOF
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=16G
-#SBATCH --time=02:00:00
+#SBATCH --time=04:00:00
 #SBATCH --partition=standard
 
 set -eo pipefail
 module load matlab
 
-matlab -nodisplay -nosplash -nodesktop -r "\
-spmpath = '${SPM_PATH}'; \
-base_dir = '${BASE_DIR}'; \
-run('${REPO}/matlab/spm_smooth_data.m'); \
-exit;"
+matlab -batch "spmpath = '${SPM_PATH}'; base_dir = '${BASE_DIR}'; run('${REPO}/matlab/spm_smooth_data.m');"
 EOF
