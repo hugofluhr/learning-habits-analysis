@@ -20,9 +20,11 @@ if ~exist('subjects_override', 'var')
 end
 addpath(spmpath);
 
-% output_dir is injectable so all tasks of one SLURM array write into one folder
-if ~exist('output_dir', 'var') || isempty(output_dir)
+% current_date / output_dir are injectable so all tasks of one SLURM array write into one folder
+if ~exist('current_date', 'var') || isempty(current_date)
     current_date = char(datetime('now', 'Format', 'yyyy-MM-dd-HH-mm'));
+end
+if ~exist('output_dir', 'var') || isempty(output_dir)
     output_dir = fullfile(analysis_dir, 'outputs', ['glm2_all_runs_scrubbed_' current_date]);
 end
 if ~exist(output_dir, 'dir')
