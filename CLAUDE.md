@@ -80,33 +80,44 @@ Cluster paths (these are what the `multivariate/submit_*.sh` scripts inject):
 | Data root (`--base-dir`) | `/home/hfluhr/data/learninghabits` |
 | Derivatives | `/home/hfluhr/shares-hare/ds-learning-habits/derivatives/{fmriprep-24.0.1-noSDC,glmsingle,decoding,searchlight,frem,rsa}` |
 | Conda env | `/home/hfluhr/data/conda/envs/learning-habits` (build with `multivariate/build_env.sh`) |
+| SPM | `/home/hfluhr/repos/spm12` — despite the folder name this is an **SPM25** development checkout, not SPM12 r7771 as on the VM |
+| SPM-ready data | `/home/hfluhr/data/learninghabits/spm_format` (flat `sub-XX/func/`; see its `README.md`) |
+| bbt for GLMs | `/home/hfluhr/data/learninghabits/bbt_062026_mf_cols.csv` (baseline modelling values; used by every first level) |
+| First-level outputs | `/home/hfluhr/data/learninghabits/spm_format/outputs/<model>_<date>/` |
+| Contrast exports + second levels | `/home/hfluhr/data/learninghabits/spm_outputs/<model>_<date>/` |
 
 For local smoke tests use `/Users/hugofluhr/phd_local/data/LearningHabits/dev_sample/`
 (has `bbt.csv` and masks, but **no** GLMsingle betas).
 
 ## Running MATLAB scripts
 
-> These paths are on the decommissioned VM and have no cluster equivalent recorded yet —
-> ask before running the MATLAB/SPM pipeline.
-
-SPM12 is at `/home/ubuntu/repos/spm12`. Load it and run a script:
-
-```bash
-module load matlab/r2023a
-matlab -nodisplay -nosplash -nodesktop -r "run('/home/ubuntu/repos/learning-habits-analysis/matlab/first_lvl/glm2_all_runs.m'); exit;"
-```
-
-To inject a variable before running a script (the scripts use `if ~exist('var','var') || isempty(var)` guards to preserve externally-set variables):
+The SPM pipeline runs on the cluster through sbatch wrappers in `scripts/` (run them from the
+repo root on the cluster, never on the login node itself). Each supports `DRY_RUN=1`, which prints
+the job and calls `sbatch --test-only`.
 
 ```bash
-matlab -nodisplay -r "glm_root = '/path/to/glm'; run('script.m'); exit"
+bash scripts/submit_spm_prep.sh                         # unzip fMRIPrep noSDC + confounds -> spm_format/ (every bbt subject)
+bash scripts/submit_spm_smooth.sh                       # 5 mm smoothing, skips already-smoothed files
+bash scripts/submit_first_lvl.sh glm2_chosen_all_runs.m # any matlab/first_lvl/*.m, SLURM array, one subject per task
+bash scripts/submit_first_lvl.sh glm2_all_runs.m sub-01 sub-15   # specific subjects
+bash scripts/submit_downstream.sh all <first-level folder>       # session contrasts -> export -> second levels
 ```
 
-Always pipe through `tee` to log output:
+Only scripts that have been ported can run on the cluster: they need injectable paths with
+cluster defaults, no `clear;`, and an injectable `current_date`/`output_dir`. As of 2026-09-23
+that means `glm2_all_runs.m` and `glm2_chosen_all_runs.m`; the others still carry VM paths
+(see the vault note "LH - Model re-run tracker").
+
+The wrappers inject variables before `run()`. The scripts keep externally-set values through
+`if ~exist('var','var') || isempty(var)` guards:
 
 ```bash
-matlab -nodisplay -r "..." 2>&1 | tee logfile.log
+module load matlab
+matlab -batch "glm_root = '/path/to/glm'; run('script.m');"
 ```
+
+Use `matlab -batch`, not `-r "...; exit"`: with `-r`, an error inside `run()` leaves MATLAB at
+its prompt until the job's walltime runs out, whereas `-batch` exits non-zero and SLURM marks the job FAILED.
 
 ## Subject lists
 
@@ -117,15 +128,26 @@ bash multivariate/submit_searchlight.sh        # correct — uses participants_m
 bash multivariate/submit_searchlight.sh 01 05  # correct — specific subjects only when intentional
 ```
 
+The SPM first-level pipeline is the exception: it runs on **every subject in the bbt** (62;
+the GLM scripts skip sub-04 and sub-45), and exclusions happen at second level.
+`participants_mvpa.tsv` is not a subset of the bbt (sub-46 has no bbt row), so don't use it there.
+
 ## Session contrasts + export + second-level pipeline
 
-The three-step pipeline is documented in `INSTRUCTIONS_session_contrasts_and_secondlvl.md`. Runner scripts that loop over all three GLMs are in `matlab/runners/`:
+The pipeline is documented in `INSTRUCTIONS_session_contrasts_and_secondlvl.md`, which predates the
+cluster port and still describes VM paths. On the cluster, one wrapper submits each step for one
+first-level folder:
 
 ```bash
-bash matlab/runners/run_step1_add_session_contrasts.sh   # appends per-session contrasts to SPM.mat
-bash matlab/runners/run_step2_export_contrasts.sh         # exports contrast images by session
-bash matlab/runners/run_step3_second_lvl.sh               # one-sample t-tests per contrast
+bash scripts/submit_downstream.sh contrasts <glm>   # appends per-session contrasts to each SPM.mat
+bash scripts/submit_downstream.sh export <glm>      # exports contrast images by session, creates symlinks
+bash scripts/submit_downstream.sh second <glm>      # one-sample t-tests for allruns/ and session-0X/
+bash scripts/submit_downstream.sh sn23 <glm>        # average Sn2+Sn3 contrasts, then second level (drops Sn1)
+bash scripts/submit_downstream.sh all <glm>         # all four, chained with afterok
 ```
+
+`add_session_contrasts_glm2.m`'s default `connames` fit `glm2_chosen_all_runs`. For other models,
+pass them with `CONNAMES="{'first_stim', ...}"`.
 
 Key scripts:
 - `matlab/first_lvl/add_session_contrasts_glm2.m` — safe to re-run (skips subjects already processed)
@@ -135,6 +157,8 @@ Key scripts:
 Excluded subjects at second level: `sub-44, sub-48, sub-68, sub-17, sub-31`.
 
 ## SPM export (non-session variant)
+
+VM-era, not ported to the cluster:
 
 ```bash
 # Edit paths inside the script, then:
@@ -197,5 +221,8 @@ PPI (psychophysiological interaction) analyses using PPPI toolbox. `PPPI_wrapper
 - Scripts use `diary(log_path)` for logging when run non-interactively.
 - Always wrap hardcoded path assignments in `if ~exist('var','var') || isempty(var)` so runner scripts can inject values via `-r "var='...'; run('script.m')"`.
 - Never use `clear;` at the top of scripts that may receive injected variables.
+- First-level scripts run as SLURM arrays, one subject per task, so `current_date` (or `output_dir`)
+  must be injectable: all tasks then write into one output folder. They also need one diary log per
+  subject set, so parallel tasks don't overwrite each other.
 - Use `delete=0` with `spm_contrasts` to append (not overwrite) contrasts.
 - Ghost contrasts (defined in `SPM.xCon` but never estimated) appear in some GLMs — the export script handles these with a `[SKIP]` warning rather than an error.
