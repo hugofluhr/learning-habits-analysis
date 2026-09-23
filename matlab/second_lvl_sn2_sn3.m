@@ -1,14 +1,17 @@
-clear;
-
 % List of subjects to exclude due to excessive motion
 excluded_subjects = {
     'sub-44', 'sub-48', 'sub-68', 'sub-17', 'sub-31'};
 
 % Define paths
-%spmpath  = '/home/ubuntu/repos/spm12';
-export_root = '/Users/hugofluhr/phd_local/data/LearningHabits/spm_outputs_noSDC/session_split/glm2_chosen_all_runs_scrubbed_2025-12-11-11-22';  % <-- SET: same export root used in average_sn2_sn3_contrasts.m
-                   %         (contains allruns/, session-01/, session-02/, session-03/, session-02-03/)
-%addpath(spmpath);
+if ~exist('spmpath', 'var') || isempty(spmpath)
+    spmpath = '/home/hfluhr/repos/spm12';
+end
+if ~exist('export_root', 'var') || isempty(export_root)
+    % same export root used in average_sn2_sn3_contrasts.m
+    % (contains allruns/, session-01/, session-02/, session-03/, session-02-03/)
+    error('Set export_root to the contrast export directory.');
+end
+addpath(spmpath);
 
 % Initialize SPM
 spm('Defaults','fMRI'); spm_jobman('initcfg');

@@ -9,9 +9,11 @@
 %
 % Safe to re-run: skips any contrast that already exists by name.
 
-spmpath = '/home/ubuntu/repos/spm12';
+if ~exist('spmpath', 'var') || isempty(spmpath)
+    spmpath = '/home/hfluhr/repos/spm12';
+end
 if ~exist('glm_root', 'var') || isempty(glm_root)
-    glm_root = '/mnt/data/learning-habits/spm_format/outputs/glm2_all_runs_scrubbed_2025-12-11-12-44';
+    error('Set glm_root to the first-level output directory (contains sub-XX/SPM.mat).');
 end
 
 addpath(spmpath);
