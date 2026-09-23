@@ -1,5 +1,3 @@
-clear;
-
 % Which confounds to use
 confound_pattern = '_.*_motion_with_dummies.txt$';
 
@@ -22,14 +20,21 @@ if ~exist('subjects_override', 'var')
 end
 addpath(spmpath);
 
-current_date = char(datetime('now', 'Format', 'yyyy-MM-dd-hh-mm'));
-output_dir = fullfile(analysis_dir, 'outputs', ['glm2_all_runs_scrubbed_' current_date]);
+% output_dir is injectable so all tasks of one SLURM array write into one folder
+if ~exist('output_dir', 'var') || isempty(output_dir)
+    current_date = char(datetime('now', 'Format', 'yyyy-MM-dd-HH-mm'));
+    output_dir = fullfile(analysis_dir, 'outputs', ['glm2_all_runs_scrubbed_' current_date]);
+end
 if ~exist(output_dir, 'dir')
     mkdir(output_dir);
 end
 
-% Start logging
-log_path = fullfile(output_dir, 'matlab_log.txt');
+% Start logging (one log per subject set, so parallel array tasks don't overwrite each other)
+if isempty(subjects_override)
+    log_path = fullfile(output_dir, 'matlab_log.txt');
+else
+    log_path = fullfile(output_dir, ['matlab_log_' strjoin(subjects_override, '_') '.txt']);
+end
 diary(log_path);
 diary on;
 
@@ -159,7 +164,12 @@ for s = 1:length(subjects)
         % Purple frame - Resp trials
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).name = 'purple_frame';
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).onset = block_resp.t_purple_frame;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).duration = block_resp.t_points_feedback - block_resp.t_purple_frame;
+        % No points feedback in the test run (t_points_feedback is NaN there), so the frame ends at ITI onset
+        if r == 3
+            matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).duration = block_resp.t_iti_onset - block_resp.t_purple_frame;
+        else
+            matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).duration = block_resp.t_points_feedback - block_resp.t_purple_frame;
+        end
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).tmod = 0;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).pmod = struct('name', {}, 'param', {}, 'poly', {});
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).orth = 0;
