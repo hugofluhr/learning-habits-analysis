@@ -201,10 +201,12 @@ for s = 1:length(subjects)
     end
 
     %% Concatenate the 3 runs into one session (runs are specified as above, then merged)
+    % Scans, onsets, pmods and confounds of the 3 runs are stacked into one session;
+    % spm_fmri_concatenate (below) then restores per-run constants, filtering and AR(1)
     sess = matlabbatch{1}.spm.stats.fmri_spec.sess;
     nscan = zeros(1, numel(sess));
     scans = {};
-    conf = cell(1, numel(sess));
+    conf = cell(1, numel(sess)); % cell array of confound matrices, one per run
     for r = 1:numel(sess)
         % expand the 4D file into volumes (SPM only does it for single-file sessions)
         vols = spm_select('Expand', sess(r).scans{1});
@@ -214,12 +216,14 @@ for s = 1:length(subjects)
     end
     run_start = [0 cumsum(nscan(1:end-1))] * TR; % onset offset of each run (secs)
 
+    % run 1 as template: it has every condition (run 3 lacks points_feedback)
     merged = sess(1);
     merged.scans = scans;
     for c = 1:numel(merged.cond)
         onset = []; duration = [];
         for r = 1:numel(sess)
-            ic = find(strcmp({sess(r).cond.name}, merged.cond(c).name)); % run 3 has no points_feedback
+            ic = find(strcmp({sess(r).cond.name}, merged.cond(c).name)); 
+            % run 3 has no points_feedback
             if isempty(ic); continue; end
             onset = [onset; sess(r).cond(ic).onset + run_start(r)];
             d = sess(r).cond(ic).duration;
