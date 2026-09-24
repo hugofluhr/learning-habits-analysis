@@ -1,19 +1,18 @@
 #!/bin/bash
-# Submit any first-level GLM script in matlab/first_lvl/ as a SLURM array, one subject per task.
+# Submit a first-level GLM script (matlab/first_lvl/) as a SLURM array, one subject per task.
 #
-# Usage (from the repo root, on the cluster):
-#   bash scripts/submit_first_lvl.sh glm2_chosen_all_runs.m                  # every subject in the bbt
-#   bash scripts/submit_first_lvl.sh glm2_chosen_all_runs.m sub-01 sub-15    # specific subjects
-#   DRY_RUN=1 bash scripts/submit_first_lvl.sh glm2_all_runs.m sub-01       # print the job, sbatch --test-only
+# Usage: bash scripts/submit_first_lvl.sh <script.m> [sub-XX ...]
+#   bash scripts/submit_first_lvl.sh glm2_chosen_all_runs.m                 # every subject in the bbt
+#   bash scripts/submit_first_lvl.sh glm2_chosen_all_runs.m sub-01 sub-15   # specific subjects
 #
-# Overridable via environment: BBT_PATH, DATA_DIR, SPM_PATH, CURRENT_DATE, THROTTLE, TIME, MEM.
+# All tasks share one current_date, so they write into the same output folder.
+# The GLM scripts skip sub-04 and sub-45 themselves.
+# Needs prepared and smoothed data (submit_spm_prep.sh, then submit_spm_smooth.sh).
 #
-# All tasks get the same injected current_date, so they write into one output folder
-# (<DATA_DIR>/outputs/<script's own prefix><CURRENT_DATE>/sub-XX). The GLM scripts skip
-# sub-04 and sub-45 themselves, so those tasks finish immediately.
-#
-# Prerequisite: submit_spm_prep.sh + submit_spm_smooth.sh have produced smoothed BOLD and
-# *_motion_with_dummies.txt for the target subjects under DATA_DIR.
+# Environment (all optional):
+#   DRY_RUN=1      print the job and run sbatch --test-only
+#   CURRENT_DATE   date tag of the output folder (default: now)
+#   BBT_PATH, DATA_DIR, SPM_PATH, THROTTLE, TIME, MEM, EXCLUDE   override the defaults set below
 
 set -euo pipefail
 

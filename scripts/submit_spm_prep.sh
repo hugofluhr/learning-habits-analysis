@@ -1,18 +1,18 @@
 #!/bin/bash
-# Prep BIDS data for SPM on the cluster: unzip BOLD/mask into a flat sub-XX/func/ layout,
-# write basic motion/events files, then add the scrubbing-aware *_motion_with_dummies.txt
-# confound file the GLMs use. One job loops over all subjects (about 16 s per subject).
+# Prepare fMRIPrep output for SPM, in one job for all subjects (about 16 s each):
+#   - unzip BOLD and brain masks into spm_format/sub-XX/func/
+#   - write *_motion_with_dummies.txt (the confounds the GLMs use), *_motion.txt, *_events.mat
 #
-# Usage (from the repo root, on the cluster):
-#   bash scripts/submit_spm_prep.sh                  # every sub_id in the bbt
-#   bash scripts/submit_spm_prep.sh 01 15            # specific subjects ("15" or "sub-15")
-#   DRY_RUN=1 bash scripts/submit_spm_prep.sh 15     # print the job, sbatch --test-only
+# Usage: bash scripts/submit_spm_prep.sh [XX ...]
+#   bash scripts/submit_spm_prep.sh          # every subject in the bbt
+#   bash scripts/submit_spm_prep.sh 01 15    # specific subjects ("15" or "sub-15")
 #
-# Overridable via environment: BBT_PATH, OUTPUT_DIR.
-# The subject list defaults to the bbt, not participants_mvpa.tsv: first levels run on every
-# subject with behavioural data (sub-46 is in the MVPA list but has no bbt row).
+# The default is the bbt, not participants_mvpa.tsv: sub-46 is in the MVPA list but has no bbt row.
+# Run before submit_spm_smooth.sh.
 #
-# Run this before submit_spm_smooth.sh and the first-level GLMs.
+# Environment (all optional):
+#   DRY_RUN=1              print the job and run sbatch --test-only
+#   BBT_PATH, OUTPUT_DIR   override the defaults set below
 
 set -euo pipefail
 

@@ -1,11 +1,10 @@
 #!/bin/bash
-# Smooth (5mm FWHM) the flat SPM-format BOLD produced by submit_spm_prep.sh,
-# on the cluster. Loops over every sub-* dir found under base_dir, so run
-# submit_spm_prep.sh first (optionally for a subset of subjects, for a
-# smoke test) to control scope.
+# Smooth (5 mm FWHM) the BOLD in spm_format/sub-*/func/, in one job for all subjects.
+# Files that are already smoothed are skipped, so only new subjects get processed.
 #
-# Usage (from repo root):
-#   bash scripts/submit_spm_smooth.sh
+# Usage: bash scripts/submit_spm_smooth.sh
+#
+# Environment (optional): EXCLUDE overrides the excluded nodes set below.
 
 set -euo pipefail
 

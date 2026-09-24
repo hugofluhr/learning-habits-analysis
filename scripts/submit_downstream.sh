@@ -10,13 +10,16 @@
 #     sn23       average session-02 and session-03, then one-sample t-tests
 #     all        all four; second and sn23 both wait for export
 #
-# Environment: CONNAMES (optional MATLAB cell, e.g. "{'first_stim'}"; by default the conditions come
-# from the model's own contrasts), DEPENDENCY, DRY_RUN=1, SPM_PATH, OUTPUTS_DIR, EXPORTS_DIR, EXCLUDE.
+# Environment (all optional):
+#   CONNAMES     conditions for session contrasts, e.g. "{'first_stim'}" (default: the model's own)
+#   DEPENDENCY   job id the first job waits for
+#   DRY_RUN=1    print the jobs and run sbatch --test-only
+#   SPM_PATH, OUTPUTS_DIR, EXPORTS_DIR, EXCLUDE   override the defaults set below
 
 set -euo pipefail
 
 if [ "$#" -ne 2 ]; then
-    sed -n '2,14p' "$0" >&2
+    sed -n '2,17p' "$0" >&2
     exit 1
 fi
 STEP="$1"
