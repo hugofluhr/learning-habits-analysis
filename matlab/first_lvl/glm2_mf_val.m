@@ -1,27 +1,51 @@
-clear;
-
-% Paths
-spmpath = '/home/ubuntu/repos/spm12';
-data_dir = '/home/ubuntu/data/learning-habits/spm_format';
-analysis_dir = '/home/ubuntu/data/learning-habits/spm_format';
-bbt_path = '/home/ubuntu/data/learning-habits/bbt_062026_mf_cols.csv';
+% Which confounds to use
 confound_pattern = '_.*_motion_with_dummies.txt$';
+
+% Paths - wrapped so runner scripts can inject values via
+% -r "data_dir='...'; run('script.m')"
+if ~exist('spmpath', 'var') || isempty(spmpath)
+    spmpath = '/home/hfluhr/repos/spm12';
+end
+if ~exist('data_dir', 'var') || isempty(data_dir)
+    data_dir = '/home/hfluhr/data/learninghabits/spm_format';
+end
+if ~exist('analysis_dir', 'var') || isempty(analysis_dir)
+    analysis_dir = '/home/hfluhr/data/learninghabits/spm_format';
+end
+if ~exist('bbt_path', 'var') || isempty(bbt_path)
+    bbt_path = '/home/hfluhr/data/learninghabits/bbt_062026_mf_cols.csv';
+end
+if ~exist('subjects_override', 'var')
+    subjects_override = {};
+end
 addpath(spmpath);
 
-current_date = char(datetime('now', 'Format', 'yyyy-MM-dd-hh-mm'));
-output_dir = fullfile(analysis_dir, 'outputs', ['glm2_mf_chosenval_' current_date]);
+% current_date / output_dir are injectable so all tasks of one SLURM array write into one folder
+if ~exist('current_date', 'var') || isempty(current_date)
+    current_date = char(datetime('now', 'Format', 'yyyy-MM-dd-HH-mm'));
+end
+if ~exist('output_dir', 'var') || isempty(output_dir)
+    output_dir = fullfile(analysis_dir, 'outputs', ['glm2_mf_chosenval_' current_date]);
+end
 if ~exist(output_dir, 'dir')
     mkdir(output_dir);
 end
 
-% Start logging
-log_path = fullfile(output_dir, 'matlab_log.txt');
+% Start logging (one log per subject set, so parallel array tasks don't overwrite each other)
+if isempty(subjects_override)
+    log_path = fullfile(output_dir, 'matlab_log.txt');
+else
+    log_path = fullfile(output_dir, ['matlab_log_' strjoin(subjects_override, '_') '.txt']);
+end
 diary(log_path);
 diary on;
 
 % Load behavioral data
 bbt = readtable(bbt_path);
 subjects = unique(bbt.sub_id);
+if ~isempty(subjects_override)
+    subjects = subjects_override;
+end
 block_names = {'learning1', 'learning2', 'test'};
 
 % Parameters
@@ -133,7 +157,12 @@ for s = 1:length(subjects)
         % Purple frame - Resp trials
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).name = 'purple_frame';
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).onset = block_resp.t_purple_frame;
-        matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).duration = block_resp.t_points_feedback - block_resp.t_purple_frame;
+        % No points feedback in the test run (t_points_feedback is NaN there), so the frame ends at ITI onset
+        if r == 3
+            matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).duration = block_resp.t_iti_onset - block_resp.t_purple_frame;
+        else
+            matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).duration = block_resp.t_points_feedback - block_resp.t_purple_frame;
+        end
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).tmod = 0;
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).pmod = struct('name', {}, 'param', {}, 'poly', {});
         matlabbatch{1}.spm.stats.fmri_spec.sess(r).cond(4).orth = 0;
