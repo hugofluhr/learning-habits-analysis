@@ -115,8 +115,11 @@ run_step() {
             submit_job "second_lvl" "04:00:00" "${EXPORT_ROOT}/logs" \
                 "spmpath = '${SPM_PATH}'; export_root = '${EXPORT_ROOT}'; run('${REPO}/matlab/second_lvl/second_lvl_all_runs.m');" ;;
         sn23)
+            # Two separate MATLAB sessions, so the second-level script can't pick up variables
+            # left over from the averaging script (neither clears its workspace).
             submit_job "second_lvl_sn23" "02:00:00" "${EXPORT_ROOT}/logs" \
-                "spmpath = '${SPM_PATH}'; root_dir = '${EXPORT_ROOT}'; run('${REPO}/matlab/average_sn2_sn3_contrasts.m'); export_root = '${EXPORT_ROOT}'; run('${REPO}/matlab/second_lvl_sn2_sn3.m');" ;;
+                "spmpath = '${SPM_PATH}'; root_dir = '${EXPORT_ROOT}'; run('${REPO}/matlab/average_sn2_sn3_contrasts.m');" \
+                "matlab -batch \"spmpath = '${SPM_PATH}'; export_root = '${EXPORT_ROOT}'; run('${REPO}/matlab/second_lvl_sn2_sn3.m');\"" ;;
         *)
             echo "ERROR: unknown step '$1'" >&2; exit 1 ;;
     esac

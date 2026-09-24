@@ -219,7 +219,7 @@ PPI (psychophysiological interaction) analyses using PPPI toolbox. `PPPI_wrapper
 ## MATLAB scripting conventions
 
 - Scripts use `diary(log_path)` for logging when run non-interactively.
-- Always wrap hardcoded path assignments in `if ~exist('var','var') || isempty(var)` so runner scripts can inject values via `-r "var='...'; run('script.m')"`.
+- Always wrap hardcoded path assignments in `if ~exist('var','var') || isempty(var)` so runner scripts can inject values via `-batch "var='...'; run('script.m');"` (see "Running MATLAB scripts" for why `-batch` rather than `-r`).
 - Never use `clear;` at the top of scripts that may receive injected variables.
 - First-level scripts run as SLURM arrays, one subject per task, so `current_date` (or `output_dir`)
   must be injectable: all tasks then write into one output folder. They also need one diary log per
