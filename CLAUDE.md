@@ -91,16 +91,14 @@ For local smoke tests use `/Users/hugofluhr/phd_local/data/LearningHabits/dev_sa
 
 ## Running MATLAB scripts
 
-The SPM pipeline runs on the cluster through sbatch wrappers in `scripts/` (run them from the
-repo root on the cluster, never on the login node itself). Each supports `DRY_RUN=1`, which prints
-the job and calls `sbatch --test-only`.
+The SPM pipeline runs on the cluster. Each step has a short submit script in `scripts/` (run it from the cluster checkout; it only calls `sbatch`) and a plain job file in `scripts/slurm/` holding the `#SBATCH` settings and the commands the job runs.
 
 ```bash
 bash scripts/submit_spm_prep.sh                         # unzip fMRIPrep noSDC + confounds -> spm_format/ (every bbt subject)
 bash scripts/submit_spm_smooth.sh                       # 5 mm smoothing, skips already-smoothed files
 bash scripts/submit_first_lvl.sh glm2_chosen_all_runs.m # any matlab/first_lvl/*.m, SLURM array, one subject per task
 bash scripts/submit_first_lvl.sh glm2_all_runs.m sub-01 sub-15   # specific subjects
-bash scripts/submit_downstream.sh all <first-level folder>       # session contrasts -> export -> second levels
+bash scripts/submit_downstream.sh <first-level folder>           # session contrasts -> export -> second levels
 ```
 
 Only scripts that have been ported can run on the cluster: they need injectable paths with
@@ -134,21 +132,18 @@ the GLM scripts skip sub-04 and sub-45), and exclusions happen at second level.
 
 ## Session contrasts + export + second-level pipeline
 
-The pipeline is documented in `INSTRUCTIONS_session_contrasts_and_secondlvl.md`, which predates the
-cluster port and still describes VM paths. On the cluster, one wrapper submits each step for one
-first-level folder:
+The pipeline is documented in `INSTRUCTIONS_session_contrasts_and_secondlvl.md`, which predates the cluster port and still describes VM paths. On the cluster, one job runs the steps for one first-level folder, in this order, and stops at the first failure:
 
 ```bash
-bash scripts/submit_downstream.sh contrasts <glm>   # appends per-session contrasts to each SPM.mat
-bash scripts/submit_downstream.sh export <glm>      # exports contrast images by session, creates symlinks
-bash scripts/submit_downstream.sh second <glm>      # one-sample t-tests for allruns/ and session-0X/
-bash scripts/submit_downstream.sh sn23 <glm>        # average Sn2+Sn3 contrasts, then second level (drops Sn1)
-bash scripts/submit_downstream.sh all <glm>         # all four, chained with afterok
+bash scripts/submit_downstream.sh <glm>                    # all four steps
+bash scripts/submit_downstream.sh <glm> contrasts export   # only these steps
+#   contrasts  appends per-session contrasts to each SPM.mat
+#   export     exports contrast images by session, creates symlinks
+#   second     one-sample t-tests for allruns/ and session-0X/
+#   sn23       average Sn2+Sn3 contrasts, then second level (drops Sn1)
 ```
 
-`add_session_contrasts_glm2.m` takes its conditions from each model's own contrasts: every existing
-t-contrast named after a regressor, so combined contrasts like `Qval_sum` are left out. A name that
-matches no regressor is an error. `CONNAMES="{'first_stim', ...}"` overrides the list.
+`add_session_contrasts_glm2.m` takes its conditions from each model's own contrasts: every existing t-contrast named after a regressor, so combined contrasts like `Qval_sum` are left out. A name that matches no regressor is an error. `CONNAMES="{'first_stim', ...}"` overrides the list.
 
 Key scripts:
 - `matlab/first_lvl/add_session_contrasts_glm2.m` — safe to re-run (skips subjects already processed)

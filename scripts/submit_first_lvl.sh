@@ -5,90 +5,49 @@
 #   bash scripts/submit_first_lvl.sh glm2_chosen_all_runs.m                 # every subject in the bbt
 #   bash scripts/submit_first_lvl.sh glm2_chosen_all_runs.m sub-01 sub-15   # specific subjects
 #
-# All tasks share one current_date, so they write into the same output folder.
+# All tasks share one CURRENT_DATE, so they write into the same output folder.
+# To add subjects to an existing folder, set CURRENT_DATE to that folder's date tag.
 # The GLM scripts skip sub-04 and sub-45 themselves.
-# Needs prepared and smoothed data (submit_spm_prep.sh, then submit_spm_smooth.sh).
-#
-# Environment (all optional):
-#   DRY_RUN=1      print the job and run sbatch --test-only
-#   CURRENT_DATE   date tag of the output folder (default: now)
-#   BBT_PATH, DATA_DIR, SPM_PATH, THROTTLE, TIME, MEM, EXCLUDE   override the defaults set below
+# The job itself is scripts/slurm/first_lvl.sbatch.
 
 set -euo pipefail
 
 if [ "$#" -lt 1 ]; then
-    echo "Usage: bash scripts/submit_first_lvl.sh <script.m> [sub-XX ...]" >&2
+    sed -n '2,11p' "$0" >&2
     exit 1
 fi
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-SCRIPT_NAME="$(basename "$1" .m)"
-SCRIPT="${REPO}/matlab/first_lvl/${SCRIPT_NAME}.m"
+NAME="$(basename "$1" .m)"
 shift
+
+export SCRIPT="$REPO/matlab/first_lvl/$NAME.m"
+export SPM_PATH=/home/hfluhr/repos/spm12
+export DATA_DIR=/home/hfluhr/data/learninghabits/spm_format
+export BBT_PATH=/home/hfluhr/data/learninghabits/bbt_062026_mf_cols.csv
+export CURRENT_DATE="${CURRENT_DATE:-$(date +%Y-%m-%d-%H-%M)}"
+
 if [ ! -f "$SCRIPT" ]; then
-    echo "ERROR: no such script: ${SCRIPT}" >&2
+    echo "No such script: $SCRIPT" >&2
     exit 1
 fi
 
-SPM_PATH="${SPM_PATH:-/home/hfluhr/repos/spm12}"
-DATA_DIR="${DATA_DIR:-/home/hfluhr/data/learninghabits/spm_format}"
-BBT_PATH="${BBT_PATH:-/home/hfluhr/data/learninghabits/bbt_062026_mf_cols.csv}"
-CURRENT_DATE="${CURRENT_DATE:-$(date +%Y-%m-%d-%H-%M)}"
-THROTTLE="${THROTTLE:-20}"
-TIME="${TIME:-02:00:00}"
-MEM="${MEM:-16G}"
-# MATLAB's Apptainer container fails on these GPU nodes ("Failed to create user namespace")
-EXCLUDE="${EXCLUDE-u24-cva0ls0-[509-516]}"
-LOG_DIR="${DATA_DIR}/logs"
+LOG_DIR="$DATA_DIR/logs"
 mkdir -p "$LOG_DIR"
 
-# Subject list: arguments, or every sub_id in the bbt
-SUBJECTS_FILE="${LOG_DIR}/${SCRIPT_NAME}_${CURRENT_DATE}_subjects.txt"
+# Subject list: the arguments, or every sub_id in the bbt
+export SUBJECTS_FILE="$LOG_DIR/${NAME}_${CURRENT_DATE}_subjects.txt"
 if [ "$#" -gt 0 ]; then
     printf "%s\n" "$@" > "$SUBJECTS_FILE"
 else
-    awk -F, 'NR==1 {for (i = 1; i <= NF; i++) if ($i == "sub_id") c = i; next} {print $c}' "$BBT_PATH" \
+    awk -F, 'NR == 1 {for (i = 1; i <= NF; i++) if ($i == "sub_id") col = i; next} {print $col}' "$BBT_PATH" \
         | sort -u > "$SUBJECTS_FILE"
 fi
 N=$(wc -l < "$SUBJECTS_FILE")
-if [ "$N" -eq 0 ]; then
-    echo "ERROR: empty subject list" >&2
-    exit 1
-fi
 
-echo "Script:   ${SCRIPT}"
-echo "Subjects: ${N} (${SUBJECTS_FILE})"
-echo "bbt:      ${BBT_PATH}"
-echo "Output:   ${DATA_DIR}/outputs/<${SCRIPT_NAME} prefix>${CURRENT_DATE}"
-
-SBATCH_ARGS=()
-[ "${DRY_RUN:-0}" = "1" ] && SBATCH_ARGS+=(--test-only)
-
-JOB=$(cat <<EOF
-#!/bin/bash -l
-#SBATCH --job-name=${SCRIPT_NAME}
-#SBATCH --output=${LOG_DIR}/${SCRIPT_NAME}_%A_%a.out
-#SBATCH --error=${LOG_DIR}/${SCRIPT_NAME}_%A_%a.err
-#SBATCH --array=0-$((N - 1))%${THROTTLE}
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task=2
-#SBATCH --mem=${MEM}
-#SBATCH --time=${TIME}
-#SBATCH --partition=standard
-${EXCLUDE:+#SBATCH --exclude=${EXCLUDE}}
-
-set -eo pipefail
-SUB=\$(sed -n "\$((SLURM_ARRAY_TASK_ID + 1))p" "${SUBJECTS_FILE}")
-echo "Task \${SLURM_ARRAY_TASK_ID}: \${SUB}"
-module load matlab
-
-matlab -batch "spmpath = '${SPM_PATH}'; data_dir = '${DATA_DIR}'; analysis_dir = '${DATA_DIR}'; bbt_path = '${BBT_PATH}'; current_date = '${CURRENT_DATE}'; subjects_override = {'\${SUB}'}; run('${SCRIPT}');"
-EOF
-)
-
-if [ "${DRY_RUN:-0}" = "1" ]; then
-    echo "----- job script -----"
-    echo "$JOB"
-    echo "----------------------"
-fi
-echo "$JOB" | sbatch ${SBATCH_ARGS[@]+"${SBATCH_ARGS[@]}"}
+echo "$NAME: $N subjects, output folder date tag $CURRENT_DATE"
+sbatch --job-name="$NAME" \
+    --array="0-$((N - 1))%20" \
+    --output="$LOG_DIR/${NAME}_%A_%a.out" \
+    --error="$LOG_DIR/${NAME}_%A_%a.err" \
+    "$REPO/scripts/slurm/first_lvl.sbatch"
