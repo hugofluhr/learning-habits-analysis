@@ -7,9 +7,10 @@ design has ``Sn(k) ...`` columns that are non-zero only in run k's rows, so:
 
   * conditions without a pmod: the concat column must equal the sum of the
     per-session columns of that condition;
-  * pmod columns: they differ only because SPM mean-centres the pmod over the
-    whole session instead of per run, so
-    ``concat - sum_k session_k = sum_k c_k * parent_k`` for some constants c_k;
+  * pmod columns: the same, since the pmod values enter the design unchanged (SPM does
+    not mean-centre them). The fit on the parent columns below is kept as a guard: if
+    the columns ever differ by a constant per run (centring), it shows up as offsets
+    ``c_k`` with ``concat - sum_k session_k = sum_k c_k * parent_k``;
   * confounds: concat ``Sn(1) R{off+j}`` must equal per-session ``Sn(k) R{j}`` up to
     a per-run constant (SPM mean-centres user regressors over the whole session, so
     the concat columns are offset; the run constants absorb that);
@@ -90,7 +91,7 @@ def main():
         print(summarise(stem, diff, borders, overhang_rows))
 
     # --- pmods
-    print('\n== pmod columns: concat - sum(per-session) explained by per-session parent columns ==')
+    print('\n== pmod columns: concat vs sum of per-session columns (offsets c_k should be 0) ==')
     for parent, pm in [('first_stim', 'Qval'), ('first_stim', 'Hval'), ('second_stim', 'Qval'), ('second_stim', 'Hval')]:
         stem = f'{parent}x{pm}^1*bf(1)'
         cc = cols_of(C, stem)

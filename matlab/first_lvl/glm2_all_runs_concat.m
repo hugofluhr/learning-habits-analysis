@@ -222,8 +222,7 @@ for s = 1:length(subjects)
     for c = 1:numel(merged.cond)
         onset = []; duration = [];
         for r = 1:numel(sess)
-            ic = find(strcmp({sess(r).cond.name}, merged.cond(c).name)); 
-            % run 3 has no points_feedback
+            ic = find(strcmp({sess(r).cond.name}, merged.cond(c).name));
             if isempty(ic); continue; end
             onset = [onset; sess(r).cond(ic).onset + run_start(r)];
             d = sess(r).cond(ic).duration;
