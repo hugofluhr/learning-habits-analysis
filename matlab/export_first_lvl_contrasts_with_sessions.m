@@ -127,7 +127,8 @@ for k = 1:numel(spms)
         error('[ALLRUNS] Contrast name/order mismatch. Fix first-level definitions.');
     end
 
-    for sn = unique(sess_nums)
+    % Row vector, so a model without session contrasts loops zero times (unique([]) is 0x1)
+    for sn = reshape(unique(sess_nums), 1, [])
         mask_sn  = sess_nums == sn;
         names_sn = sess_base(mask_sn);
         if numel(ref_sess) < sn || isempty(ref_sess{sn})
