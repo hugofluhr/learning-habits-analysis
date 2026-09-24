@@ -3,6 +3,8 @@
 **Date:** 2026-09-24
 **Companion notes:** [2026-09-23_spm-cluster-port-validation.md](2026-09-23_spm-cluster-port-validation.md) (validation, Bug A damage on 2 subjects), [2026-09-10_spm-cluster-port.md](2026-09-10_spm-cluster-port.md) (the port, Bug A found)
 
+**Continued in:** [2026-09-24_tier1-reruns-and-second-level-comparison.md](2026-09-24_tier1-reruns-and-second-level-comparison.md) (the tier-1 runs, the comparison with the manuscript, VIF, concat models; open threads 1, 2 and 6 below are resolved there).
+
 Continued from the 09-23 validation. The PR review turned into a simplification of the bash wrappers and a fix to session contrasts. Then PR #2 was merged, all-subject prep started, and the `model-reruns` branch was created.
 
 ---
