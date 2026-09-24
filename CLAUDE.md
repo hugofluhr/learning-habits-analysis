@@ -146,8 +146,9 @@ bash scripts/submit_downstream.sh sn23 <glm>        # average Sn2+Sn3 contrasts,
 bash scripts/submit_downstream.sh all <glm>         # all four, chained with afterok
 ```
 
-`add_session_contrasts_glm2.m`'s default `connames` fit `glm2_chosen_all_runs`. For other models,
-pass them with `CONNAMES="{'first_stim', ...}"`.
+`add_session_contrasts_glm2.m` takes its conditions from each model's own contrasts: every existing
+t-contrast named after a regressor, so combined contrasts like `Qval_sum` are left out. A name that
+matches no regressor is an error. `CONNAMES="{'first_stim', ...}"` overrides the list.
 
 Key scripts:
 - `matlab/first_lvl/add_session_contrasts_glm2.m` — safe to re-run (skips subjects already processed)

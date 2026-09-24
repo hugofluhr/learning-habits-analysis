@@ -10,8 +10,8 @@
 #     sn23       average session-02 and session-03, then one-sample t-tests
 #     all        all four; second and sn23 both wait for export
 #
-# Environment: CONNAMES (MATLAB cell, e.g. "{'first_stim','second_stim'}"; the default list fits
-# glm2_chosen_all_runs), DEPENDENCY, DRY_RUN=1, SPM_PATH, OUTPUTS_DIR, EXPORTS_DIR, EXCLUDE.
+# Environment: CONNAMES (optional MATLAB cell, e.g. "{'first_stim'}"; by default the conditions come
+# from the model's own contrasts), DEPENDENCY, DRY_RUN=1, SPM_PATH, OUTPUTS_DIR, EXPORTS_DIR, EXCLUDE.
 
 set -euo pipefail
 

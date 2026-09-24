@@ -1,13 +1,17 @@
 % add_session_contrasts_glm2.m
 %
-% Appends per-session t-contrasts to an already-estimated glm2_chosen_all_runs
-% directory (one SPM.mat per subject). For each entry in connames and each SPM
-% session, a contrast named "<cname> - Session <N>" is added.
+% Appends per-session t-contrasts to an already-estimated first-level directory
+% (one SPM.mat per subject). For each condition name and each SPM session, a
+% contrast named "<cname> - Session <N>" is added.
 %   Session 1 = learning1
 %   Session 2 = learning2
 %   Session 3 = test
 %
-% Usage: set glm_root below and run.
+% By default the condition names come from the model itself: every existing
+% t-contrast whose name is a regressor (e.g. 'second_stimxQval_chosen'), so
+% combined contrasts like 'Qval_sum' are left out. Inject connames to override.
+%
+% Usage: inject glm_root (and optionally connames), then run.
 
 if ~exist('spmpath', 'var') || isempty(spmpath)
     spmpath = '/home/hfluhr/repos/spm12';
@@ -18,13 +22,13 @@ end
 
 addpath(spmpath);
 
-if ~exist('connames', 'var') || isempty(connames)
-    connames = {
-        'first_stim', 'second_stim', ...
-        'second_stimxQval_chosen', 'second_stimxHval_chosen', ...
-        'response', 'purple_frame'
-    };
+if ~exist('connames', 'var')
+    connames = {};  % empty = take them from each model's own contrasts
 end
+
+% Columns of regressor <cname>: "Sn(N) <cname>*bf(1)", or "Sn(N) <cname>^1*bf(1)" for a pmod
+col_idx = @(names, cname) find(~cellfun(@isempty, regexp(names, ...
+    ['^Sn\(\d+\) ' regexptranslate('escape', cname) '(\^\d+)?\*bf\(1\)$'], 'once')));
 
 % One label per SPM.Sess index (must match session order in the GLM)
 session_labels = {'Session 1', 'Session 2', 'Session 3'};  % 1=learning1 2=learning2 3=test
@@ -66,6 +70,26 @@ for sd = 1:numel(sub_dirs)
         continue;
     end
 
+    if isempty(connames)
+        sub_connames = {};
+        for k = 1:numel(SPM.xCon)
+            if strcmp(SPM.xCon(k).STAT, 'T') && ~isempty(col_idx(colnames, SPM.xCon(k).name))
+                sub_connames{end+1} = SPM.xCon(k).name; %#ok<SAGROW>
+            end
+        end
+        if isempty(sub_connames)
+            error('[%s] No single-regressor t-contrasts in SPM.mat; inject connames.', sub_id);
+        end
+    else
+        sub_connames = connames;
+    end
+    for ci = 1:numel(sub_connames)
+        if isempty(col_idx(colnames, sub_connames{ci}))
+            error('[%s] "%s" matches no regressor in any session.', sub_id, sub_connames{ci});
+        end
+    end
+    fprintf('[%s] Conditions: %s\n', sub_id, strjoin(sub_connames, ', '));
+
     matlabbatch_con                         = {};
     matlabbatch_con{1}.spm.stats.con.spmmat = {spm_path};
     matlabbatch_con{1}.spm.stats.con.delete = 0;  % append, keep existing contrasts
@@ -74,10 +98,11 @@ for sd = 1:numel(sub_dirs)
     for si = 1:nSess
         cols_s  = SPM.Sess(si).col;
         names_s = colnames(cols_s);
-        for ci = 1:numel(connames)
-            cname     = connames{ci};
-            idx_local = find(contains(names_s, cname), 1);
+        for ci = 1:numel(sub_connames)
+            cname     = sub_connames{ci};
+            idx_local = col_idx(names_s, cname);
             if isempty(idx_local)
+                % legitimately absent in some sessions, e.g. points_feedback in the test run
                 fprintf('  [%s] "%s" absent in %s - skipped.\n', sub_id, cname, session_labels{si});
                 continue;
             end
