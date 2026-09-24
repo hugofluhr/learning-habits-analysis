@@ -11,8 +11,10 @@ function export_spm_dms(base_dir, varargin)
 %   'SpmMatName' ('SPM.mat' by default)
 
 % add SPM to path
-spmpath = '/home/ubuntu/repos/spm12';
-addpath(spmpath);
+% (only if the caller hasn't already put an SPM on the path)
+if isempty(which('spm'))
+    addpath('/home/hfluhr/repos/spm12');
+end
 
 p = inputParser;
 p.addRequired('base_dir', @(s) ischar(s) || isstring(s));

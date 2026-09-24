@@ -82,12 +82,12 @@ def ensure_csvs(glm_dir, matlab_module, spm_path, overwrite):
     over = 'true' if overwrite else 'false'
     matlab_cmd = (
         f"addpath('{spm_path}'); addpath('{os.path.join(REPO_ROOT, 'matlab')}'); "
-        f"export_spm_dms('{glm_dir}', 'Overwrite', {over}); exit"
+        f"export_spm_dms('{glm_dir}', 'Overwrite', {over});"
     )
+    # bash -lc gives a login shell, so `module` is available on the cluster
     shell_cmd = (
-        'source /etc/profile.d/z00-lmod.sh && '
         f'module load {matlab_module} && '
-        f'matlab -nodisplay -nosplash -nodesktop -r "{matlab_cmd}"'
+        f'matlab -batch "{matlab_cmd}"'
     )
     print(f'Exporting design matrices via MATLAB ({matlab_module}) ...')
     subprocess.run(['bash', '-lc', shell_cmd], check=True)
@@ -164,8 +164,8 @@ def main():
                    help='do not run the MATLAB export even if CSVs are missing')
     p.add_argument('--overwrite-export', action='store_true',
                    help='re-export design matrices even if CSVs already exist')
-    p.add_argument('--matlab-module', default='matlab/r2023a')
-    p.add_argument('--spm-path', default='/home/ubuntu/repos/spm12')
+    p.add_argument('--matlab-module', default='matlab')
+    p.add_argument('--spm-path', default='/home/hfluhr/repos/spm12')
     args = p.parse_args()
 
     glm_dir = os.path.abspath(args.glm_dir)

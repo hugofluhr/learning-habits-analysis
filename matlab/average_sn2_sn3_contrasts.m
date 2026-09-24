@@ -11,11 +11,17 @@
 %
 % Output mirrors the same layout under session-02-03/.
 %
-% Usage: set root_dir to the model export root, then run.
+% Usage: inject root_dir (the model export root), then run.
 
 %% ---- configuration -------------------------------------------------------
 
-root_dir = '/Users/hugofluhr/phd_local/data/LearningHabits/spm_outputs_noSDC/session_split/glm2_chosen_all_runs_scrubbed_2025-12-11-11-22';
+if ~exist('root_dir', 'var') || isempty(root_dir)
+    error('Set root_dir to the model export root (contains session-02/ and session-03/).');
+end
+if ~exist('spmpath', 'var') || isempty(spmpath)
+    spmpath = '/home/hfluhr/repos/spm12';
+end
+addpath(spmpath);
 
 sn2_dir  = fullfile(root_dir, 'session-02');
 sn3_dir  = fullfile(root_dir, 'session-03');
