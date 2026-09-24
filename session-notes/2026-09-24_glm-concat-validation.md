@@ -56,11 +56,11 @@ collinearity; the per-session `response` / `purple_frame` contrasts are not a us
 
 | What | State |
 |---|---|
-| `matlab/first_lvl/glm2_all_runs_concat.m` | branch `glm-concat` (`38990bc`, comments in `a7e5d57`, `88ba078`); pushed |
-| `scripts/check_concat_design.py`, `scripts/compare_concat_vifs.py` | branch `glm-concat` (`a7e5d57`); pushed |
-| `scripts/check_concat_pmods.m`, `scripts/compare_concat_estimates.m`, `scripts/check_concat_response_betas.py`, this note | branch `glm-concat` (`88ba078`); pushed |
+| `matlab/first_lvl/glm2_all_runs_concat.m` | merged to `main` (PR #3, squash `a91f2c1`) |
+| `scripts/check_concat_design.py`, `scripts/compare_concat_vifs.py` | merged to `main` (PR #3, `a91f2c1`) |
+| `scripts/check_concat_pmods.m`, `scripts/compare_concat_estimates.m`, `scripts/check_concat_response_betas.py`, this note | merged to `main` (PR #3, `a91f2c1`) |
 
-Everything on this branch is a new file; no existing tracked file is edited, to avoid conflicts with other work.
+Everything in PR #3 is a new file; no existing tracked file is edited, to avoid conflicts with other work.
 
 ## Data produced (cluster, sub-01 only)
 
@@ -73,17 +73,15 @@ Verified as above (findings 1–4). No other subjects run: only sub-01 and sub-1
 
 ## Git state at session end
 
-PR #2 (`spm-cluster-port` → `main`) was squash-merged as `c020c29`. `glm-concat` was then rebased onto it
-(`git rebase --onto origin/main 2216712 glm-concat`), leaving four commits on top of `main`: `2c92847` (brief),
-`38990bc`, `a7e5d57`, `88ba078`, plus the commit that updates this note. Force-pushed; the cluster worktree
-`~/repos/lh-concat` was reset to `origin/glm-concat`. No PR is open for `glm-concat` yet.
+PR #2 (`spm-cluster-port` → `main`) was squash-merged as `c020c29`. `glm-concat` was rebased onto it
+(`git rebase --onto origin/main 2216712 glm-concat`) and PR #3 was squash-merged as `a91f2c1`. The branch and both
+`lh-concat` worktrees (local and cluster) were then removed. This note was last updated directly on `main`.
 
 ## Open threads
 
-1. Decide whether to open a PR for `glm-concat` → `main` (all new files, no shared code touched).
-2. Run sub-15 (per-session `glm2_all_runs` + concat) and repeat the design, VIF and beta checks.
-3. Decide whether the run-level Hval offset (finding 3) is acceptable; if not, try a per-run z-scored Hval variant.
-4. Group level: `add_session_contrasts_glm2.m` and `submit_downstream.sh contrasts` do not apply to this design, and base
+1. Run sub-15 (per-session `glm2_all_runs` + concat) and repeat the design, VIF and beta checks.
+2. Decide whether the run-level Hval offset (finding 3) is acceptable; if not, try a per-run z-scored Hval variant.
+3. Group level: `add_session_contrasts_glm2.m` and `submit_downstream.sh contrasts` do not apply to this design, and base
    contrasts have one weight where the per-session model sums three (slope ≈ 3 in finding 4).
-5. `srun` MATLAB failed on some nodes with a container `resolv.conf` mount error (L4 nodes and `u24-cva0000-129`);
+4. `srun` MATLAB failed on some nodes with a container `resolv.conf` mount error (L4 nodes and `u24-cva0000-129`);
    `--exclude` of those nodes worked.
