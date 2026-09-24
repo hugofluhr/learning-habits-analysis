@@ -1,28 +1,22 @@
 #!/bin/bash
-# Submit the steps after a first level (session contrasts -> export -> second level) on the cluster.
+# Submit the steps that follow a first level, one SLURM job per step.
 #
-# Usage (from the repo root, on the cluster):
-#   bash scripts/submit_downstream.sh <step> <glm>
-#     <glm>   first-level output folder name under $OUTPUTS_DIR (or a full path)
-#     <step>  contrasts  append per-session t-contrasts to every SPM.mat (add_session_contrasts_glm2.m)
-#             export     export contrast images by session into $EXPORTS_DIR/<glm> (+ create symlinks)
-#             second     one-sample t-tests for allruns/ and session-0X/ (second_lvl/second_lvl_all_runs.m)
-#             sn23       average session-02 + session-03 images, then second level on them
-#             all        contrasts -> export -> second -> sn23, chained with afterok dependencies
+# Usage: bash scripts/submit_downstream.sh <step> <glm>
+#   <glm>   first-level folder name under $OUTPUTS_DIR, or a full path
+#   <step>  contrasts | export | second | sn23 | all
+#     contrasts  per-session t-contrasts appended to each SPM.mat
+#     export     contrast images by session, into $EXPORTS_DIR/<glm>
+#     second     one-sample t-tests for allruns/ and session-0X/
+#     sn23       average session-02 and session-03, then one-sample t-tests
+#     all        all four; second and sn23 both wait for export
 #
-# Examples:
-#   bash scripts/submit_downstream.sh all glm2_chosen_all_runs_scrubbed_2026-09-23-15-00
-#   CONNAMES="{'first_stim','first_stimxQval','first_stimxHval','second_stim','second_stimxQval','second_stimxHval','response','purple_frame'}" \
-#       bash scripts/submit_downstream.sh contrasts glm2_all_runs_scrubbed_2026-09-23-15-00
-#   DRY_RUN=1 bash scripts/submit_downstream.sh export <glm>      # print the job, sbatch --test-only
-#
-# Environment: CONNAMES (MATLAB cell literal; default = add_session_contrasts_glm2.m's own list, which
-# fits glm2_chosen_all_runs), DEPENDENCY (job id to wait for), SPM_PATH, OUTPUTS_DIR, EXPORTS_DIR.
+# Environment: CONNAMES (MATLAB cell, e.g. "{'first_stim','second_stim'}"; the default list fits
+# glm2_chosen_all_runs), DEPENDENCY, DRY_RUN=1, SPM_PATH, OUTPUTS_DIR, EXPORTS_DIR, EXCLUDE.
 
 set -euo pipefail
 
 if [ "$#" -ne 2 ]; then
-    sed -n '2,20p' "$0" >&2
+    sed -n '2,14p' "$0" >&2
     exit 1
 fi
 STEP="$1"
@@ -32,9 +26,7 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 SPM_PATH="${SPM_PATH:-/home/hfluhr/repos/spm12}"
 OUTPUTS_DIR="${OUTPUTS_DIR:-/home/hfluhr/data/learninghabits/spm_format/outputs}"
 EXPORTS_DIR="${EXPORTS_DIR:-/home/hfluhr/data/learninghabits/spm_outputs}"
-# MATLAB runs in an Apptainer container, which fails on the L4 GPU nodes u24-cva0ls0-[509-516]
-# ("Failed to create user namespace: Permission denied", seen 2026-09-23). Exclude them;
-# override with EXCLUDE="" or another node list.
+# MATLAB's Apptainer container fails on these GPU nodes ("Failed to create user namespace")
 EXCLUDE="${EXCLUDE-u24-cva0ls0-[509-516]}"
 
 if [[ "$GLM" == */* ]]; then GLM_ROOT="$GLM"; else GLM_ROOT="${OUTPUTS_DIR}/${GLM}"; fi
@@ -46,8 +38,6 @@ if [ ! -d "$GLM_ROOT" ]; then
 fi
 mkdir -p "${GLM_ROOT}/logs" "${EXPORT_ROOT}/logs"
 
-# submit_job <name> <time> <log_dir> <matlab statements> [extra shell run after MATLAB]
-# Prints the job id.
 submit_job() {
     local name="$1" time="$2" log_dir="$3" mcmd="$4" post="${5:-}"
     local dep_args=() test_args=()
@@ -80,8 +70,7 @@ EOF
     echo "$job" | sbatch --parsable ${dep_args[@]+"${dep_args[@]}"} ${test_args[@]+"${test_args[@]}"}
 }
 
-# Step 2's symlinks: MATLAB's system() was unreliable on the VM, so the export writes
-# manifests ('copy', false) and the shell creates the links from them.
+# Fallback for links the export's system() call didn't create (it failed on the VM)
 read -r -d '' SYMLINKS <<'EOF' || true
 n_made=0
 if [ -f "$EXPORT_ROOT/allruns/contrasts_manifest.tsv" ]; then
@@ -115,8 +104,7 @@ run_step() {
             submit_job "second_lvl" "04:00:00" "${EXPORT_ROOT}/logs" \
                 "spmpath = '${SPM_PATH}'; export_root = '${EXPORT_ROOT}'; run('${REPO}/matlab/second_lvl/second_lvl_all_runs.m');" ;;
         sn23)
-            # Two separate MATLAB sessions, so the second-level script can't pick up variables
-            # left over from the averaging script (neither clears its workspace).
+            # Separate MATLAB sessions: neither script clears its workspace
             submit_job "second_lvl_sn23" "02:00:00" "${EXPORT_ROOT}/logs" \
                 "spmpath = '${SPM_PATH}'; root_dir = '${EXPORT_ROOT}'; run('${REPO}/matlab/average_sn2_sn3_contrasts.m');" \
                 "matlab -batch \"spmpath = '${SPM_PATH}'; export_root = '${EXPORT_ROOT}'; run('${REPO}/matlab/second_lvl_sn2_sn3.m');\"" ;;
@@ -128,14 +116,17 @@ run_step() {
 echo "First level: ${GLM_ROOT}" >&2
 echo "Export:      ${EXPORT_ROOT}" >&2
 if [ "$STEP" = "all" ]; then
-    for s in contrasts export second sn23; do
+    for s in contrasts export; do
         id=$(run_step "$s")
         echo "${s}: job ${id}" >&2
-        # sn23 needs the export, not the second level, but chaining keeps the order simple
         [ "${DRY_RUN:-0}" = "1" ] || DEPENDENCY="${id%%;*}"
+    done
+    for s in second sn23; do
+        id=$(run_step "$s")
+        echo "${s}: job ${id}" >&2
     done
 else
     id=$(run_step "$STEP")
     echo "${STEP}: job ${id}" >&2
-    echo "$id"   # stdout, so callers can chain: DEPENDENCY=$(bash submit_downstream.sh contrasts <glm>)
+    echo "$id"
 fi
