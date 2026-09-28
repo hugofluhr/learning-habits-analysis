@@ -12,8 +12,8 @@ Checks on whether the concat models' H-value effects could come from run-level d
 ### 1. More than half of the chosen-H regressor is between-run variance, and it is a near-linear function of run order
 Second-level sample (59 subjects), share of trial-level variance between runs, median [IQR]: chosen H 0.55 [0.52–0.58] (min 0.43), GLM1 concat first/second-stim H 0.41 / 0.43, all Q modulators 0.00–0.02. Median chosen-H run means −1.03 / −0.04 / +0.76 (learning 1 / learning 2 / test), so the run-level part rises ~0.9 z-units per run in every subject; the rise from learning 1 to test barely varies across subjects (+1.79, IQR +1.74 to +1.83). Consequences: the H effect in the concat models is confounded with run order to the extent it rests on this component; a between-subject covariate test on the z-scored rise has almost no leverage; the Q loss is not explained by Q's own between-run variance (≈ 0). `python scripts/concat_between_run_variance.py --out <csv>` (commit `69cc7a5`); per-subject table on the cluster: `spm_outputs/compare_second_lvl_2026-09-24-14-56/concat_between_run_variance.csv`.
 
-### 2. Check 2 (H split): the bilateral DLS effect is carried by within-run H; vmPFC mostly by the run-level part
-`glm2_chosen_all_runs_concat_hsplit_scrubbed_2026-09-28-10-25` (N = 59): chosen H split into within-run (deviation from run mean) and between-run (run mean) modulators, which sum to H. VIF median/max: Q 1.5/2.0, H within 1.7/2.2, H between 4.1/5.5. H within alone: DLS right (27, 9, 6) k 15 t 4.81 cluster p .013, left (−27, 9, 2) k 14 t 4.01 p .015; M1 (−12, −33, 72) k 160 p < .001; vmPFC only 2 voxels (p .025). H between: DLS (30, 9, 2) k 26 p .003, (−27, 9, 6) k 16 p .011; vmPFC (−3, 42, −15) k 7 p .009. So the DLS and M1 results do not depend on run order; the vmPFC effect largely does. Q_chosen is unchanged by the split (right VS k 7 p .010, left VS 1 voxel p .035), so the Q loss comes from the concat design, not from how H is modelled. Clusters: `clusters('glm2_chosen_all_runs_concat_hsplit_scrubbed_2026-09-28-10-25', 'hval')` with the second code block in the 2026-09-24 note; VIF: `spm_outputs/glm2_chosen_all_runs_concat_hsplit_scrubbed_2026-09-28-10-25/vif_report/`.
+### 2. Check 2 (H split): both parts of H relate to DLS; within-run H alone is sufficient; vmPFC mostly run-level
+`glm2_chosen_all_runs_concat_hsplit_scrubbed_2026-09-28-10-25` (N = 59): chosen H split into within-run (deviation from run mean) and between-run (run mean) modulators, which sum to H. VIF median/max: Q 1.5/2.0, H within 1.7/2.2, H between 4.1/5.5. H within alone: DLS right (27, 9, 6) k 15 t 4.81 cluster p .013, left (−27, 9, 2) k 14 t 4.01 p .015; M1 (−12, −33, 72) k 160 p < .001; vmPFC only 2 voxels (p .025). H between: DLS (30, 9, 2) k 26 p .003, (−27, 9, 6) k 16 p .011; vmPFC (−3, 42, −15) k 7 p .009. So within-run H alone is sufficient for the DLS and M1 effects, i.e. they do not depend on the run-level component; but the run-level component also loads on DLS, more strongly (and is confounded with run order). *Corrected 2026-09-28: an earlier wording said the DLS effect is "carried by" within-run H, which wrongly implied the run-level part contributes nothing.* The vmPFC effect largely rests on the run-level part. Q_chosen is unchanged by the split (right VS k 7 p .010, left VS 1 voxel p .035), so the Q loss comes from the concat design, not from how H is modelled. Clusters: `clusters('glm2_chosen_all_runs_concat_hsplit_scrubbed_2026-09-28-10-25', 'hval')` with the second code block in the 2026-09-24 note; VIF: `spm_outputs/glm2_chosen_all_runs_concat_hsplit_scrubbed_2026-09-28-10-25/vif_report/`.
 
 ### 3. The choice variable is ~97 % chosen Q, yet GLM3 shows no VS effect
 Per-subject trial-level correlation of `chosen_choice_val_zscore` with chosen Q: median r 0.97 (0.78–1.00); with chosen H 0.60; Q–H 0.40. GLM3 has nothing in VS but strong posterior putamen (−33, −12, 2; k 30, t 5.59, p .002 in Guida), where GLM2 chosen Q_chosen has VS. Hypothesis (not tested): with H in the model (GLM2 chosen), Q's beta is its effect beyond H, and the VS Q effect may depend on H absorbing shared variance; GLM3's single regressor also picks up what it shares with H. Test: GLM2 chosen with Q only.
@@ -160,6 +160,62 @@ for run, cons in models:
                 print(run, con, lev, reg, x[['x', 'y', 'z', 'cluster_k', 'peak_t', 'cluster_p_fwe']].round(3).values.tolist())
 ```
 
+### 9. Within-run H is largely trial order, especially in learning 1
+Per subject and run, median r(chosen H, trial position within run): learning 1 0.83 [IQR 0.80–0.85], learning 2 0.46, test 0.37; Q: 0.16 / 0.00 / −0.02. So a within-run H effect cannot be separated from any drift of the stimulus response over the run without modelling time; the H split (finding 2) does not address this. Code: second half of the block below.
+
+### 10. Per session, the DLS H effect is only in session 1; whole-mask averages are uninformative
+Per-session GLM2 chosen, chosen H, DLS (Guida) SVC: session 1 (−30, −3, −1) k 24 cluster p .004 and (27, 6, 6) k 6 p .051; sessions 2, 3 and 2+3: no suprathreshold voxel. Session 1 is the VIF-inflated session where within-run H ≈ trial order (finding 9). Averages over the whole Guida mask (605 voxels) are ≈ 0 for every H beta (per-session, Sn2+3, concat within, concat unsplit; all |t| < 1.2), because the effect is focal: that check ("check 1") could not answer the question. Code: first half of the block below; per-session SVC from the peak tables.
+
+```python
+# Findings 9-10: whole-Guida-mask H betas per model/session, and within-run H vs trial order
+import nibabel as nib, numpy as np, pandas as pd, scipy.io as sio
+from scipy import stats
+from nilearn.image import resample_to_img
+O = '/home/hfluhr/data/learninghabits/spm_outputs'
+mask = nib.load('/home/hfluhr/data/learninghabits/masks/MNI152NLin2009cAsym/habit_Guida2022_MNI152NLin2009cAsym.nii')
+def inputs(d):
+    S = sio.loadmat(f'{d}/SPM.mat', squeeze_me=True, struct_as_record=False)['SPM']
+    return [str(p).strip().split(',')[0] for p in np.atleast_1d(S.xY.P)]
+def sid(f):
+    i = f.find('sub-'); return f[i:i + 6]
+def roi_means(d):
+    files = inputs(d)
+    ref = nib.load(files[0])
+    roi = np.squeeze(resample_to_img(mask, ref, interpolation='nearest').get_fdata()) > 0
+    return pd.Series({sid(f): np.nanmean(np.squeeze(nib.load(f).get_fdata())[roi]) for f in files})
+
+print('=== Check 1: chosen-H betas, subject means over the whole Guida mask (a priori)')
+ps = 'glm2_chosen_all_runs_scrubbed_2026-09-24-14-56'
+cols = {f'per-session {l}': f'{O}/{ps}/second-lvl/{l}/second_stimxhval_chosen' for l in ['session-01', 'session-02', 'session-03', 'session-02-03']}
+cols['concat within-run H'] = f'{O}/glm2_chosen_all_runs_concat_hsplit_scrubbed_2026-09-28-10-25/second-lvl/allruns/second_stimxhvalwithin_chosen'
+cols['concat H (unsplit)'] = f'{O}/glm2_chosen_all_runs_concat_scrubbed_2026-09-24-17-40/second-lvl/allruns/second_stimxhval_chosen'
+df = pd.DataFrame({k: roi_means(v) for k, v in cols.items()}).dropna()
+print(f'n = {len(df)} subjects')
+for c in df:
+    x = df[c]; t, p = stats.ttest_1samp(x, 0)
+    print(f'  {c:24s} mean {x.mean():+.4f}  SD {x.std():.4f}  t({len(x)-1}) = {t:+.2f}  p = {p:.4f}  % subjects > 0: {100*(x > 0).mean():.0f}')
+s = df[['per-session session-01', 'per-session session-02', 'per-session session-03']]
+m, se = s.mean(), s.std() / np.sqrt(len(s))
+w = 1 / se**2
+comb = (w * m).sum() / w.sum(); comb_se = 1 / np.sqrt(w.sum())
+print(f'  inverse-variance-weighted combination of sessions 1-3: {comb:+.4f}, z = {comb/comb_se:+.2f}  (weights {dict((k.split()[-1], round(v / w.sum(), 2)) for k, v in w.items())})')
+print('  correlation across subjects, concat within-run H vs per-session betas:', {c.split()[-1]: round(df['concat within-run H'].corr(df[c]), 2) for c in s})
+
+print('\n=== Check 2a: within-run H (and Q) vs trial order, per subject and run')
+b = pd.read_csv('/home/hfluhr/data/learninghabits/bbt_062026_mf_cols.csv')
+b = b[b.block.isin(['learning1', 'learning2', 'test']) & b.action.notna() & ~b.sub_id.isin(['sub-04', 'sub-45', 'sub-44', 'sub-48', 'sub-68', 'sub-17', 'sub-31'])].copy()
+b['trial'] = b.groupby(['sub_id', 'block']).t_second_stim.rank()
+r = b.groupby(['block', 'sub_id']).apply(lambda g: pd.Series({'r(H, trial)': g.chosen_value_ck_zscore.corr(g.trial),
+                                                               'r(Q, trial)': g.chosen_value_rl_zscore.corr(g.trial)}))
+print(r.groupby('block').agg(['median', lambda x: x.quantile(.25), lambda x: x.quantile(.75)]).round(2).rename(columns={'<lambda_0>': 'q25', '<lambda_1>': 'q75'}).to_string())
+```
+
+### 11. With within-run trial order in the model, within-run H loses the voxel-level DLS effect; trial order itself loads on DLS
+`glm2_chosen_all_runs_concat_hsplit_time_scrubbed_2026-09-28-12-59`: the H-split model plus a second-stimulus modulator for trial rank within run, demeaned per run (commit `195380f`). VIF median/max: H within 1.9/2.3, trial order 3.0/3.5, H between 4.1/5.5, Q 1.5/2.0. SVC: H within no longer has any DLS/putamen cluster (keeps M1 (−12, −33, 72) and (15, −36, 72), p .014/.015, and parietal (15, −51, 62) k 59 p < .001); trial order: DLS (27, 12, 6) k 12 p .018, (−27, 3, 2) k 27 p .002, putamen (−30, 3, −1) k 26 p .002; H between unchanged in DLS (30, 9, 2) k 27 p .003 and vmPFC (k 7, p .009); Q_chosen VS 2 + 1 voxels. *My first reading ("the within-run DLS effect is explained by trial order") read a voxel-level null as a zero effect and was withdrawn after finding 12.*
+
+### 12. Within-run H relates to DLS beyond a linear time trend (ROI-level): time explains ~25–30 % of it
+Beta size in DLS, H split vs H split + time. First done in 6 mm spheres at the manuscript's GLM2 chosen peaks: ratio 0.66/0.69, remaining effect p ≈ .03; discarded because those peaks come from the invalid, session-1-driven per-session map (Hugo). Redone with a leave-one-subject-out ROI (6 mm sphere at the peak of the other 58 subjects' within-run H map, H split without time, inside the Guida mask; peaks (−27, 9, 2) in 56/59 folds, (27, 9, 6) in 59/59): left H within +0.233 (SE 0.076, p .003) → +0.177 with time (SE 0.076, 95 % CI [+0.03, +0.33], p .024); right +0.214 (p < .001) → +0.147 (CI [+0.03, +0.26], p .015); ratio 0.76 / 0.69, drop significant (paired p .028 / .004), SE unchanged (a real reduction, not lost power); trial order +0.005/trial (p .024 / .002). Both remaining effects survive Bonferroni for 2 hemispheres (just, on the left). So: DLS tracks H beyond a linear within-run time trend at ROI level, not voxel-level FWE; the run-level part of H stays confounded with run order; time control is linear only. `python scripts/loso_roi_time_check.py`.
+
 ---
 
 ## Code shipped (branch `model-reruns`)
@@ -169,11 +225,14 @@ for run, cons in models:
 | `69cc7a5` | `scripts/concat_between_run_variance.py` |
 | `48f5d64` | `glm2_chosen_all_runs_concat_hsplit.m` (check 2) and this note |
 | `45d4371` | `scripts/compare_models_second_lvl.py` (finding 5) |
+| `195380f` | `glm2_chosen_all_runs_concat_hsplit_time.m` (finding 11) |
+| (this commit) | `scripts/loso_roi_time_check.py` (finding 12) |
 
 ## Open threads
-1. GLM2 chosen with Q only (per-session, possibly concat): does the VS Q effect depend on H being in the model (findings 3, 5)? The model-free value and choice-variable maps already point that way.
-2. vmPFC test-session effect (findings 5, 8; chosen-value regressors only): how to report it (per-session results are not preregistered); why learning 2 trends negative (finding 7); whether repetition of the 8 learning pairs, no feedback, or converged values make test different (finding 6).
-3. Dilution vs cancellation of the vmPFC effect: subject-level counterfactual (session 2 demeaned, noise kept) not run; the group-mean arithmetic is in finding 7.
-4. The Q-value loss in both concat models: not caused by how H is modelled (finding 2); candidates are the shared onset regressor and the Q/H suppression (findings 3, 5).
-5. vmPFC H effect in the concat models rests mostly on the between-run component: treat as unconfirmed.
-6. Between-subject covariate test on the H rise: little leverage on the z scale (finding 1). Learning-runs-only concat variant: not run.
+1. H vs time: the within-run H effect in DLS survives a linear time trend at ROI level (finding 12). Robustness: quadratic/nonlinear time; is the trial-order increase specific to the second stimulus (add time to first stimulus and response)?
+2. The run-level part of H (55 % of its variance, stronger DLS clusters) cannot be separated from run order; the experiment-wide time regressor on the unsplit concat would show whether H and elapsed time are separable at all.
+3. GLM2 chosen with Q only: does the VS Q effect depend on H being in the model (findings 3, 5)?
+4. vmPFC test-session effect (findings 5, 8): how to report it; why learning 2 trends negative; repetition vs no feedback vs converged values.
+5. Dilution vs cancellation of the vmPFC effect: subject-level counterfactual not run (finding 7 has the group-mean arithmetic).
+6. The Q-value loss in both concat models: candidates are the shared onset regressor and the Q/H suppression.
+7. vmPFC H effect in the concat models rests mostly on the between-run component: treat as unconfirmed.
