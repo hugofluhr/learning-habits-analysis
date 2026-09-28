@@ -1,9 +1,9 @@
 # Session log: bulletproofing the concat models
 
-**Date:** 2026-09-25 (check 2 set up 2026-09-28)
+**Date:** 2026-09-25 to 2026-09-28 (between-run check on the 25th; H split, model-free audit, model comparison and vmPFC on the 28th)
 **Companion note:** [2026-09-24_tier1-reruns-and-second-level-comparison.md](2026-09-24_tier1-reruns-and-second-level-comparison.md) (the concat models' results, open thread 1: bulletproof the GLM2 chosen concat and understand the Q-value loss)
 
-Checks on whether the concat models' H-value effects could come from run-level differences rather than trial-by-trial H. Hugo's framing: the between-run differences of H are real signal (slow accumulation of choice history), so demeaning H within runs is not an option; the question is whether the data can separate that signal from anything else that changes across runs.
+Checks on whether the concat models' H-value effects could come from run-level differences rather than trial-by-trial H; then a model-free audit, a full model-free vs GLM2 chosen comparison, and a test-session vmPFC value effect that pooled analyses had hidden. Hugo's framing: the between-run differences of H are real signal (slow accumulation of choice history), so demeaning H within runs is not an option; the question is whether the data can separate that signal from anything else that changes across runs.
 
 ---
 
@@ -92,6 +92,74 @@ lv = b.groupby('block').chosen_stim_value.value_counts(normalize=True).unstack()
 print('share of choices by chosen value (pooled):'); print(lv.to_string())
 ```
 
+### 7. Pooled analyses hide the vmPFC effect through dilution plus a negative session-2 trend
+In the vmPFC voxels significant in session 3 (98 / 102 voxels), group effect by level, GLM2 chosen Q / model-free value: session 1 −0.01 / +0.05, session 2 −0.23 / −0.23, session 3 +0.57 / +0.55, Sn2+Sn3 +0.17 / +0.16, all runs +0.33 / +0.37, GLM2 chosen concat +0.06. Session 2 as an ROI-average one-sample test (ROI from session 3, not circular for session 2): t(58) = −1.93, p = .058 (GLM2 chosen) and −2.45, p = .018 (model-free value); no voxel below t −3.23. A marginal negative trend. Dilution and cancellation both contribute (arithmetic on the group means, GLM2 chosen): with session 2 at 0, Sn2+Sn3 would be +0.285 (observed +0.17) and all runs +0.56 (observed +0.33); dilution alone roughly halves the effect, the session-2 trend removes ~40 % of the rest. t-values also depend on variance; the subject-level counterfactual (session 2 demeaned, noise kept) was not run.
+
+```python
+# Finding 7a: effect and t in the session-3 vmPFC cluster at each level
+import nibabel as nib, numpy as np
+from nilearn.image import resample_to_img
+O = '/home/hfluhr/data/learninghabits/spm_outputs'
+mask = nib.load('/home/hfluhr/data/learninghabits/masks/MNI152NLin2009cAsym/vmpfc_bartra2013_MNI152NLin2009cAsym.nii')
+for name, run, con, lev_concat in [('GLM2 chosen Q', 'glm2_chosen_all_runs_scrubbed_2026-09-24-14-56', 'second_stimxqval_chosen', ('glm2_chosen_all_runs_concat_scrubbed_2026-09-24-17-40', 'second_stimxqval_chosen')),
+                                   ('model-free value', 'glm2_mf_chosenval_2026-09-24-14-56', 'second_stimxchosenval', None)]:
+    ref = nib.load(f'{O}/{run}/second-lvl/session-03/{con}/spmT_0001.nii')
+    t3 = np.squeeze(ref.get_fdata())
+    m = np.squeeze(resample_to_img(mask, ref, interpolation='nearest').get_fdata()) > 0
+    roi = m & (t3 > 3.23)   # vmPFC voxels significant at p < .001 in session 3 (df 58)
+    print(f'== {name}: ROI = {roi.sum()} vmPFC voxels with session-3 t > 3.23')
+    levels = [(l, f'{O}/{run}/second-lvl/{l}/{con}') for l in ['session-01', 'session-02', 'session-03', 'session-02-03', 'allruns']]
+    if lev_concat: levels.append(('concat allruns', f'{O}/{lev_concat[0]}/second-lvl/allruns/{lev_concat[1]}'))
+    for l, d in levels:
+        t = np.squeeze(nib.load(f'{d}/spmT_0001.nii').get_fdata())
+        c = np.squeeze(nib.load(f'{d}/con_0001.nii').get_fdata())
+        print(f'  {l:15s} mean t {np.nanmean(t[roi]):5.2f}   max t {np.nanmax(t[roi]):5.2f}   mean group effect (con) {np.nanmean(c[roi]):+.3f}')
+```
+
+```python
+# Finding 7b: subject-level ROI means per session, one-sample t-tests
+import nibabel as nib, numpy as np, scipy.io as sio
+from scipy import stats
+from nilearn.image import resample_to_img
+O = '/home/hfluhr/data/learninghabits/spm_outputs'
+mask = nib.load('/home/hfluhr/data/learninghabits/masks/MNI152NLin2009cAsym/vmpfc_bartra2013_MNI152NLin2009cAsym.nii')
+def inputs(spm_dir):
+    S = sio.loadmat(f'{spm_dir}/SPM.mat', squeeze_me=True, struct_as_record=False)['SPM']
+    return [str(p).strip().split(',')[0] for p in np.atleast_1d(S.xY.P)]
+for name, run, con in [('GLM2 chosen Q', 'glm2_chosen_all_runs_scrubbed_2026-09-24-14-56', 'second_stimxqval_chosen'),
+                       ('model-free value', 'glm2_mf_chosenval_2026-09-24-14-56', 'second_stimxchosenval')]:
+    ref = nib.load(f'{O}/{run}/second-lvl/session-03/{con}/spmT_0001.nii')
+    roi = (np.squeeze(resample_to_img(mask, ref, interpolation='nearest').get_fdata()) > 0) & (np.squeeze(ref.get_fdata()) > 3.23)
+    print(f'== {name} (ROI {roi.sum()} voxels, from session 3)')
+    for lev in ['session-01', 'session-02', 'session-03']:
+        files = inputs(f'{O}/{run}/second-lvl/{lev}/{con}')
+        v = np.array([np.nanmean(np.squeeze(nib.load(f).get_fdata())[roi]) for f in files])
+        t, p = stats.ttest_1samp(v, 0)
+        print(f'  {lev}: n {len(v)}, mean {v.mean():+.3f}, t({len(v)-1}) = {t:+.2f}, p two-sided = {p:.4f}' + ('  (ROI defined here: circular)' if lev == 'session-03' else ''))
+    t2 = np.squeeze(nib.load(f'{O}/{run}/second-lvl/session-02/{con}/spmT_0001.nii').get_fdata())
+    print(f'  session-02 voxel t in ROI: min {np.nanmin(t2[roi]):.2f}, voxels with t < -3.23: {(t2[roi] < -3.23).sum()}')
+```
+
+### 8. VS and vmPFC by session: VS in test strongest with H in the model; the test vmPFC effect is specific to chosen-value regressors
+Test session (session 3), SVC: GLM2 chosen Q_chosen VS bilateral (9, 9, −4) k 10 p .006 and (−9, 9, −4) k 12 p .004, vmPFC k 97; GLM3 choice variable VS none, vmPFC (0, 42, −4) k 95 t 5.21 p < .001; model-free value VS k 3 p .021, vmPFC k 102; GLM1 per-stimulus Q VS small (first stim k 4 + 3, second stim k 5), vmPFC none. Learning sessions: VS 0–2 voxels in every model, so the all-runs VS effects come from pooling. So VS follows the Q-with-H pattern (finding 5) and the test vmPFC effect appears for every chosen-value regressor (three models) but not for per-stimulus Q.
+
+```python
+# Finding 8: VS and vmPFC SVC clusters per session and model (peak tables from svc_report.m)
+import pandas as pd
+SVC = '/home/hfluhr/data/learninghabits/spm_outputs/compare_second_lvl_2026-09-24-14-56/svc'
+models = [('glm2_all_runs_scrubbed_2026-09-24-14-56', ['first_stimxqval', 'second_stimxqval']),
+          ('glm2_chosen_all_runs_scrubbed_2026-09-24-14-56', ['second_stimxqval_chosen']),
+          ('glm3_chosen_choice_var_scrubbed_2026-09-24-14-56', ['second_stimxchoiceval_chosen']),
+          ('glm2_mf_chosenval_2026-09-24-14-56', ['second_stimxchosenval'])]
+for run, cons in models:
+    d = pd.read_csv(f'{SVC}/{run}.csv').dropna(subset=['peak_t']).drop_duplicates(['model', 'region', 'cluster_k', 'cluster_p_fwe'])
+    for con in cons:
+        for lev in ['session-01', 'session-02', 'session-03', 'allruns']:
+            for reg in ['striatum_bartra', 'vmpfc_bartra']:
+                x = d[(d.model == f'{lev}/{con}') & (d.region == reg) & ((d.cluster_p_fwe < .05) | (d.peak_p_fwe < .05))]
+                print(run, con, lev, reg, x[['x', 'y', 'z', 'cluster_k', 'peak_t', 'cluster_p_fwe']].round(3).values.tolist())
+```
+
 ---
 
 ## Code shipped (branch `model-reruns`)
@@ -100,11 +168,12 @@ print('share of choices by chosen value (pooled):'); print(lv.to_string())
 |---|---|
 | `69cc7a5` | `scripts/concat_between_run_variance.py` |
 | `48f5d64` | `glm2_chosen_all_runs_concat_hsplit.m` (check 2) and this note |
-| (this commit) | `scripts/compare_models_second_lvl.py` (finding 5) |
+| `45d4371` | `scripts/compare_models_second_lvl.py` (finding 5) |
 
 ## Open threads
-1. ~~Check 2~~ done (finding 2). Next: GLM2 chosen with Q only (per-session and concat), to test whether the VS Q effect depends on H being in the model (finding 3) and to explain the Q loss.
-2. Between-subject covariate test (does a larger H rise predict a larger increase in DLS stimulus response across runs): only on the raw H scale, if at all (finding 1).
-3. Learning runs only (runs 1 + 2) variant, to remove the learning/test phase change as an alternative explanation.
-4. The Q-value loss in both concat models: not caused by how H is modelled (finding 2); candidates are the shared onset regressor and the Q/H suppression in finding 3.
+1. GLM2 chosen with Q only (per-session, possibly concat): does the VS Q effect depend on H being in the model (findings 3, 5)? The model-free value and choice-variable maps already point that way.
+2. vmPFC test-session effect (findings 5, 8; chosen-value regressors only): how to report it (per-session results are not preregistered); why learning 2 trends negative (finding 7); whether repetition of the 8 learning pairs, no feedback, or converged values make test different (finding 6).
+3. Dilution vs cancellation of the vmPFC effect: subject-level counterfactual (session 2 demeaned, noise kept) not run; the group-mean arithmetic is in finding 7.
+4. The Q-value loss in both concat models: not caused by how H is modelled (finding 2); candidates are the shared onset regressor and the Q/H suppression (findings 3, 5).
 5. vmPFC H effect in the concat models rests mostly on the between-run component: treat as unconfirmed.
+6. Between-subject covariate test on the H rise: little leverage on the z scale (finding 1). Learning-runs-only concat variant: not run.
