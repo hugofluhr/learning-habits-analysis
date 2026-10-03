@@ -230,7 +230,7 @@ Beta size in DLS, H split vs H split + time. First done in 6 mm spheres at the m
 
 ## Open threads
 1. H vs time: the within-run H effect in DLS survives a linear time trend at ROI level (finding 12). Robustness: quadratic/nonlinear time; is the trial-order increase specific to the second stimulus (add time to first stimulus and response)?
-2. The run-level part of H (55 % of its variance, stronger DLS clusters) cannot be separated from run order; the experiment-wide time regressor on the unsplit concat would show whether H and elapsed time are separable at all.
+2. The run-level part of H (55 % of its variance, stronger DLS clusters) cannot be separated from run order; the experiment-wide time regressor on the unsplit concat would show whether H and elapsed time are separable at all. *2026-10-01: confirmed not yet run (no unsplit-H + time model exists); check its VIF from the bbt first, see `2026-10-01_roi-betas-by-run.md` finding 4.*
 3. GLM2 chosen with Q only: does the VS Q effect depend on H being in the model (findings 3, 5)?
 4. vmPFC test-session effect (findings 5, 8): how to report it; why learning 2 trends negative; repetition vs no feedback vs converged values.
 5. Dilution vs cancellation of the vmPFC effect: subject-level counterfactual not run (finding 7 has the group-mean arithmetic).
